@@ -1,0 +1,16 @@
+Haber Çekme
+python main.py news --count 10 --category ekonomi --scraping --verbose
+
+TTS Dönüştürme
+# Text'ten:
+python main.py tts --text "Merhaba dünya" --voice nova --force
+
+# URL'den:
+python main.py tts --url "https://aa.com.tr/tr/..." --voice alloy
+
+Toplu İşlem
+python main.py batch --category spor --count 15 --voice shimmer --min-chars 300
+
+API Server
+python main.py api
+# → http://localhost:8000/docs
