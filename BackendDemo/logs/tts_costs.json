@@ -790,5 +790,93 @@
     "file_size_bytes": 1546080,
     "processing_time": 12.139922857284546,
     "success": true
+  },
+  {
+    "timestamp": "2025-09-26T20:44:47.641372",
+    "model": "tts-1",
+    "voice": "alloy",
+    "character_count": 1450,
+    "estimated_cost": 2.1749999999999997e-05,
+    "file_path": "audio_outputs\\tts_20250926_204434_Başlık_Temsilciler_Meclisind_9095942a.mp3",
+    "file_size_bytes": 1973760,
+    "processing_time": 13.00929570198059,
+    "success": true
+  },
+  {
+    "timestamp": "2025-09-26T20:44:52.470700",
+    "model": "tts-1",
+    "voice": "alloy",
+    "character_count": 336,
+    "estimated_cost": 5.039999999999999e-06,
+    "file_path": "audio_outputs\\tts_20250926_204447_Başlık_Bursada_orman_yangını_b4035a7b.mp3",
+    "file_size_bytes": 460320,
+    "processing_time": 4.81960391998291,
+    "success": true
+  },
+  {
+    "timestamp": "2025-09-26T20:45:02.213092",
+    "model": "tts-1",
+    "voice": "alloy",
+    "character_count": 714,
+    "estimated_cost": 1.0709999999999999e-05,
+    "file_path": "audio_outputs\\tts_20250926_204452_Başlık_Çiftçilere_bugün_476_63c4d0c7.mp3",
+    "file_size_bytes": 1086240,
+    "processing_time": 9.728485345840454,
+    "success": true
+  },
+  {
+    "timestamp": "2025-09-26T20:45:09.315297",
+    "model": "tts-1",
+    "voice": "alloy",
+    "character_count": 744,
+    "estimated_cost": 1.116e-05,
+    "file_path": "audio_outputs\\tts_20250926_204502_Başlık_Beyaz_Saraydan_Erdoğa_6b8f9a90.mp3",
+    "file_size_bytes": 1012320,
+    "processing_time": 7.022308826446533,
+    "success": true
+  },
+  {
+    "timestamp": "2025-09-26T20:45:18.187149",
+    "model": "tts-1",
+    "voice": "alloy",
+    "character_count": 869,
+    "estimated_cost": 1.3035e-05,
+    "file_path": "audio_outputs\\tts_20250926_204509_Başlık_Cumhurbaşkanı_Erdoğan_f5ae595d.mp3",
+    "file_size_bytes": 1198560,
+    "processing_time": 8.396141290664673,
+    "success": true
+  },
+  {
+    "timestamp": "2025-09-26T20:45:33.622176",
+    "model": "tts-1",
+    "voice": "alloy",
+    "character_count": 1726,
+    "estimated_cost": 2.589e-05,
+    "file_path": "audio_outputs\\tts_20250926_204518_Başlık_İstanbulda_haftanın_s_21199677.mp3",
+    "file_size_bytes": 2373600,
+    "processing_time": 15.423784732818604,
+    "success": true
+  },
+  {
+    "timestamp": "2025-09-26T20:45:46.345246",
+    "model": "tts-1",
+    "voice": "alloy",
+    "character_count": 1038,
+    "estimated_cost": 1.5570000000000002e-05,
+    "file_path": "audio_outputs\\tts_20250926_204533_Başlık_Borsa_günü_düşüşle_tam_1e9914c3.mp3",
+    "file_size_bytes": 1575840,
+    "processing_time": 12.716872930526733,
+    "success": true
+  },
+  {
+    "timestamp": "2025-09-26T20:48:10.107570",
+    "model": "tts-1",
+    "voice": "alloy",
+    "character_count": 1052,
+    "estimated_cost": 1.5779999999999998e-05,
+    "file_path": "audio_outputs\\tts_20250926_204546_Başlık_ABD_Başkanı_Trump_Gaz_fc4a7dc0.mp3",
+    "file_size_bytes": 1418400,
+    "processing_time": 143.59734892845154,
+    "success": true
   }
 ]
