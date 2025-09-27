@@ -4,3 +4,7 @@
 /src/api/endpoints/__pycache__/
 /src/services/__pycache__/
 /src/providers/__pycache__/
+.env
+*.env
+.env.local
+.env.production
