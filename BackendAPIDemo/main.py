@@ -20,8 +20,8 @@ import json
 # Local imports
 from src.config import settings
 from src.api import create_app
-from src.api.content import router as content_router
-from src.api.processing import router as processing_router
+# from src.api.content import router as content_router
+# from src.api.processing import router as processing_router
 
 def setup_logging():
     """Basic logging setup"""
@@ -329,20 +329,16 @@ def cmd_api(args):
     """API command - start web server"""
     print("🌐 Starting API server...")
     
-    # Create FastAPI app
+    # Create FastAPI app - router'lar otomatik dahil edilecek
     app = create_app()
-    
-    # Add routers
-    app.include_router(content_router)
-    app.include_router(processing_router)
-    
-    # Add any new routers here:
-    # app.include_router(game_router)
-    # app.include_router(chat_router)
     
     print(f"🚀 Server starting on {settings.host}:{settings.port}")
     print(f"📚 API Documentation: http://{settings.host}:{settings.port}/docs")
     print(f"🏥 Health Check: http://{settings.host}:{settings.port}/health")
+    print(f"📰 News API: http://{settings.host}:{settings.port}/api/news/latest")
+    print(f"🎵 TTS API: http://{settings.host}:{settings.port}/api/tts/voices")
+    print(f"🧪 Mockup Reels: http://{settings.host}:{settings.port}/api/reels/mockup/scraped-news")
+    print(f"⚙️  System API: http://{settings.host}:{settings.port}/api/system/health")
     
     # Start server
     import uvicorn
@@ -353,7 +349,6 @@ def cmd_api(args):
         log_level="info" if not settings.debug else "debug",
         reload=settings.debug
     )
-
 # ================================
 # CLI SETUP
 # ================================

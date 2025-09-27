@@ -10,6 +10,7 @@ Audio generation, voice management ve cost tracking
 from fastapi import APIRouter, Query, HTTPException, UploadFile, File
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, HttpUrl, Field
+from enum import Enum
 from pathlib import Path
 
 from ...services.processing import processing_service

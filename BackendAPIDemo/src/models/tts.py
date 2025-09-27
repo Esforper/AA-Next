@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from .base import BaseResponse
+from enum import Enum
 
 class TTSVoice(str, Enum):
     # OpenAI voices
