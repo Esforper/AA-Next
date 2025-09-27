@@ -25,6 +25,11 @@ try:
 except ImportError:
     print("⚠️  System router import failed")
     system_router = None
+    
+try:
+    from .reels_mockup import router as reels_mockup_router
+except ImportError:
+    reels_mockup_router = None
 
 # Optional routers - config'e göre enable/disable edilebilir
 try:
@@ -63,6 +68,7 @@ AVAILABLE_ROUTERS = {
     "chat": chat_router,
     "crypto": crypto_router,
     "video": video_router,
+    "reels_mockup": reels_mockup_router,
 }
 
 # Sadece mevcut olan router'ları export et

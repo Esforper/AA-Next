@@ -121,7 +121,15 @@ def _register_routers(app: FastAPI):
     Router'ları dahil et
     Yeni sistem eklemek için buraya yeni import ekle
     """
-    
+    # Diğer import'lardan sonra ekle:
+    # Diğer router'lardan sonra ekle:
+    try:
+        from .endpoints.reels_mockup import router as reels_mockup_router
+        app.include_router(reels_mockup_router)
+        print("✅ Reels Mockup router registered")
+    except ImportError as e:
+        print(f"⚠️  Reels Mockup router import failed: {e}")
+        
     # Core routers - her zaman dahil
     try:
         from .endpoints.news import router as news_router
