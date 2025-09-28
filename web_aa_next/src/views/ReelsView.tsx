@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useReelsViewModel } from '../viewmodels';
 import { ReelItem, LoadingSpinner, Button } from '../components';
-import clsx from 'clsx';
 
 export const ReelsView: React.FC = () => {
   const {
@@ -13,23 +12,200 @@ export const ReelsView: React.FC = () => {
     nextReel,
     prevReel,
     togglePlayPause,
-    seekAudio,
     fetchReels
   } = useReelsViewModel();
 
-  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [touchStartY, setTouchStartY] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(0);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [mouseStartY, setMouseStartY] = useState(0);
+  const [mouseStartX, setMouseStartX] = useState(0);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
   const currentReel = reels[currentReelIndex];
 
-  // Get current subtitle based on audio position
-  const getCurrentSubtitle = () => {
-    if (!currentReel?.subtitles || !audioState.isPlaying) return null;
-    
-    return currentReel.subtitles.find(
-      sub => audioState.position >= sub.start && audioState.position <= sub.end
+
+  // Get current image to display
+  const getCurrentImage = () => {
+    if (!currentReel?.images || currentReel.images.length === 0) {
+      return currentReel?.main_image || '';
+    }
+    return currentReel.images[currentImageIndex] || currentReel.main_image || '';
+  };
+
+  // Handle image navigation
+  const nextImage = () => {
+    if (!currentReel?.images || currentReel.images.length === 0) return;
+    setCurrentImageIndex((prev) => (prev + 1) % currentReel.images.length);
+  };
+
+  const prevImage = () => {
+    if (!currentReel?.images || currentReel.images.length === 0) return;
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? currentReel.images.length - 1 : prev - 1
     );
   };
 
-  const currentSubtitle = getCurrentSubtitle();
+  // Reset image index when reel changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [currentReelIndex]);
+
+  // Touch event handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    setTouchStartY(touch.clientY);
+    setTouchStartX(touch.clientX);
+    setIsScrolling(false);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const deltaY = touch.clientY - touchStartY;
+    const deltaX = touch.clientX - touchStartX;
+    
+    // Determine scroll direction with better logic
+    const absDeltaY = Math.abs(deltaY);
+    const absDeltaX = Math.abs(deltaX);
+    
+    // If movement is significant, determine direction
+    if (absDeltaY > 10 || absDeltaX > 10) {
+      if (absDeltaY > absDeltaX) {
+        setIsScrolling(true); // Vertical scroll
+      } else {
+        setIsScrolling(false); // Horizontal scroll
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    
+    const touch = e.changedTouches[0];
+    const deltaY = touch.clientY - touchStartY;
+    const deltaX = touch.clientX - touchStartX;
+    const absDeltaY = Math.abs(deltaY);
+    const absDeltaX = Math.abs(deltaX);
+    
+    // Minimum swipe distance
+    const minSwipeDistance = 50;
+    
+    // Check if it's a valid swipe
+    if (absDeltaY < minSwipeDistance && absDeltaX < minSwipeDistance) {
+      return; // Not a valid swipe
+    }
+    
+    // Determine primary direction
+    if (absDeltaY > absDeltaX) {
+      // Vertical swipe - Reels navigation
+      if (deltaY > 0) {
+        // Swipe down - Previous reel
+        prevReel();
+      } else {
+        // Swipe up - Next reel
+        nextReel();
+      }
+    } else {
+      // Horizontal swipe - Image navigation
+      if (deltaX > 0) {
+        // Swipe right - Previous image
+        prevImage();
+      } else {
+        // Swipe left - Next image
+        nextImage();
+      }
+    }
+  };
+
+  // Mouse event handlers for desktop
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setMouseStartY(e.clientY);
+    setMouseStartX(e.clientX);
+    setIsMouseDown(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isMouseDown) return;
+    e.preventDefault();
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isMouseDown) return;
+    e.preventDefault();
+    
+    const deltaY = e.clientY - mouseStartY;
+    const deltaX = e.clientX - mouseStartX;
+    const absDeltaY = Math.abs(deltaY);
+    const absDeltaX = Math.abs(deltaX);
+    
+    // Minimum swipe distance
+    const minSwipeDistance = 50;
+    
+    // Check if it's a valid swipe
+    if (absDeltaY < minSwipeDistance && absDeltaX < minSwipeDistance) {
+      setIsMouseDown(false);
+      return; // Not a valid swipe
+    }
+    
+    // Determine primary direction
+    if (absDeltaY > absDeltaX) {
+      // Vertical swipe - Reels navigation
+      if (deltaY > 0) {
+        // Swipe down - Previous reel
+        prevReel();
+      } else {
+        // Swipe up - Next reel
+        nextReel();
+      }
+    } else {
+      // Horizontal swipe - Image navigation
+      if (deltaX > 0) {
+        // Swipe right - Previous image
+        prevImage();
+      } else {
+        // Swipe left - Next image
+        nextImage();
+      }
+    }
+    
+    setIsMouseDown(false);
+  };
+
+  // Wheel event handler for mouse wheel scrolling
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    
+    const deltaY = e.deltaY;
+    const deltaX = e.deltaX;
+    const absDeltaY = Math.abs(deltaY);
+    const absDeltaX = Math.abs(deltaX);
+    
+    // Determine primary direction
+    if (absDeltaY > absDeltaX) {
+      // Vertical wheel - Reels navigation
+      if (deltaY > 0) {
+        // Wheel down - Next reel
+        nextReel();
+      } else {
+        // Wheel up - Previous reel
+        prevReel();
+      }
+    } else {
+      // Horizontal wheel - Image navigation
+      if (deltaX > 0) {
+        // Wheel right - Next image
+        nextImage();
+      } else {
+        // Wheel left - Previous image
+        prevImage();
+      }
+    }
+  };
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -49,22 +225,18 @@ export const ReelsView: React.FC = () => {
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          if (audioState.isLoaded) {
-            seekAudio(Math.max(0, audioState.position - 5));
-          }
+          prevImage();
           break;
         case 'ArrowRight':
           e.preventDefault();
-          if (audioState.isLoaded) {
-            seekAudio(Math.min(audioState.duration, audioState.position + 5));
-          }
+          nextImage();
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [prevReel, nextReel, togglePlayPause, seekAudio, audioState]);
+  }, [prevReel, nextReel, togglePlayPause, prevImage, nextImage]);
 
   if (loading && reels.length === 0) {
     return (
@@ -99,119 +271,44 @@ export const ReelsView: React.FC = () => {
   }
 
   return (
-    <div className="relative h-screen bg-black overflow-hidden">
+    <div 
+      ref={containerRef}
+      className="relative h-screen bg-black overflow-hidden select-none reels-container"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onWheel={handleWheel}
+      style={{ 
+        userSelect: 'none', 
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none'
+      } as React.CSSProperties}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {/* Main Reel Display */}
       <div className="relative h-full flex items-center justify-center">
         {/* Background Image */}
         <div 
-          className="absolute inset-0 bg-cover bg-center filter blur-sm"
+          className="absolute inset-0 bg-cover bg-center filter blur-sm transition-all duration-300"
           style={{ 
-            backgroundImage: `url(${currentReel?.main_image})`,
+            backgroundImage: `url(${getCurrentImage()})`,
             transform: 'scale(1.1)' // Prevent white edges from blur
           }}
         />
         
-        {/* Content Container */}
-        <div className="relative z-10 w-full h-full flex items-center justify-center">
-          {/* Reel Card */}
-          <div className="w-full max-w-md mx-4">
-            <ReelItem
-              reel={currentReel}
-              isActive={true}
-              onPlay={togglePlayPause}
-              onImageClick={togglePlayPause}
-              className="shadow-2xl"
-            />
-          </div>
-        </div>
+        {/* Full Screen Reel Display */}
+        <ReelItem
+          reel={currentReel}
+          isActive={true}
+          onPlay={togglePlayPause}
+          onImageClick={togglePlayPause}
+          className="absolute inset-0 w-full h-full"
+        />
 
-        {/* Navigation Controls */}
-        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex flex-col space-y-4 z-20">
-          {/* Previous */}
-          <button
-            onClick={prevReel}
-            className="w-12 h-12 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white hover:bg-opacity-70 transition-all"
-          >
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" />
-            </svg>
-          </button>
 
-          {/* Play/Pause */}
-          <button
-            onClick={togglePlayPause}
-            className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition-all shadow-lg"
-          >
-            {audioState.isPlaying ? (
-              <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M6 4h2v12H6V4zm6 0h2v12h-2V4z" />
-              </svg>
-            ) : (
-              <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M8 5v10l8-5-8-5z" />
-              </svg>
-            )}
-          </button>
-
-          {/* Next */}
-          <button
-            onClick={nextReel}
-            className="w-12 h-12 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white hover:bg-opacity-70 transition-all"
-          >
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Bottom Controls */}
-        <div className="absolute bottom-4 left-0 right-0 z-20">
-          {/* Audio Progress Bar */}
-          {audioState.isLoaded && (
-            <div className="mx-4 mb-4">
-              <div className="flex items-center space-x-2 text-white text-sm">
-                <span>
-                  {Math.floor(audioState.position / 60)}:{(audioState.position % 60).toFixed(0).padStart(2, '0')}
-                </span>
-                <div className="flex-1 bg-gray-600 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-200"
-                    style={{
-                      width: `${(audioState.position / audioState.duration) * 100}%`
-                    }}
-                  />
-                </div>
-                <span>
-                  {Math.floor(audioState.duration / 60)}:{(audioState.duration % 60).toFixed(0).padStart(2, '0')}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Subtitles */}
-          {showSubtitles && currentSubtitle && (
-            <div className="mx-4 mb-4">
-              <div className="bg-black bg-opacity-70 rounded-lg p-3 text-center">
-                <p className="text-white text-lg">{currentSubtitle.text}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Toggle Subtitles */}
-          <div className="flex justify-center">
-            <button
-              onClick={() => setShowSubtitles(!showSubtitles)}
-              className={clsx(
-                'px-4 py-2 rounded-full text-sm font-medium transition-all',
-                showSubtitles 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-black bg-opacity-50 text-white hover:bg-opacity-70'
-              )}
-            >
-              {showSubtitles ? 'Alt yazıları gizle' : 'Alt yazıları göster'}
-            </button>
-          </div>
-        </div>
 
         {/* Reel Counter */}
         <div className="absolute top-4 left-4 z-20">
@@ -219,6 +316,34 @@ export const ReelsView: React.FC = () => {
             {currentReelIndex + 1} / {reels.length}
           </div>
         </div>
+
+        {/* Image Indicators */}
+        {currentReel?.images && currentReel.images.length > 1 && (
+          <div className="absolute top-4 right-4 z-20">
+            <div className="bg-black bg-opacity-50 rounded-full px-3 py-1 text-white text-sm">
+              {currentImageIndex + 1} / {currentReel.images.length}
+            </div>
+          </div>
+        )}
+
+        {/* Image Dots */}
+        {currentReel?.images && currentReel.images.length > 1 && (
+          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-20">
+            <div className="flex space-x-2">
+              {currentReel.images.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    index === currentImageIndex 
+                      ? 'bg-white' 
+                      : 'bg-white bg-opacity-50'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

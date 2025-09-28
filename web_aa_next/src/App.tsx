@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { HomeView, ReelsView, GamesView, ProfileView, NewsDetailView, TestView, SimpleHomeView } from './views';
+import { HomeView, ReelsView, GamesView, ProfileView, NewsDetailView, TestView, SimpleHomeView, BackendTestView } from './views';
 import { TabBar } from './components';
 import { useNavigationViewModel } from './viewmodels';
 
@@ -49,16 +49,17 @@ const AppContent: React.FC = () => {
   const showTabBar = !location.pathname.startsWith('/news/');
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Routes>
-        <Route path="/" element={<TestView />} />
-        <Route path="/home" element={<SimpleHomeView />} />
-        <Route path="/reels" element={<ReelsView />} />
-        <Route path="/games" element={<GamesView />} />
-        <Route path="/profile" element={<ProfileView />} />
-        <Route path="/news/:id" element={<NewsDetailView />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        <div className="min-h-screen bg-gray-50">
+          <Routes>
+            <Route path="/" element={<TestView />} />
+            <Route path="/home" element={<SimpleHomeView />} />
+            <Route path="/reels" element={<ReelsView />} />
+            <Route path="/games" element={<GamesView />} />
+            <Route path="/profile" element={<ProfileView />} />
+            <Route path="/news/:id" element={<NewsDetailView />} />
+            <Route path="/backend-test" element={<BackendTestView />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
       
       {showTabBar && (
         <TabBar
