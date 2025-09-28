@@ -6,3 +6,4 @@ export * from './ReelsView';
 export * from './GamesView';
 export * from './ProfileView';
 export * from './NewsDetailView';
+export * from './BackendTestView';

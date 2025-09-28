@@ -3,8 +3,12 @@ export const API_CONFIG = {
   BASE_URL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000',
   ENDPOINTS: {
     REELS: {
-      MIX: '/api/reels/mix',
-      READY: '/api/agenda/ready'
+      MOCKUP: '/api/reels/mockup',
+      SCRAPED_NEWS: '/api/reels/mockup/scraped-news',
+      GENERATE: '/api/reels/mockup/generate-reels',
+      NEWS_DETAIL: '/api/reels/mockup/news-detail',
+      CATEGORIES: '/api/reels/mockup/categories',
+      STATS: '/api/reels/mockup/stats'
     },
     ARTICLES: {
       LIST: '/api/articles',

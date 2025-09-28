@@ -342,13 +342,24 @@ def cmd_api(args):
     
     # Start server
     import uvicorn
-    uvicorn.run(
-        app,
-        host=settings.host,
-        port=settings.port,
-        log_level="info" if not settings.debug else "debug",
-        reload=settings.debug
-    )
+    # When using reload/workers, uvicorn requires an import string (or --factory)
+    if settings.debug:
+        # Use application factory with import string so reload works reliably
+        uvicorn.run(
+            "src.api:create_app",
+            host=settings.host,
+            port=settings.port,
+            log_level="debug",
+            reload=True,
+            factory=True,
+        )
+    else:
+        uvicorn.run(
+            app,
+            host=settings.host,
+            port=settings.port,
+            log_level="info",
+        )
 # ================================
 # CLI SETUP
 # ================================

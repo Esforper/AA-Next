@@ -24,40 +24,43 @@ export const ReelItem: React.FC<ReelItemProps> = ({
       shadow="lg"
       rounded="lg"
       className={clsx(
-        'w-full max-w-sm mx-auto overflow-hidden',
+        'w-full max-w-sm mx-auto overflow-hidden select-none',
         {
           'ring-2 ring-blue-500': isActive
         },
         className
       )}
     >
-      {/* Image Section */}
+      {/* Image Section - Full Screen Style */}
       <div 
-        className="relative h-96 bg-gray-200 cursor-pointer"
+        className="relative h-screen bg-gray-200 cursor-pointer"
         onClick={onImageClick}
+        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
       >
         <img
           src={reel.main_image}
           alt={reel.title}
           className="w-full h-full object-cover"
           loading="lazy"
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
         />
         
-        {/* Play Button Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
+        {/* Audio Play Button Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-10">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onPlay?.();
             }}
             className={clsx(
-              'w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200',
+              'w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200',
               'bg-white bg-opacity-90 hover:bg-opacity-100 hover:scale-110',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500'
+              'focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-lg'
             )}
           >
             <svg
-              className="w-8 h-8 text-gray-800 ml-1"
+              className="w-10 h-10 text-gray-800 ml-1"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -67,37 +70,47 @@ export const ReelItem: React.FC<ReelItemProps> = ({
         </div>
         
         {/* Category Badge */}
-        <div className="absolute top-3 left-3">
-          <span className="px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded-full">
+        <div className="absolute top-4 left-4">
+          <span className="px-3 py-1 text-sm font-medium bg-blue-600 text-white rounded-full">
             {reel.category}
           </span>
         </div>
         
         {/* Duration Badge */}
-        <div className="absolute top-3 right-3">
-          <span className="px-2 py-1 text-xs font-medium bg-black bg-opacity-70 text-white rounded-full">
+        <div className="absolute top-4 right-4">
+          <span className="px-3 py-1 text-sm font-medium bg-black bg-opacity-70 text-white rounded-full">
             {Math.floor(reel.estimated_duration / 60)}:{(reel.estimated_duration % 60).toString().padStart(2, '0')}
           </span>
         </div>
       </div>
       
-      {/* Content Section */}
-      <div className="p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+      {/* Content Section - Overlay Style */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/70 to-transparent text-white select-none"
+        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+      >
+        <h3 
+          className="text-xl font-bold mb-2 line-clamp-2"
+          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+        >
           {reel.title}
         </h3>
         
-        <p className="text-sm text-gray-600 mb-3 line-clamp-3">
+        <p 
+          className="text-sm text-gray-200 mb-3 line-clamp-2"
+          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+        >
           {reel.content}
         </p>
         
         {/* Tags */}
         {reel.tags && reel.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-2 mb-3">
             {reel.tags.slice(0, 3).map((tag, index) => (
               <span
                 key={index}
-                className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full"
+                className="px-3 py-1 text-xs bg-white bg-opacity-20 text-white rounded-full backdrop-blur-sm"
+                style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
               >
                 #{tag}
               </span>
@@ -107,7 +120,7 @@ export const ReelItem: React.FC<ReelItemProps> = ({
         
         {/* Author & Location */}
         {(reel.author || reel.location) && (
-          <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
+          <div className="text-xs text-gray-300" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
             {reel.author && <span>{reel.author}</span>}
             {reel.author && reel.location && <span> • </span>}
             {reel.location && <span>{reel.location}</span>}
