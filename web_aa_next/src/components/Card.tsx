@@ -8,6 +8,7 @@ export interface CardProps {
   shadow?: 'none' | 'sm' | 'md' | 'lg';
   rounded?: 'none' | 'sm' | 'md' | 'lg';
   onClick?: () => void;
+  style?: React.CSSProperties;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -16,13 +17,15 @@ export const Card: React.FC<CardProps> = ({
   padding = 'md',
   shadow = 'md',
   rounded = 'md',
-  onClick
+  onClick,
+  style
 }) => {
   const Component = onClick ? 'button' : 'div';
   
   return (
     <Component
       onClick={onClick}
+      style={style}
       className={clsx(
         'bg-white',
         

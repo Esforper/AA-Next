@@ -9,6 +9,7 @@ export interface ReelItemProps {
   onPlay?: () => void;
   onImageClick?: () => void;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export const ReelItem: React.FC<ReelItemProps> = ({
@@ -16,7 +17,8 @@ export const ReelItem: React.FC<ReelItemProps> = ({
   isActive = false,
   onPlay,
   onImageClick,
-  className
+  className,
+  style
 }) => {
   return (
     <Card
@@ -30,6 +32,7 @@ export const ReelItem: React.FC<ReelItemProps> = ({
         },
         className
       )}
+      style={style}
     >
       {/* Image Section - Full Screen Style */}
       <div 
@@ -46,28 +49,6 @@ export const ReelItem: React.FC<ReelItemProps> = ({
           onContextMenu={(e) => e.preventDefault()}
         />
         
-        {/* Audio Play Button Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-10">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay?.();
-            }}
-            className={clsx(
-              'w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200',
-              'bg-white bg-opacity-90 hover:bg-opacity-100 hover:scale-110',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-lg'
-            )}
-          >
-            <svg
-              className="w-10 h-10 text-gray-800 ml-1"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path d="M8 5v10l8-5-8-5z" />
-            </svg>
-          </button>
-        </div>
         
         {/* Category Badge */}
         <div className="absolute top-4 left-4">
@@ -76,12 +57,6 @@ export const ReelItem: React.FC<ReelItemProps> = ({
           </span>
         </div>
         
-        {/* Duration Badge */}
-        <div className="absolute top-4 right-4">
-          <span className="px-3 py-1 text-sm font-medium bg-black bg-opacity-70 text-white rounded-full">
-            {Math.floor(reel.estimated_duration / 60)}:{(reel.estimated_duration % 60).toString().padStart(2, '0')}
-          </span>
-        </div>
       </div>
       
       {/* Content Section - Overlay Style */}
