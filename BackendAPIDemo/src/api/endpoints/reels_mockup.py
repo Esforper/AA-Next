@@ -98,10 +98,10 @@ Proje kapsamında toplanan bağışlar doğrudan protez üretimi ve dağıtımı
         "author": "Mehmet Yalçın",
         "location": "Ankara",
         "published_date": "2024-09-27T14:30:00Z",
-        "main_image": "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/thumbs_b_c_1234567890.jpg",
+        "main_image": "https://picsum.photos/seed/news1/600/400",
         "images": [
-            "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/gazze_etkinlik_1.jpg",
-            "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/gazze_etkinlik_2.jpg"
+            "https://picsum.photos/seed/news2/600/400",
+            "https://picsum.photos/seed/news3/600/400"
         ],
         "tags": ["Gazze", "protez", "dayanışma", "sanat", "AID", "ÖNDER"],
         "keywords": ["engelsiz gazze", "protez desteği", "sanat etkinliği", "uluslararası doktorlar derneği"],
@@ -124,11 +124,11 @@ Kazı çalışmaları kapsamında bu yıl toplamda 2 bin 500'ün üzerinde eser 
         "author": "Ayşe Demir",
         "location": "Çanakkale",
         "published_date": "2024-09-27T13:45:00Z",
-        "main_image": "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/thumbs_b_c_9876543210.jpg",
+        "main_image": "https://picsum.photos/seed/news4/600/400",
         "images": [
-            "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/troya_bros_1.jpg",
-            "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/troya_kazi_1.jpg",
-            "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/troya_yesim_tas.jpg"
+            "https://picsum.photos/seed/news5/600/400",
+            "https://picsum.photos/seed/news6/600/400",
+            "https://picsum.photos/seed/news7/600/400"
         ],
         "tags": ["Troya", "altın broş", "arkeoloji", "antik kent", "kazı", "yeşim taşı"],
         "keywords": ["troya antik kenti", "4 bin 500 yıllık", "altın broş", "arkeolojik buluntu"],
@@ -151,13 +151,13 @@ SİPER sisteminin seri üretimine 2025 yılında başlanması ve ilk teslimatlar
         "author": "Kemal Özkan",
         "location": "Ankara",
         "published_date": "2024-09-27T12:15:00Z",
-        "main_image": "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/thumbs_b_c_1122334455.jpg",
+        "main_image": "https://picsum.photos/seed/news8/600/400",
         "images": [
-            "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/siper_fuze_1.jpg",
-            "https://cdnuploads.aa.com.tr/uploads/Contents/2024/09/27/mavi_vatan_1.jpg"
+            "https://picsum.photos/seed/news9/600/400",
+            "https://picsum.photos/seed/news10/600/400"
         ],
         "videos": [
-            "https://cdnuploads.aa.com.tr/uploads/Videos/2024/09/27/siper_test_video.mp4"
+            "https://samplelib.com/lib/preview/mp4/sample-10s.mp4?dummy=1"
         ],
         "tags": ["SİPER", "mavi vatan", "hava savunma", "milli savunma", "deniz kuvvetleri"],
         "keywords": ["siper füze sistemi", "uzun menzil hava savunma", "mavi vatan", "türk savunma sanayi"],
