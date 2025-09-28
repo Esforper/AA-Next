@@ -130,6 +130,14 @@ def _register_routers(app: FastAPI):
     except ImportError as e:
         print(f"⚠️  Reels Mockup router import failed: {e}")
         
+        
+    try:
+        from .endpoints.reels import router as reels_router
+        app.include_router(reels_router)
+        print("✅ Reels router registered")
+    except ImportError as e:
+        print(f"⚠️  Reels Mockup router import failed: {e}")
+        
     # Core routers - her zaman dahil
     try:
         from .endpoints.news import router as news_router
@@ -151,6 +159,10 @@ def _register_routers(app: FastAPI):
         print("✅ System router registered")
     except ImportError as e:
         print(f"⚠️  System router import failed: {e}")
+    
+    
+
+    
     
     # Optional routers - config'e göre dahil et
     if settings.websocket_enabled:

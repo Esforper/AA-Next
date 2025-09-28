@@ -29,6 +29,21 @@ from .realtime import (
     WebSocketMessage
 )
 
+# from .reels_tracking import (
+#     ReelView, UserDailyStats, UserReelStats, ReelAnalytics,
+#     DailyProgress, ReelFeedItem, TrendingReels, TrendPeriod,
+#     TrackViewRequest, TrackViewResponse, ViewStatus
+# )
+
+try:
+    from .reels_tracking import (
+        ReelView, UserDailyStats, UserReelStats, ReelAnalytics,
+        DailyProgress, ReelFeedItem, TrendingReels, TrendPeriod,
+        TrackViewRequest, TrackViewResponse, ViewStatus
+    )
+except ImportError as e:
+    print(f"⚠️ Reels tracking models import failed: {e}")
+
 # Optional systems - sadece gerektiğinde import et
 try:
     from .game import (
