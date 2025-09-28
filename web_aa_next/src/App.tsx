@@ -49,18 +49,22 @@ const AppContent: React.FC = () => {
   const showTabBar = !location.pathname.startsWith('/news/');
 
   return (
-        <div className="min-h-screen bg-gray-50">
-          <Routes>
-            <Route path="/" element={<TestView />} />
-            <Route path="/home" element={<SimpleHomeView />} />
-            <Route path="/reels" element={<ReelsView />} />
-            <Route path="/games" element={<GamesView />} />
-            <Route path="/profile" element={<ProfileView />} />
-            <Route path="/news/:id" element={<NewsDetailView />} />
-            <Route path="/backend-test" element={<BackendTestView />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Main Content Area */}
+      <div className="pb-16 sm:pb-20">
+        <Routes>
+          <Route path="/" element={<TestView />} />
+          <Route path="/home" element={<SimpleHomeView />} />
+          <Route path="/reels" element={<ReelsView />} />
+          <Route path="/games" element={<GamesView />} />
+          <Route path="/profile" element={<ProfileView />} />
+          <Route path="/news/:id" element={<NewsDetailView />} />
+          <Route path="/backend-test" element={<BackendTestView />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
       
+      {/* Tab Bar - Responsive */}
       {showTabBar && (
         <TabBar
           tabs={tabs}
