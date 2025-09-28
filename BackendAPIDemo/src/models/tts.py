@@ -1,5 +1,5 @@
 # ================================
-# src/models/tts.py
+# src/models/tts.py - Fixed Voice Defaults
 # ================================
 
 from pydantic import BaseModel, Field
@@ -9,13 +9,25 @@ from .base import BaseResponse
 from enum import Enum
 
 class TTSVoice(str, Enum):
-    # OpenAI voices
+    # OpenAI voices (Updated - removed invalid mini_default)
     ALLOY = "alloy"
     ECHO = "echo"
     FABLE = "fable"
     ONYX = "onyx"
     NOVA = "nova"
     SHIMMER = "shimmer"
+    
+    # New OpenAI voices
+    CORAL = "coral"
+    VERSE = "verse"
+    BALLAD = "ballad"
+    ASH = "ash"
+    SAGE = "sage"
+    MARIN = "marin"
+    CEDAR = "cedar"
+    
+    # RSS için recommended
+    RSS_DEFAULT = "nova"  # Nova is good for news
     
     # Yeni provider voice'ları buraya ekle
     # AZURE_JENNY = "azure_jenny"
@@ -25,14 +37,14 @@ class TTSModel(str, Enum):
     # OpenAI models
     TTS_1 = "tts-1"
     TTS_1_HD = "tts-1-hd"
-    
+    GPT_4O_MINI_TTS = "gpt-4o-mini-tts"
     # Yeni provider modelleri buraya ekle
 
 class TTSRequest(BaseModel):
     """TTS conversion request"""
     text: str = Field(..., min_length=1, max_length=50000)
-    voice: str = TTSVoice.ALLOY
-    model: str = TTSModel.TTS_1
+    voice: str = TTSVoice.NOVA  # Default: Nova voice
+    model: str = TTSModel.GPT_4O_MINI_TTS  # Default: GPT-4O Mini TTS
     speed: float = Field(default=1.0, ge=0.25, le=4.0)
     output_format: str = "mp3"
     

@@ -14,3 +14,16 @@ python main.py batch --category spor --count 15 --voice shimmer --min-chars 300
 API Server
 python main.py api
 # → http://localhost:8000/docs
+
+
+
+# 1. RSS'den 5 haber çek ve reel yap
+python main.py batch --category guncel --count 5 --voice alloy
+
+# 2. Feed'i kontrol et
+curl "http://localhost:8000/api/reels/feed?limit=10"
+
+# 3. Bir reel izleme kaydet
+curl -X POST "http://localhost:8000/api/reels/track-view" \
+  -H "X-User-ID: test_user" \
+  -d '{"reel_id":"aa_123", "duration_ms":30000, "completed":true}'

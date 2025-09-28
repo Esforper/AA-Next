@@ -1,10 +1,10 @@
 # ================================
-# src/api/endpoints/reels.py - Extended Reels API Endpoints
+# src/api/endpoints/reels.py - Updated Reels API Endpoints
 # ================================
 
 """
-Reels API endpoint'leri - Tracking, Analytics ve Feed sistemi ile genişletilmiş
-Orijinal mockup endpoint'leri + yeni tracking fonksiyonları
+Reels API endpoint'leri - Yeni ReelsAnalyticsService ve ReelFeedItem modelleriyle güncellenmiş
+Instagram-style pagination ve feed sistemi ile
 """
 
 from fastapi import APIRouter, Query, HTTPException, Depends, Header
@@ -13,18 +13,19 @@ from pydantic import BaseModel, HttpUrl, Field
 from datetime import datetime, date
 import hashlib
 
-# Original imports
+# Analytics service - Updated
+from ...services.reels_analytics import reels_analytics
+from ...models.reels_tracking import (
+    TrackViewRequest, TrackViewResponse, UserReelStats, 
+    DailyProgress, ReelFeedItem, TrendPeriod, ViewStatus,
+    FeedResponse, FeedPagination, FeedMetadata, ReelStatus
+)
+
+# Original imports (still needed)
 from ...services.content import content_service
 from ...services.processing import processing_service
 from ...models.news import NewsResponse, Article
 from ...models.base import BaseResponse
-
-# New tracking imports
-from ...services.reels_analytics import reels_analytics
-from ...models.reels_tracking import (
-    TrackViewRequest, TrackViewResponse, UserReelStats, 
-    DailyProgress, ReelFeedItem, TrendPeriod, ViewStatus
-)
 
 # Router
 router = APIRouter(prefix="/api/reels", tags=["reels"])
@@ -65,14 +66,13 @@ class UserStatsResponse(BaseModel):
     current_streak_days: int = 0
     avg_daily_reels: float = 0.0
 
-class FeedResponse(BaseModel):
-    """Feed response model"""
-    success: bool = True
-    reels: List[ReelFeedItem]
-    total_count: int
-    trending_count: int
-    recent_count: int
-    user_watched_count: int
+class BulkReelCreationRequest(BaseModel):
+    """Toplu reel oluşturma request'i"""
+    category: str = Field(default="guncel", description="Haber kategorisi")
+    count: int = Field(default=10, ge=1, le=50, description="Oluşturulacak reel sayısı")
+    voice: str = Field(default="alloy", description="TTS ses modeli")
+    min_chars: int = Field(default=300, description="Minimum karakter sayısı")
+    enable_scraping: bool = Field(default=True, description="Web scraping aktif et")
 
 # ============ UTILITY FUNCTIONS ============
 
@@ -80,7 +80,7 @@ def get_user_id_from_header(user_id: Optional[str] = Header(None, alias="X-User-
     """Header'dan user ID al, yoksa default ver"""
     return user_id or "anonymous_user"
 
-# ============ TRACKING ENDPOINTS ============
+# ============ CORE TRACKING ENDPOINTS ============
 
 @router.post("/track-view", response_model=TrackViewResponse)
 async def track_reel_view(
@@ -139,11 +139,6 @@ async def get_user_watched_reels(
         # Category filter
         if category:
             watched_reels = [reel for reel in watched_reels if reel.get("category") == category]
-        
-        # Duration'ları saniyeye çevir
-        for reel in watched_reels:
-            reel["duration_seconds"] = reel["duration_ms"] / 1000.0
-            reel["meaningful_view"] = reel["duration_ms"] >= 3000
         
         return {
             "success": True,
@@ -240,42 +235,45 @@ async def get_user_stats(user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"User stats error: {str(e)}")
 
-# ============ FEED & DISCOVERY ENDPOINTS ============
+# ============ MAIN FEED ENDPOINTS (Instagram-style) ============
 
 @router.get("/feed", response_model=FeedResponse)
 async def get_user_feed(
     limit: int = Query(20, ge=1, le=50, description="Feed'de kaç reel gösterilecek"),
+    cursor: Optional[str] = Query(None, description="Pagination cursor (reel_id)"),
     user_id: str = Depends(get_user_id_from_header),
     include_watched: bool = Query(True, description="İzlenmiş reels dahil edilsin mi")
 ):
     """
+    **Ana Feed Endpoint - Instagram Style**
+    
     Kullanıcı için kişiselleştirilmiş reel feed'i
     
-    **Trending + Recent karışımı, izlenmiş flagları ile**
+    **Trending + Recent + Personalized karışımı, cursor-based pagination ile**
     
-    - **limit**: Feed boyutu
+    - **limit**: Feed boyutu (1-50)
+    - **cursor**: Pagination için son görülen reel_id
     - **include_watched**: İzlenmiş reels dahil et (ama flag ile işaretle)
     """
     try:
         # Feed'i oluştur
-        feed_items = await reels_analytics.generate_user_feed(user_id, limit)
+        feed_response = await reels_analytics.generate_user_feed(
+            user_id=user_id, 
+            limit=limit,
+            cursor=cursor
+        )
         
         # İzlenmiş reels'i filtrele (eğer istenmiyorsa)
         if not include_watched:
-            feed_items = [item for item in feed_items if not item.is_watched]
+            filtered_reels = [reel for reel in feed_response.reels if not reel.is_watched]
+            feed_response.reels = filtered_reels
+            
+            # Metadata güncelle
+            feed_response.feed_metadata.trending_count = sum(1 for r in filtered_reels if r.is_trending)
+            feed_response.feed_metadata.fresh_count = sum(1 for r in filtered_reels if r.is_fresh)
+            feed_response.feed_metadata.personalized_count = len(filtered_reels) - feed_response.feed_metadata.trending_count - feed_response.feed_metadata.fresh_count
         
-        # İstatistikler
-        trending_count = sum(1 for item in feed_items if item.is_trending)
-        recent_count = len(feed_items) - trending_count
-        watched_count = sum(1 for item in feed_items if item.is_watched)
-        
-        return FeedResponse(
-            reels=feed_items,
-            total_count=len(feed_items),
-            trending_count=trending_count,
-            recent_count=recent_count,
-            user_watched_count=watched_count
-        )
+        return feed_response
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Feed generation error: {str(e)}")
@@ -298,7 +296,7 @@ async def get_trending_reels(
         # Kullanıcının izlediği reels'i işaretle
         watched_reel_ids = await reels_analytics._get_user_watched_reel_ids(user_id)
         for reel in trending_reels:
-            reel.is_watched = reel.reel_id in watched_reel_ids
+            reel.is_watched = reel.id in watched_reel_ids
         
         return {
             "success": True,
@@ -337,6 +335,124 @@ async def get_latest_published_reel():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Latest reel error: {str(e)}")
 
+# ============ REEL MANAGEMENT ENDPOINTS ============
+
+@router.get("/{reel_id}")
+async def get_reel_by_id(
+    reel_id: str,
+    user_id: str = Depends(get_user_id_from_header)
+):
+    """
+    Belirli bir reel'in detaylarını al
+    
+    - **reel_id**: Reel ID'si
+    """
+    try:
+        reel = await reels_analytics.get_reel_by_id(reel_id)
+        
+        if not reel:
+            raise HTTPException(status_code=404, detail="Reel not found")
+        
+        # Kullanıcının bu reel'i izleyip izlemediğini kontrol et
+        watched_reel_ids = await reels_analytics._get_user_watched_reel_ids(user_id)
+        reel.is_watched = reel_id in watched_reel_ids
+        
+        return {
+            "success": True,
+            "reel": reel,
+            "message": "Reel found successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Get reel error: {str(e)}")
+
+@router.post("/bulk-create")
+async def bulk_create_reels(request: BulkReelCreationRequest):
+    """
+    Toplu reel oluşturma (RSS'den haberler alıp TTS yapıp reel oluştur)
+    
+    **RSS → TTS → Reel pipeline'ının manuel tetiklenmesi**
+    
+    - **category**: Haber kategorisi
+    - **count**: Oluşturulacak reel sayısı
+    - **voice**: TTS ses modeli
+    - **min_chars**: Minimum karakter sayısı
+    """
+    try:
+        # 1. RSS'den haberler al
+        news_response = await content_service.get_latest_news(
+            count=request.count * 2,  # Filtreleme için fazla al
+            category=request.category,
+            enable_scraping=request.enable_scraping
+        )
+        
+        if not news_response.success:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch news: {news_response.message}")
+        
+        # 2. Filtreleme
+        filtered_articles = [
+            article for article in news_response.articles
+            if len(article.content) >= request.min_chars
+        ][:request.count]
+        
+        if not filtered_articles:
+            raise HTTPException(status_code=404, detail="No articles found matching criteria")
+        
+        # 3. TTS işlemi (simulated - gerçekte processing_service kullanacağız)
+        processed_count = 0
+        failed_count = 0
+        
+        for article in filtered_articles:
+            try:
+                # TTS işlemi (simulated)
+                tts_content = article.to_tts_content()
+                
+                # Simulated TTS response
+                estimated_cost = (len(tts_content) / 1_000_000) * 0.015
+                duration_seconds = max(15, len(tts_content.split()) // 150 * 60)
+                audio_filename = f"reel_{hashlib.md5(article.url.encode()).hexdigest()[:12]}.mp3"
+                audio_url = f"/audio/{audio_filename}"
+                file_size_mb = duration_seconds * 0.5
+                
+                # 4. Reel oluştur
+                reel = await reels_analytics.create_reel_from_article(
+                    article=article,
+                    audio_url=audio_url,
+                    duration_seconds=duration_seconds,
+                    file_size_mb=file_size_mb,
+                    voice_used=request.voice,
+                    estimated_cost=estimated_cost
+                )
+                
+                processed_count += 1
+                print(f"✅ Reel created: {reel.id}")
+                
+            except Exception as e:
+                failed_count += 1
+                print(f"❌ Failed to create reel for {article.title}: {e}")
+                continue
+        
+        return {
+            "success": True,
+            "message": f"Bulk reel creation completed",
+            "summary": {
+                "requested_count": request.count,
+                "articles_found": len(filtered_articles),
+                "reels_created": processed_count,
+                "failed": failed_count,
+                "success_rate": round((processed_count / len(filtered_articles)) * 100, 1),
+                "category": request.category,
+                "voice_used": request.voice
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk creation error: {str(e)}")
+
 # ============ ANALYTICS ENDPOINTS ============
 
 @router.get("/analytics/{reel_id}")
@@ -349,21 +465,17 @@ async def get_reel_analytics(reel_id: str):
     **Admin/moderator için reel performans bilgileri**
     """
     try:
-        reel_analytics_data = await reels_analytics.get_reel_analytics(reel_id)
+        # Detaylı performans raporu al
+        performance_report = await reels_analytics.get_reel_performance_report(reel_id)
         
-        if reel_analytics_data:
-            # Engagement score hesapla
-            engagement_score = reel_analytics_data.get_engagement_score()
-            
-            return {
-                "success": True,
-                "reel_id": reel_id,
-                "analytics": reel_analytics_data.dict(),
-                "engagement_score": round(engagement_score, 2),
-                "performance_level": "high" if engagement_score > 7 else "medium" if engagement_score > 4 else "low"
-            }
-        else:
-            raise HTTPException(status_code=404, detail="Reel analytics not found")
+        if "error" in performance_report:
+            raise HTTPException(status_code=404, detail=performance_report["error"])
+        
+        return {
+            "success": True,
+            "reel_id": reel_id,
+            "performance_report": performance_report
+        }
         
     except HTTPException:
         raise
@@ -382,20 +494,11 @@ async def get_analytics_overview(
     **Sistem geneli istatistikler**
     """
     try:
-        # Basit overview - geliştirilecek
-        trending_reels = await reels_analytics.get_trending_reels(TrendPeriod.DAILY, 10)
-        latest_reel = await reels_analytics.get_latest_published_reel()
+        overview = await reels_analytics.get_analytics_overview(period_days)
         
         return {
             "success": True,
-            "period_days": period_days,
-            "overview": {
-                "top_trending_count": len(trending_reels),
-                "latest_reel_published": latest_reel.get("published_at") if latest_reel else None,
-                "total_categories": len(set(reel.category for reel in trending_reels)),
-                "avg_trend_score": round(sum(reel.recommendation_score for reel in trending_reels) / len(trending_reels), 2) if trending_reels else 0
-            },
-            "top_trending": trending_reels[:5]  # Top 5
+            "analytics_overview": overview
         }
         
     except Exception as e:
@@ -488,87 +591,42 @@ async def get_user_session_summary(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Session summary error: {str(e)}")
 
-# ============ ORIGINAL MOCKUP ENDPOINTS (Preserved) ============
+# ============ SYSTEM STATUS ENDPOINTS ============
 
-@router.get("/mockup/scraped-news")
-async def get_scraped_news_mockup(
-    count: int = Query(3, ge=1, le=10, description="Number of news items"),
-    category: Optional[str] = Query(None, description="Category filter")
-):
+@router.get("/system/status")
+async def get_reel_system_status():
     """
-    **[ORIGINAL MOCKUP ENDPOINT]**
-    Web scraping'den gelmiş gibi detaylı haber verisi
+    Reel sisteminin durumu
+    
+    **Sistem sağlık kontrolü ve istatistikleri**
     """
     try:
-        # Mockup data (basit simülasyon)
-        mockup_news = [
-            {
-                "title": "Sample News 1",
-                "summary": "This is a sample news summary",
-                "category": category or "guncel",
-                "published_date": datetime.now().isoformat()
-            }
-        ] * count
+        # Sistem istatistikleri al
+        all_reels = await reels_analytics.get_all_published_reels()
+        overview = await reels_analytics.get_analytics_overview(1)  # Son 24 saat
+        
+        status = {
+            "system_health": "healthy",
+            "total_published_reels": len(all_reels),
+            "reels_today": overview.get("overview", {}).get("recent_reels", 0),
+            "total_views_today": overview.get("overview", {}).get("total_views", 0),
+            "active_users": overview.get("user_stats", {}).get("active_users", 0),
+            "last_reel_published": None
+        }
+        
+        # Son reel bilgisi
+        latest_reel = await reels_analytics.get_latest_published_reel()
+        if latest_reel:
+            status["last_reel_published"] = latest_reel.published_at.isoformat()
         
         return {
             "success": True,
-            "message": f"Retrieved {count} scraped news items",
-            "news_items": mockup_news,
-            "total_count": count,
-            "scraping_info": {
-                "scraping_time": datetime.now().isoformat(),
-                "source": "aa.com.tr",
-                "quality": "high",
-                "errors": 0
-            }
+            "system_status": status,
+            "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scraped news error: {str(e)}")
-
-@router.get("/mockup/generate-reels")
-async def generate_reels_from_scraped_mockup(
-    count: int = Query(3, ge=1, le=10, description="Number of reels to generate"),
-    voice: str = Query("alloy", description="TTS voice"),
-    category: Optional[str] = Query(None, description="Category filter")
-):
-    """
-    **[ORIGINAL MOCKUP ENDPOINT]**
-    Scraped news'dan reel generate et (mockup)
-    """
-    try:
-        # Mockup reel generation
-        reels = []
-        for i in range(count):
-            reel = {
-                "id": f"mockup_reel_{i}",
-                "title": f"Mockup Reel {i+1}",
-                "category": category or "guncel",
-                "voice_used": voice,
-                "duration_seconds": 30 + i * 10,
-                "estimated_cost": 0.001 * (i + 1)
-            }
-            reels.append(reel)
-        
-        total_cost = sum(reel["estimated_cost"] for reel in reels)
-        total_duration = sum(reel["duration_seconds"] for reel in reels)
-        
-        return {
-            "success": True,
-            "message": f"Generated {len(reels)} reels from scraped news",
-            "reels": reels,
-            "summary": {
-                "total_reels": len(reels),
-                "total_characters": count * 500,  # Estimated
-                "total_estimated_cost": round(total_cost, 6),
-                "total_duration_seconds": total_duration,
-                "average_duration": round(total_duration / len(reels), 1),
-                "voice_used": voice
-            }
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reel generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"System status error: {str(e)}")
 
 # ============ API DOCUMENTATION HELPER ============
 
@@ -580,6 +638,11 @@ async def list_reel_endpoints():
     **Geliştirici referansı için**
     """
     endpoints = {
+        "core_feed": [
+            "GET /api/reels/feed - Instagram-style ana feed (cursor pagination)",
+            "GET /api/reels/trending - Trend reels",
+            "GET /api/reels/latest-published - En son reel"
+        ],
         "tracking": [
             "POST /api/reels/track-view - Reel izleme kaydı",
             "GET /api/reels/user/{id}/watched - İzlenen reels",
@@ -591,26 +654,80 @@ async def list_reel_endpoints():
             "GET /api/reels/analytics/{reel_id} - Reel analytics",
             "GET /api/reels/analytics/overview - Sistem overview"
         ],
-        "feed": [
-            "GET /api/reels/feed - Kişiselleştirilmiş feed",
-            "GET /api/reels/trending - Trend reels",
-            "GET /api/reels/latest-published - En son reel"
+        "management": [
+            "GET /api/reels/{reel_id} - Reel detayı",
+            "POST /api/reels/bulk-create - Toplu reel oluştur",
+            "GET /api/reels/system/status - Sistem durumu"
         ],
         "utility": [
             "GET /api/reels/user/{id}/session-summary - Session özeti",
             "GET /api/reels/endpoints - Bu endpoint listesi"
-        ],
-        "mockup": [
-            "GET /api/reels/mockup/scraped-news - Test verisi",
-            "GET /api/reels/mockup/generate-reels - Test reel generation"
         ]
     }
     
     return {
         "success": True,
-        "message": "Reels API endpoints",
+        "message": "Updated Reels API endpoints",
         "total_endpoints": sum(len(group) for group in endpoints.values()),
         "endpoints": endpoints,
         "base_url": "/api/reels",
-        "authentication": "X-User-ID header recommended"
+        "authentication": "X-User-ID header recommended",
+        "pagination": "Cursor-based for main feed",
+        "new_features": [
+            "Instagram-style feed algorithm",
+            "Real ReelFeedItem with NewsData",
+            "Cursor-based pagination",
+            "Bulk reel creation",
+            "Enhanced analytics"
+        ]
     }
+    
+    
+    
+"""  
+
+Instagram-style Ana Feed:
+httpGET /api/reels/feed?limit=20&cursor=reel_123
+
+Cursor-based pagination
+FeedResponse yapısı (pagination + metadata)
+Algoritma: %30 trending, %50 personalized, %20 fresh
+
+2. Yeni ReelFeedItem Desteği:
+
+Tam haber verisi (NewsData)
+Audio bilgileri (url, duration, file_size)
+TTS maliyeti tracking
+Reel durumu (draft/published/archived)
+
+3. Bulk Reel Creation:
+httpPOST /api/reels/bulk-create
+{
+  "category": "guncel",
+  "count": 10,
+  "voice": "alloy"
+}
+
+RSS → TTS → Reel pipeline
+Toplu işlem with success rate
+
+4. Enhanced Analytics:
+
+Detaylı performance report (/analytics/{reel_id})
+Sistem overview with hourly breakdown
+User session summary with achievements
+
+5. Real Data Integration:
+
+Mockup temizliği - gerçek ReelsAnalyticsService kullanımı
+Article → ReelFeedItem dönüşümü
+Gerçek tracking sistemi
+
+🎯 Ana API Akışı:
+Frontend için:
+
+Ana Feed: GET /feed - Ana sayfa
+İzleme: POST /track-view - Her reel için
+Progress: GET /user/{id}/daily-progress - Dashboard
+
+"""

@@ -1,13 +1,13 @@
 # ================================
-# src/models/reels_tracking.py - Reels Tracking Models
+# src/models/reels_tracking.py - Updated ReelFeedItem Model
 # ================================
 
 """
 Reels izleme, kullanıcı aktivitesi ve progress tracking modelleri
-Basit ve genişletilebilir yapı
+Mockup data yapısına uygun olarak güncellendi
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, date
 from enum import Enum
@@ -26,6 +26,14 @@ class TrendPeriod(str, Enum):
     HOURLY = "hourly"           # Son 1 saat
     DAILY = "daily"             # Son 24 saat  
     WEEKLY = "weekly"           # Son 7 gün
+
+class ReelStatus(str, Enum):
+    """Reel durumu - mockup'a uygun"""
+    DRAFT = "draft"
+    PROCESSING = "processing"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+    FAILED = "failed"
 
 # ============ CORE TRACKING MODELS ============
 
@@ -111,8 +119,6 @@ class UserReelStats(BaseModel):
         """Toplam ekran süresini saat olarak döndür"""
         return self.total_screen_time_ms / (1000 * 60 * 60)
 
-# ============ REEL ANALYTICS MODELS ============
-
 class ReelAnalytics(BaseModel):
     """Bir reel'in analitik verileri"""
     reel_id: str
@@ -152,8 +158,6 @@ class ReelAnalytics(BaseModel):
         view_score = min(self.total_views / 100, 1.0) * 3.0  # 100 view max
         
         return completion_score + duration_score + view_score
-
-# ============ PROGRESS TRACKING MODELS ============
 
 class DailyProgress(BaseModel):
     """Kullanıcının günlük progress takibi"""
@@ -195,26 +199,102 @@ class DailyProgress(BaseModel):
         
         return (cat_data.get("watched", 0) / cat_data["published"]) * 100.0
 
-# ============ FEED & TRENDING MODELS ============
+# ============ NEWS DATA MODEL (Mockup'tan uyarlandı) ============
+
+class NewsData(BaseModel):
+    """Reel'deki haber verisi - mockup'taki ScrapedNewsItem'a benzer"""
+    title: str
+    summary: str
+    full_content: str
+    url: HttpUrl
+    
+    # Metadata
+    category: str
+    author: Optional[str] = None
+    location: Optional[str] = None
+    published_date: str
+    scraped_date: str
+    
+    # Media
+    main_image: Optional[str] = None
+    images: List[str] = []
+    videos: List[str] = []
+    
+    # SEO & Tags
+    tags: List[str] = []
+    keywords: List[str] = []
+    meta_description: Optional[str] = None
+    
+    # Metrics
+    word_count: int
+    character_count: int
+    estimated_reading_time: int  # minutes
+    
+    # Technical
+    source: str = "aa"
+    scraping_quality: str = "high"  # high, medium, low
+    content_language: str = "tr"
+
+# ============ FEED & REEL MODELS (Updated to match Mockup) ============
 
 class ReelFeedItem(BaseModel):
-    """Feed'deki bir reel item'i"""
-    reel_id: str
-    title: str
-    category: str
-    published_at: datetime
+    """Feed'deki bir reel item'i - mockup yapısına uygun"""
+    
+    # Core identifiers
+    id: str = Field(..., description="Reel unique ID")
+    
+    # News data (full news content)
+    news_data: NewsData = Field(..., description="Haber verisi")
+    
+    # TTS & Audio info (mockup'tan)
+    tts_content: str = Field(..., description="TTS için kullanılan metin")
+    voice_used: str = Field(default="alloy", description="Kullanılan ses")
+    model_used: str = Field(default="tts-1", description="Kullanılan TTS model")
+    
+    # Audio files
+    audio_url: str = Field(..., description="Ses dosyası URL'i")
+    duration_seconds: int = Field(..., description="Ses süresi (saniye)")
+    file_size_mb: float = Field(default=0.0, description="Dosya boyutu (MB)")
+    
+    # Publishing info
+    status: ReelStatus = Field(default=ReelStatus.PUBLISHED, description="Reel durumu")
+    published_at: datetime = Field(..., description="Yayınlanma zamanı")
+    created_at: datetime = Field(default_factory=datetime.now, description="Oluşturulma zamanı")
+    
+    # Analytics & Engagement
+    total_views: int = Field(default=0, description="Toplam görüntülenme")
+    total_screen_time_ms: int = Field(default=0, description="Toplam ekran süresi")
+    completion_rate: float = Field(default=0.0, description="Tamamlama oranı")
+    trend_score: float = Field(default=0.0, description="Trend puanı")
     
     # User-specific flags
     is_watched: bool = Field(default=False, description="Kullanıcı tarafından izlendi mi")
     is_trending: bool = Field(default=False, description="Trend mi")
+    is_fresh: bool = Field(default=False, description="Yeni mi (son 3 saat)")
     
-    # Analytics info
-    trend_rank: Optional[int] = Field(None, description="Trend sıralaması")
-    total_views: int = Field(default=0, description="Toplam görüntülenme")
-    total_screen_time_ms: int = Field(default=0, description="Toplam ekran süresi")
-    
-    # Recommendation score
+    # Recommendation & Feed info
     recommendation_score: float = Field(default=0.0, description="Öneri puanı")
+    feed_reason: str = Field(default="algorithmic", description="Feed'de olma sebebi")
+    trend_rank: Optional[int] = Field(None, description="Trend sıralaması")
+    
+    # Cost tracking (mockup'tan)
+    character_count: int = Field(default=0, description="TTS karakter sayısı")
+    estimated_cost: float = Field(default=0.0, description="Tahmini maliyet")
+    processing_time_seconds: float = Field(default=0.0, description="İşlem süresi")
+    
+    # Thumbnail (gelecekte eklenecek)
+    thumbnail_url: Optional[str] = Field(None, description="Thumbnail URL'i")
+    
+    def is_recent(self, hours: int = 3) -> bool:
+        """Son X saat içinde yayınlandı mı"""
+        from datetime import timedelta
+        return datetime.now() - self.published_at < timedelta(hours=hours)
+    
+    def get_engagement_rate(self) -> float:
+        """Engagement oranı hesapla"""
+        if self.total_views == 0:
+            return 0.0
+        return (self.total_screen_time_ms / 1000) / (self.duration_seconds * self.total_views)
 
 class TrendingReels(BaseModel):
     """Trend olan reels listesi"""
@@ -274,13 +354,39 @@ class StatsFilter(BaseModel):
     category: Optional[str] = Field(None, description="Kategori filtresi")
     time_range: Optional[TimeRange] = Field(None, description="Zaman aralığı")
     min_duration_ms: Optional[int] = Field(None, description="Minimum izleme süresi")
-    
+
+# ============ PAGINATION MODELS (Instagram-style) ============
+
+class FeedPagination(BaseModel):
+    """Feed pagination bilgisi"""
+    current_page: int = Field(default=1, description="Mevcut sayfa")
+    has_next: bool = Field(default=False, description="Sonraki sayfa var mı")
+    has_previous: bool = Field(default=False, description="Önceki sayfa var mı")
+    next_cursor: Optional[str] = Field(None, description="Sonraki sayfa cursor'u")
+    total_available: int = Field(default=0, description="Toplam mevcut reel sayısı")
+
+class FeedMetadata(BaseModel):
+    """Feed algoritma metadata'sı"""
+    trending_count: int = Field(default=0, description="Trending reel sayısı")
+    personalized_count: int = Field(default=0, description="Kişiselleştirilmiş reel sayısı")
+    fresh_count: int = Field(default=0, description="Yeni reel sayısı")
+    algorithm_version: str = Field(default="v1.0", description="Algoritma versiyonu")
+
+class FeedResponse(BaseModel):
+    """Instagram-style feed response"""
+    success: bool = Field(default=True)
+    reels: List[ReelFeedItem] = Field(..., description="Reel listesi")
+    pagination: FeedPagination = Field(..., description="Sayfalama bilgisi")
+    feed_metadata: FeedMetadata = Field(..., description="Feed metadata'sı")
+    generated_at: datetime = Field(default_factory=datetime.now, description="Oluşturulma zamanı")
+
 # ============ EXPORTS ============
 
 __all__ = [
     # Enums
     "ViewStatus",
-    "TrendPeriod",
+    "TrendPeriod", 
+    "ReelStatus",
     
     # Core models
     "ReelView", 
@@ -288,10 +394,14 @@ __all__ = [
     "UserReelStats",
     "ReelAnalytics",
     "DailyProgress",
+    "NewsData",
     
-    # Feed models
+    # Feed models (Updated)
     "ReelFeedItem",
     "TrendingReels",
+    "FeedResponse",
+    "FeedPagination", 
+    "FeedMetadata",
     
     # Request/Response
     "TrackViewRequest",
@@ -301,7 +411,6 @@ __all__ = [
     "TimeRange",
     "StatsFilter"
 ]
-
 
 
 """

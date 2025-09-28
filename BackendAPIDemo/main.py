@@ -1,10 +1,10 @@
 # ================================
-# main.py - Universal Application Entry Point
+# main.py - Universal Application Entry Point (Updated)
 # ================================
 
 """
 AA Universal API - Main Entry Point
-- CLI Commands
+- CLI Commands (Updated with RSS-Reels)
 - API Server  
 - System Management
 """
@@ -20,8 +20,6 @@ import json
 # Local imports
 from src.config import settings
 from src.api import create_app
-# from src.api.content import router as content_router
-# from src.api.processing import router as processing_router
 
 def setup_logging():
     """Basic logging setup"""
@@ -170,7 +168,7 @@ async def cmd_tts(args):
         print(f"❌ TTS command error: {e}")
 
 async def cmd_batch(args):
-    """Batch command - process multiple items"""
+    """Batch command - process multiple items (Updated)"""
     print("⚡ Starting batch processing...")
     
     try:
@@ -215,48 +213,159 @@ async def cmd_batch(args):
                 print("❌ Cancelled")
                 return
         
-        # Process articles
-        successful = 0
-        failed = 0
-        actual_cost = 0.0
-        
-        for i, article in enumerate(filtered_articles, 1):
-            print(f"\n🔄 [{i}/{len(filtered_articles)}] {article.title[:50]}...")
-            
-            result = await processing_service.article_to_speech(
-                article=article,
-                voice=args.voice,
-                model=args.model
-            )
-            
-            if result.success:
-                successful += 1
-                actual_cost += result.result.estimated_cost
-                filename = Path(result.result.file_path).name if result.result.file_path else "unknown"
-                print(f"   ✅ Success: {filename}")
-            else:
-                failed += 1
-                print(f"   ❌ Failed: {result.message}")
+        # Use updated batch processing (with RSS optimization)
+        print("🔄 Using enhanced RSS-optimized batch processing...")
+        results = await processing_service.batch_articles_to_speech(
+            articles=filtered_articles,
+            voice=args.voice,
+            model=args.model,
+            create_reels=True,  # Auto-create reels
+            rss_optimized=True  # Use RSS optimization
+        )
         
         # Summary
+        successful = sum(1 for r in results if r.success)
+        failed = len(results) - successful
+        actual_cost = sum(r.result.estimated_cost for r in results if r.success)
+        
         print(f"\n📊 Batch processing completed:")
         print(f"   ✅ Successful: {successful}")
         print(f"   ❌ Failed: {failed}")
         print(f"   💰 Total cost: ${actual_cost:.6f}")
         print(f"   📈 Success rate: {(successful/len(filtered_articles)*100):.1f}%")
+        print(f"   🎬 Reels created: {successful} (auto-generated)")
         
     except Exception as e:
         print(f"❌ Batch command error: {e}")
 
+async def cmd_rss_reels(args):
+    """RSS-Reels command - Create reels from latest RSS news (NEW)"""
+    print("🎬 Creating reels from latest RSS news...")
+    
+    try:
+        from src.services.processing import processing_service
+        
+        # RSS-specific parameters
+        voice = args.voice or "mini_default"
+        category = args.category or "guncel"
+        count = args.count or 10
+        
+        print(f"📰 Category: {category}")
+        print(f"🎙️  Voice: {voice}")
+        print(f"📊 Count: {count}")
+        print(f"🎯 Mode: {'Test Feed' if args.test_feed else 'Production'}")
+        
+        if args.test_feed:
+            print("🧪 Test feed mode - creating sample reels for testing...")
+        
+        # Execute RSS → TTS → Reel pipeline
+        result = await processing_service.create_reels_from_latest_news(
+            category=category,
+            count=count,
+            voice=voice,
+            min_chars=args.min_chars or 50
+        )
+        
+        if result["success"]:
+            print(f"\n✅ RSS-Reels pipeline completed!")
+            print(f"   🎬 Reels created: {result['reels_created']}")
+            print(f"   📰 Articles processed: {result['total_articles_processed']}")
+            print(f"   📈 Success rate: {result['success_rate']}%")
+            print(f"   💰 Total cost: ${result['total_cost']:.6f}")
+            print(f"   🎙️  Voice used: {result['voice_used']}")
+            
+            if args.test_feed:
+                print(f"\n🎯 Test feed ready! Access via:")
+                print(f"   📱 API: GET /api/reels/feed")
+                print(f"   🌐 Web: http://localhost:8000/api/reels/feed")
+                
+                # Show sample reels info
+                try:
+                    from src.services.reels_analytics import reels_analytics
+                    latest_reels = await reels_analytics.get_all_published_reels()
+                    recent_reels = sorted(latest_reels, key=lambda r: r.published_at, reverse=True)[:3]
+                    
+                    print(f"\n📋 Sample reels created:")
+                    for i, reel in enumerate(recent_reels, 1):
+                        print(f"   {i}. {reel.news_data.title[:50]}...")
+                        print(f"      🎵 {reel.duration_seconds}s | 📁 {reel.audio_url}")
+                except Exception as e:
+                    print(f"   ⚠️ Could not fetch reel details: {e}")
+                    
+        else:
+            print(f"❌ RSS-Reels pipeline failed: {result['message']}")
+            print(f"   🎬 Reels created: {result.get('reels_created', 0)}")
+            
+    except Exception as e:
+        print(f"❌ RSS-Reels command error: {e}")
+
+async def cmd_test_feed(args):
+    """Test Feed command - Show current feed status"""
+    print("🧪 Testing current feed status...")
+    
+    try:
+        from src.services.reels_analytics import reels_analytics
+        
+        # Get all published reels
+        all_reels = await reels_analytics.get_all_published_reels()
+        print(f"📊 Total published reels: {len(all_reels)}")
+        
+        if not all_reels:
+            print("❌ No reels found. Run 'rss-reels --test-feed' first to create test data.")
+            return
+        
+        # Recent reels (last 24 hours)
+        from datetime import timedelta
+        now = datetime.now()
+        recent_reels = [r for r in all_reels if (now - r.published_at).total_seconds() < 86400]
+        print(f"🕐 Recent reels (24h): {len(recent_reels)}")
+        
+        # Category breakdown
+        categories = {}
+        for reel in all_reels:
+            cat = reel.news_data.category
+            categories[cat] = categories.get(cat, 0) + 1
+        
+        print(f"📂 Categories: {dict(categories)}")
+        
+        # Sample feed generation
+        print(f"\n🎯 Generating sample feed...")
+        feed_response = await reels_analytics.generate_user_feed("test_user", limit=5)
+        
+        if feed_response.success:
+            print(f"✅ Feed generated successfully!")
+            print(f"   📱 Reels in feed: {len(feed_response.reels)}")
+            print(f"   🔥 Trending: {feed_response.feed_metadata.trending_count}")
+            print(f"   🆕 Fresh: {feed_response.feed_metadata.fresh_count}")
+            print(f"   👤 Personalized: {feed_response.feed_metadata.personalized_count}")
+            
+            print(f"\n📋 Sample feed items:")
+            for i, reel in enumerate(feed_response.reels[:3], 1):
+                flags = []
+                if reel.is_trending: flags.append("🔥 Trending")
+                if reel.is_fresh: flags.append("🆕 Fresh")
+                if reel.is_watched: flags.append("👁️ Watched")
+                
+                print(f"   {i}. {reel.news_data.title[:60]}...")
+                print(f"      📂 {reel.news_data.category} | 🎵 {reel.duration_seconds}s | {' | '.join(flags)}")
+        
+        print(f"\n🌐 API Endpoints to test:")
+        print(f"   📱 Main feed: GET /api/reels/feed?limit=20")
+        print(f"   🔥 Trending: GET /api/reels/trending")
+        print(f"   📊 Analytics: GET /api/reels/analytics/overview")
+        
+    except Exception as e:
+        print(f"❌ Test feed error: {e}")
+
 async def cmd_stats(args):
-    """Stats command - show system statistics"""
+    """Stats command - show system statistics (Updated)"""
     print("📊 System Statistics")
     print("=" * 50)
     
     try:
         from src.services.processing import processing_service
         
-        # TTS stats
+        # TTS stats (enhanced)
         tts_stats = await processing_service.get_tts_stats()
         print("🎵 TTS Statistics:")
         for key, value in tts_stats.items():
@@ -270,6 +379,34 @@ async def cmd_stats(args):
             print("   Recent files:")
             for file_info in audio_files[:5]:
                 print(f"   - {file_info['filename']} ({file_info['size_mb']} MB)")
+        
+        # Reels stats (NEW)
+        try:
+            from src.services.reels_analytics import reels_analytics
+            all_reels = await reels_analytics.get_all_published_reels()
+            
+            print(f"\n🎬 Reels Statistics:")
+            print(f"   Total published reels: {len(all_reels)}")
+            
+            if all_reels:
+                total_duration = sum(reel.duration_seconds for reel in all_reels)
+                total_views = sum(reel.total_views for reel in all_reels)
+                avg_duration = total_duration / len(all_reels)
+                
+                print(f"   Total duration: {total_duration} seconds ({total_duration/60:.1f} minutes)")
+                print(f"   Average duration: {avg_duration:.1f} seconds")
+                print(f"   Total views: {total_views}")
+                print(f"   Average views per reel: {total_views/len(all_reels):.1f}")
+                
+                # Category breakdown
+                categories = {}
+                for reel in all_reels:
+                    cat = reel.news_data.category
+                    categories[cat] = categories.get(cat, 0) + 1
+                print(f"   Categories: {dict(categories)}")
+                
+        except Exception as e:
+            print(f"   ⚠️ Could not get reel stats: {e}")
         
         # Storage info
         storage_path = Path(settings.storage_base_path)
@@ -320,6 +457,22 @@ async def cmd_test(args):
             else:
                 print(f"   ❌ TTS: {tts_result.message}")
         
+        # Test RSS-Reels pipeline (NEW)
+        if args.test_pipeline:
+            print("\n🎬 Testing RSS-Reels pipeline...")
+            from src.services.processing import processing_service
+            
+            pipeline_result = await processing_service.create_reels_from_latest_news(
+                category="guncel",
+                count=1,  # Only 1 for testing
+                voice="mini_default"
+            )
+            
+            if pipeline_result["success"]:
+                print(f"   ✅ Pipeline: Created {pipeline_result['reels_created']} reel(s)")
+            else:
+                print(f"   ❌ Pipeline: {pipeline_result['message']}")
+        
         print("\n✅ System tests completed")
         
     except Exception as e:
@@ -337,20 +490,22 @@ def cmd_api(args):
     print(f"🏥 Health Check: http://{settings.host}:{settings.port}/health")
     print(f"📰 News API: http://{settings.host}:{settings.port}/api/news/latest")
     print(f"🎵 TTS API: http://{settings.host}:{settings.port}/api/tts/voices")
-    print(f"🧪 Mockup Reels: http://{settings.host}:{settings.port}/api/reels/mockup/scraped-news")
+    print(f"🎬 Reels Feed: http://{settings.host}:{settings.port}/api/reels/feed")
+    print(f"🔥 Trending: http://{settings.host}:{settings.port}/api/reels/trending")
     print(f"⚙️  System API: http://{settings.host}:{settings.port}/api/system/health")
     
-    # Start server - Fixed configuration
+    # Start server
     import uvicorn
     uvicorn.run(
-        "src.api:create_app",  # Import string for reload
-        factory=True,  # App factory function
+        "src.api:create_app",
+        factory=True,
         host=settings.host,
         port=settings.port,
         log_level="info",
         reload=settings.debug,
         access_log=True
     )
+
 # ================================
 # CLI SETUP
 # ================================
@@ -358,16 +513,30 @@ def cmd_api(args):
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
-        description="AA Universal API - News, TTS and more",
+        description="AA Universal API - News, TTS, Reels and more",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # News
   python main.py news --count 5 --category spor
+  
+  # TTS
   python main.py tts --text "Hello world" --voice alloy
   python main.py tts --url "https://aa.com.tr/..." --force
+  
+  # Batch (Updated)
   python main.py batch --category guncel --count 10 --voice nova
+  
+  # RSS-Reels (NEW)
+  python main.py rss-reels --count 10 --category guncel --voice mini_default
+  python main.py rss-reels --test-feed  # Create test feed
+  
+  # Testing
+  python main.py test-feed  # Check current feed
+  python main.py test --test-pipeline  # Test full pipeline
+  
+  # Server
   python main.py api
-  python main.py test
         """
     )
     
@@ -392,8 +561,8 @@ Examples:
     tts_parser.add_argument('--speed', type=float, default=1.0, help='Speech speed')
     tts_parser.add_argument('--force', action='store_true', help='Skip confirmation')
     
-    # Batch command
-    batch_parser = subparsers.add_parser('batch', help='Batch process articles to speech')
+    # Batch command (Updated)
+    batch_parser = subparsers.add_parser('batch', help='Batch process articles to speech with reels')
     batch_parser.add_argument('--count', type=int, default=5, help='Number of articles')
     batch_parser.add_argument('--category', default='guncel', help='News category')
     batch_parser.add_argument('--voice', default='alloy', help='TTS voice')
@@ -402,13 +571,25 @@ Examples:
     batch_parser.add_argument('--max-chars', type=int, default=8000, help='Maximum characters')
     batch_parser.add_argument('--force', action='store_true', help='Skip confirmation')
     
+    # RSS-Reels command (NEW)
+    rss_reels_parser = subparsers.add_parser('rss-reels', help='Create reels from latest RSS news')
+    rss_reels_parser.add_argument('--count', type=int, default=10, help='Number of articles to process')
+    rss_reels_parser.add_argument('--category', default='guncel', help='News category')
+    rss_reels_parser.add_argument('--voice', default='mini_default', help='TTS voice (optimized for RSS)')
+    rss_reels_parser.add_argument('--min-chars', type=int, default=50, help='Minimum characters')
+    rss_reels_parser.add_argument('--test-feed', action='store_true', help='Create test feed for development')
+    
+    # Test Feed command (NEW)
+    test_feed_parser = subparsers.add_parser('test-feed', help='Show current feed status and generate sample')
+    
     # Stats command
     stats_parser = subparsers.add_parser('stats', help='Show system statistics')
     stats_parser.add_argument('--verbose', action='store_true', help='Verbose output')
     
-    # Test command
+    # Test command (Updated)
     test_parser = subparsers.add_parser('test', help='Run system tests')
     test_parser.add_argument('--skip-tts', action='store_true', help='Skip TTS tests')
+    test_parser.add_argument('--test-pipeline', action='store_true', help='Test RSS-Reels pipeline')
     
     # API command
     api_parser = subparsers.add_parser('api', help='Start API server')
@@ -435,6 +616,10 @@ Examples:
         asyncio.run(cmd_tts(args))
     elif args.command == 'batch':
         asyncio.run(cmd_batch(args))
+    elif args.command == 'rss-reels':
+        asyncio.run(cmd_rss_reels(args))
+    elif args.command == 'test-feed':
+        asyncio.run(cmd_test_feed(args))
     elif args.command == 'stats':
         asyncio.run(cmd_stats(args))
     elif args.command == 'test':
@@ -459,37 +644,36 @@ def quick_start():
     
     print("\nChoose an option:")
     print("1. Start API server")
-    print("2. Test news fetching")
-    print("3. Test TTS conversion")
+    print("2. Create test reels feed")
+    print("3. Test RSS-Reels pipeline")
     print("4. Show system stats")
+    print("5. Test current feed")
     
-    choice = input("\nEnter choice (1-4): ").strip()
+    choice = input("\nEnter choice (1-5): ").strip()
     
     if choice == '1':
         print("Starting API server...")
         import uvicorn
         app = create_app()
-        app.include_router(content_router)
-        app.include_router(processing_router)
         uvicorn.run(app, host="0.0.0.0", port=8000)
     
     elif choice == '2':
-        async def test_news():
-            from src.services.content import content_service
-            result = await content_service.get_latest_news(count=3)
-            print(f"News test: {len(result.articles)} articles")
-            for article in result.articles:
-                print(f"- {article.title}")
-        asyncio.run(test_news())
+        async def create_test_feed():
+            from src.services.processing import processing_service
+            result = await processing_service.create_reels_from_latest_news(
+                category="guncel", count=5, voice="mini_default"
+            )
+            print(f"Test feed result: {result}")
+        asyncio.run(create_test_feed())
     
     elif choice == '3':
-        async def test_tts():
+        async def test_pipeline():
             from src.services.processing import processing_service
-            from src.models.tts import TTSRequest
-            request = TTSRequest(text="Hello, this is a test message")
-            result = await processing_service.text_to_speech(request)
-            print(f"TTS test: {'Success' if result.success else 'Failed'}")
-        asyncio.run(test_tts())
+            result = await processing_service.create_reels_from_latest_news(
+                category="guncel", count=3, voice="mini_default"
+            )
+            print(f"Pipeline test: {result}")
+        asyncio.run(test_pipeline())
     
     elif choice == '4':
         async def show_stats():
@@ -497,6 +681,13 @@ def quick_start():
             stats = await processing_service.get_tts_stats()
             print("System stats:", stats)
         asyncio.run(show_stats())
+    
+    elif choice == '5':
+        async def test_current_feed():
+            from src.services.reels_analytics import reels_analytics
+            feed = await reels_analytics.generate_user_feed("test_user", 5)
+            print(f"Current feed: {len(feed.reels)} reels available")
+        asyncio.run(test_current_feed())
     
     else:
         print("Invalid choice")
@@ -512,30 +703,61 @@ if __name__ == "__main__":
         main()
 
 # ================================
-# YENİ KOMUT EKLEYİN
+# YENİ KOMUT ÖRNEKLERİ
 # ================================
 
 """
-Yeni CLI komutu eklemek için:
+RSS-Reels Pipeline Examples:
 
-1. async def cmd_yeni_komut(args) fonksiyonu yaz
-2. main() fonksiyonunda subparser ekle:
-   yeni_parser = subparsers.add_parser('yeni-komut', help='Açıklama')
-   yeni_parser.add_argument('--param', help='Parameter')
-3. Execute kısmında elif ekle:
-   elif args.command == 'yeni-komut':
-       asyncio.run(cmd_yeni_komut(args))
+# Create 10 reels from latest news
+python main.py rss-reels --count 10 --category guncel
 
-Örnek:
-async def cmd_game(args):
-    print("🎮 Starting game server...")
-    # Game logic here
+# Create test feed for development
+python main.py rss-reels --test-feed
 
-# Parser'da:
-game_parser = subparsers.add_parser('game', help='Start game server')
-game_parser.add_argument('--players', type=int, default=10)
+# Create sports reels with specific voice
+python main.py rss-reels --count 5 --category spor --voice nova
 
-# Execute'da:
-elif args.command == 'game':
-    asyncio.run(cmd_game(args))
+# Create reels with minimum character filter
+python main.py rss-reels --count 15 --min-chars 100 --voice mini_default
+
+# Test current feed status
+python main.py test-feed
+
+# Enhanced batch processing (creates reels automatically)
+python main.py batch --count 8 --category ekonomi --voice alloy
+
+# Test full pipeline
+python main.py test --test-pipeline
+
+# Show enhanced stats (includes reels)
+python main.py stats --verbose
+
+Quick Development Workflow:
+
+1. Create test data:
+   python main.py rss-reels --test-feed
+
+2. Start API server:
+   python main.py api
+
+3. Check feed in browser:
+   http://localhost:8000/api/reels/feed
+
+4. Test specific endpoints:
+   http://localhost:8000/api/reels/trending
+   http://localhost:8000/api/reels/analytics/overview
+
+Production Workflow:
+
+1. Daily reel generation:
+   python main.py rss-reels --count 20 --category guncel
+
+2. Category-specific reels:
+   python main.py rss-reels --count 10 --category spor
+   python main.py rss-reels --count 10 --category ekonomi
+
+3. Monitor system:
+   python main.py stats
+   python main.py test-feed
 """
