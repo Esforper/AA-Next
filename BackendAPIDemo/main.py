@@ -299,6 +299,126 @@ async def cmd_rss_reels(args):
     except Exception as e:
         print(f"❌ RSS-Reels command error: {e}")
 
+async def cmd_worker(args):
+    """Worker command - RSS worker management (NEW)"""
+    
+    try:
+        from src.services.rss_worker import rss_worker
+        
+        if args.action == 'start':
+            print("🤖 Starting RSS Worker...")
+            
+            # Check if worker is already running
+            status = rss_worker.get_worker_status()
+            if status["is_running"]:
+                print("❌ Worker is already running")
+                print(f"   Started: {status['start_time']}")
+                print(f"   Uptime: {status['uptime_minutes']:.1f} minutes")
+                return
+            
+            print(f"⚙️  Settings:")
+            print(f"   Interval: {rss_worker.worker_settings['interval_minutes']} minutes")
+            print(f"   Categories: {', '.join(rss_worker.worker_settings['categories'])}")
+            print(f"   Voice: {rss_worker.worker_settings['voice']}")
+            print(f"   Max articles per run: {rss_worker.worker_settings['max_articles_per_run']}")
+            
+            if not args.force:
+                confirm = input("\nStart worker? (y/n): ")
+                if confirm.lower() != 'y':
+                    print("❌ Cancelled")
+                    return
+            
+            # Start worker (blocking call)
+            print("🚀 Worker starting... Press Ctrl+C to stop")
+            await rss_worker.start_worker()
+        
+        elif args.action == 'stop':
+            print("🛑 Stopping RSS Worker...")
+            
+            status = rss_worker.get_worker_status()
+            if not status["is_running"]:
+                print("❌ Worker is not running")
+                return
+            
+            await rss_worker.stop_worker()
+            print("✅ Worker stopped")
+        
+        elif args.action == 'status':
+            print("📊 RSS Worker Status")
+            print("=" * 50)
+            
+            status = rss_worker.get_worker_status()
+            
+            # Basic status
+            print(f"🔄 Running: {'Yes' if status['is_running'] else 'No'}")
+            
+            if status['start_time']:
+                print(f"⏰ Started: {status['start_time']}")
+                print(f"⏱️  Uptime: {status['uptime_minutes']:.1f} minutes")
+            
+            if status['last_check_time']:
+                print(f"🔍 Last check: {status['last_check_time']}")
+            
+            # Statistics
+            print(f"\n📈 Statistics:")
+            print(f"   Total runs: {status['total_runs']}")
+            print(f"   Successful: {status['successful_runs']}")
+            print(f"   Failed: {status['failed_runs']}")
+            print(f"   Success rate: {status['success_rate']:.1f}%")
+            print(f"   Consecutive failures: {status['consecutive_failures']}")
+            
+            print(f"\n🎬 Production:")
+            print(f"   Articles processed: {status['total_articles_processed']}")
+            print(f"   Reels created: {status['total_reels_created']}")
+            print(f"   Total cost: ${status['total_cost']:.6f}")
+            
+            print(f"\n📂 Categories: {', '.join(status['categories_tracked'])}")
+            
+            if status['next_check_in_minutes']:
+                print(f"⏳ Next check: {status['next_check_in_minutes']} minutes")
+            
+            if status['last_error']:
+                print(f"❌ Last error: {status['last_error']}")
+        
+        elif args.action == 'restart':
+            print("🔄 Restarting RSS Worker...")
+            
+            # Stop if running
+            status = rss_worker.get_worker_status()
+            if status["is_running"]:
+                print("🛑 Stopping current worker...")
+                await rss_worker.stop_worker()
+                
+                # Wait a moment
+                await asyncio.sleep(2)
+            
+            # Start
+            print("🚀 Starting worker...")
+            await rss_worker.start_worker()
+        
+        elif args.action == 'test':
+            print("🧪 Testing RSS Worker (single iteration)...")
+            
+            status = rss_worker.get_worker_status()
+            if status["is_running"]:
+                print("❌ Cannot test while worker is running. Stop worker first.")
+                return
+            
+            # Run single iteration
+            try:
+                await rss_worker._worker_iteration()
+                print("✅ Test iteration completed successfully")
+            except Exception as e:
+                print(f"❌ Test iteration failed: {e}")
+        
+        else:
+            print(f"❌ Unknown worker action: {args.action}")
+            
+    except ImportError as e:
+        print(f"❌ Worker service not available: {e}")
+    except Exception as e:
+        print(f"❌ Worker command error: {e}")
+
 async def cmd_test_feed(args):
     """Test Feed command - Show current feed status"""
     print("🧪 Testing current feed status...")
@@ -575,9 +695,15 @@ Examples:
     rss_reels_parser = subparsers.add_parser('rss-reels', help='Create reels from latest RSS news')
     rss_reels_parser.add_argument('--count', type=int, default=10, help='Number of articles to process')
     rss_reels_parser.add_argument('--category', default='guncel', help='News category')
-    rss_reels_parser.add_argument('--voice', default='mini_default', help='TTS voice (optimized for RSS)')
+    rss_reels_parser.add_argument('--voice', default='nova', help='TTS voice (fixed default)')
     rss_reels_parser.add_argument('--min-chars', type=int, default=50, help='Minimum characters')
     rss_reels_parser.add_argument('--test-feed', action='store_true', help='Create test feed for development')
+    
+    # Worker command (NEW)
+    worker_parser = subparsers.add_parser('worker', help='RSS Worker management')
+    worker_parser.add_argument('action', choices=['start', 'stop', 'status', 'restart', 'test'], 
+                              help='Worker action')
+    worker_parser.add_argument('--force', action='store_true', help='Skip confirmation prompts')
     
     # Test Feed command (NEW)
     test_feed_parser = subparsers.add_parser('test-feed', help='Show current feed status and generate sample')
@@ -618,6 +744,8 @@ Examples:
         asyncio.run(cmd_batch(args))
     elif args.command == 'rss-reels':
         asyncio.run(cmd_rss_reels(args))
+    elif args.command == 'worker':
+        asyncio.run(cmd_worker(args))
     elif args.command == 'test-feed':
         asyncio.run(cmd_test_feed(args))
     elif args.command == 'stats':
@@ -648,8 +776,10 @@ def quick_start():
     print("3. Test RSS-Reels pipeline")
     print("4. Show system stats")
     print("5. Test current feed")
+    print("6. Start RSS Worker")
+    print("7. Check worker status")
     
-    choice = input("\nEnter choice (1-5): ").strip()
+    choice = input("\nEnter choice (1-7): ").strip()
     
     if choice == '1':
         print("Starting API server...")
@@ -688,6 +818,21 @@ def quick_start():
             feed = await reels_analytics.generate_user_feed("test_user", 5)
             print(f"Current feed: {len(feed.reels)} reels available")
         asyncio.run(test_current_feed())
+    
+    elif choice == '6':
+        async def start_worker():
+            from src.services.rss_worker import rss_worker
+            print("Starting RSS Worker...")
+            await rss_worker.start_worker()
+        asyncio.run(start_worker())
+    
+    elif choice == '7':
+        async def check_worker():
+            from src.services.rss_worker import rss_worker
+            status = rss_worker.get_worker_status()
+            print(f"Worker running: {status['is_running']}")
+            print(f"Total reels created: {status['total_reels_created']}")
+        asyncio.run(check_worker())
     
     else:
         print("Invalid choice")
