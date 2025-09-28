@@ -327,7 +327,7 @@ async def get_ready_agenda(
         raise HTTPException(status_code=500, detail=f"Agenda read error: {str(e)}")
 
 # ============ UTILITY ENDPOINTS ============
-
+from datetime import datetime
 @router.get("/stats")
 async def get_news_stats():
     """

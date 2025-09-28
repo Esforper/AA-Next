@@ -329,7 +329,7 @@ def cmd_api(args):
     """API command - start web server"""
     print("🌐 Starting API server...")
     
-    # Create FastAPI app - router'lar otomatik dahil edilecek
+    # Create FastAPI app
     app = create_app()
     
     print(f"🚀 Server starting on {settings.host}:{settings.port}")
@@ -340,14 +340,16 @@ def cmd_api(args):
     print(f"🧪 Mockup Reels: http://{settings.host}:{settings.port}/api/reels/mockup/scraped-news")
     print(f"⚙️  System API: http://{settings.host}:{settings.port}/api/system/health")
     
-    # Start server
+    # Start server - Fixed configuration
     import uvicorn
     uvicorn.run(
-        app,
+        "src.api:create_app",  # Import string for reload
+        factory=True,  # App factory function
         host=settings.host,
         port=settings.port,
-        log_level="info" if not settings.debug else "debug",
-        reload=settings.debug
+        log_level="info",
+        reload=settings.debug,
+        access_log=True
     )
 # ================================
 # CLI SETUP

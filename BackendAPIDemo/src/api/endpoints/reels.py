@@ -39,6 +39,10 @@ class ReelTrackingRequest(BaseModel):
     category: Optional[str] = Field(None, description="Reel kategorisi")
     session_id: Optional[str] = Field(None, description="Frontend session ID")
 
+class MarkSeenRequest(BaseModel):
+    """Mark reels as seen request"""
+    reel_ids: List[str] = Field(..., description="Görüldü olarak işaretlenecek reel ID'leri")
+
 class UserProgressResponse(BaseModel):
     """Günlük progress response"""
     success: bool = True
@@ -401,7 +405,7 @@ async def get_analytics_overview(
 
 @router.post("/mark-seen")
 async def mark_reel_as_seen(
-    reel_ids: List[str] = Field(..., description="Görüldü olarak işaretlenecek reel ID'leri"),
+    request: MarkSeenRequest,
     user_id: str = Depends(get_user_id_from_header)
 ):
     """
@@ -409,12 +413,12 @@ async def mark_reel_as_seen(
     
     **Kullanıcı scroll yaparken arka planda çağrılabilir**
     
-    - **reel_ids**: İşaretlenecek reel ID'leri
+    - **reel_ids**: İşaretlenecek reel ID'leri (request body'de)
     """
     try:
         marked_count = 0
         
-        for reel_id in reel_ids:
+        for reel_id in request.reel_ids:
             # Kısa süre (100ms) ile "seen" kaydı oluştur
             track_request = TrackViewRequest(
                 reel_id=reel_id,
@@ -429,9 +433,9 @@ async def mark_reel_as_seen(
         
         return {
             "success": True,
-            "message": f"Marked {marked_count}/{len(reel_ids)} reels as seen",
+            "message": f"Marked {marked_count}/{len(request.reel_ids)} reels as seen",
             "marked_count": marked_count,
-            "total_requested": len(reel_ids)
+            "total_requested": len(request.reel_ids)
         }
         
     except Exception as e:
@@ -495,32 +499,22 @@ async def get_scraped_news_mockup(
     **[ORIGINAL MOCKUP ENDPOINT]**
     Web scraping'den gelmiş gibi detaylı haber verisi
     """
-    # Original implementation preserved
- 
     try:
-        # Absolute import kullan
-        from src.api.endpoints.reels_mockup import DETAILED_MOCKUP_NEWS, create_scraped_news_item
-    except ImportError:
-        # Mockup data yoksa boş liste kullan
-        DETAILED_MOCKUP_NEWS = []
-        def create_scraped_news_item(data):
-            return data
-        
-        filtered_news = DETAILED_MOCKUP_NEWS
-        if category:
-            filtered_news = [news for news in DETAILED_MOCKUP_NEWS if news["category"] == category]
-        
-        if not filtered_news:
-            raise HTTPException(status_code=404, detail=f"No news found for category: {category}")
-        
-        selected_news = filtered_news[:count]
-        scraped_items = [create_scraped_news_item(news) for news in selected_news]
+        # Mockup data (basit simülasyon)
+        mockup_news = [
+            {
+                "title": "Sample News 1",
+                "summary": "This is a sample news summary",
+                "category": category or "guncel",
+                "published_date": datetime.now().isoformat()
+            }
+        ] * count
         
         return {
             "success": True,
-            "message": f"Retrieved {len(scraped_items)} scraped news items",
-            "news_items": scraped_items,
-            "total_count": len(scraped_items),
+            "message": f"Retrieved {count} scraped news items",
+            "news_items": mockup_news,
+            "total_count": count,
             "scraping_info": {
                 "scraping_time": datetime.now().isoformat(),
                 "source": "aa.com.tr",
@@ -529,8 +523,6 @@ async def get_scraped_news_mockup(
             }
         }
         
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scraped news error: {str(e)}")
 
@@ -544,33 +536,22 @@ async def generate_reels_from_scraped_mockup(
     **[ORIGINAL MOCKUP ENDPOINT]**
     Scraped news'dan reel generate et (mockup)
     """
-    # Original implementation preserved with minor updates
     try:
-        # Absolute import kullan
-        from src.api.endpoints.reels_mockup import DETAILED_MOCKUP_NEWS, create_scraped_news_item, create_mockup_reel_from_news
-    except ImportError:
-        # Mockup data yoksa boş liste kullan
-        DETAILED_MOCKUP_NEWS = []
-        def create_scraped_news_item(data):
-            return data
-        def create_mockup_reel_from_news(item, voice):
-            return {"error": "Mockup functions not available"}
-        
-        filtered_news = DETAILED_MOCKUP_NEWS
-        if category:
-            filtered_news = [news for news in DETAILED_MOCKUP_NEWS if news["category"] == category]
-        
-        selected_news = filtered_news[:count]
-        
+        # Mockup reel generation
         reels = []
-        for news_data in selected_news:
-            news_item = create_scraped_news_item(news_data)
-            reel = create_mockup_reel_from_news(news_item, voice)
+        for i in range(count):
+            reel = {
+                "id": f"mockup_reel_{i}",
+                "title": f"Mockup Reel {i+1}",
+                "category": category or "guncel",
+                "voice_used": voice,
+                "duration_seconds": 30 + i * 10,
+                "estimated_cost": 0.001 * (i + 1)
+            }
             reels.append(reel)
         
-        total_chars = sum(reel.character_count for reel in reels)
-        total_cost = sum(reel.estimated_cost for reel in reels)
-        total_duration = sum(reel.duration_seconds for reel in reels)
+        total_cost = sum(reel["estimated_cost"] for reel in reels)
+        total_duration = sum(reel["duration_seconds"] for reel in reels)
         
         return {
             "success": True,
@@ -578,7 +559,7 @@ async def generate_reels_from_scraped_mockup(
             "reels": reels,
             "summary": {
                 "total_reels": len(reels),
-                "total_characters": total_chars,
+                "total_characters": count * 500,  # Estimated
                 "total_estimated_cost": round(total_cost, 6),
                 "total_duration_seconds": total_duration,
                 "average_duration": round(total_duration / len(reels), 1),
@@ -633,31 +614,3 @@ async def list_reel_endpoints():
         "base_url": "/api/reels",
         "authentication": "X-User-ID header recommended"
     }
-    
-"""
-Yeni API Endpoint'leri
-Tracking Endpoints:
-
-POST /track-view - Her reel izlendiğinde çağrılacak
-GET /user/{id}/watched - Kullanıcının izlediği reels
-POST /mark-seen - Scroll sırasında görüldü işaretleme
-
-Analytics Endpoints:
-
-GET /user/{id}/daily-progress - Günlük %progress (ana mekanik!)
-GET /user/{id}/stats - Genel kullanıcı istatistikleri
-GET /analytics/{reel_id} - Reel performance bilgileri
-
-Feed & Discovery:
-
-GET /feed - Kişiselleştirilmiş ana feed (trending + recent + watched flags)
-GET /trending - Ekran süresine göre trending reels
-GET /latest-published - En son yayınlanan reel
-
-Utility:
-
-GET /user/{id}/session-summary - Session çıkış özeti
-GET /endpoints - API dokümantasyonu
-
-
-"""

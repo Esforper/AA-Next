@@ -1,625 +1,410 @@
 # ================================
-# src/api/endpoints/reels.py - Extended Reels API Endpoints
+# src/services/reels_analytics.py - Reels Analytics Service
 # ================================
 
 """
-Reels API endpoint'leri - Tracking, Analytics ve Feed sistemi ile genişletilmiş
-Orijinal mockup endpoint'leri + yeni tracking fonksiyonları
+Reels Analytics Service - Tracking, Statistics ve Feed Management
+In-memory implementation (production'da database kullanılacak)
 """
 
-from fastapi import APIRouter, Query, HTTPException, Depends, Header
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, HttpUrl, Field
-from datetime import datetime, date
+from typing import List, Optional, Dict, Any, Set
+from datetime import datetime, date, timedelta
+from collections import defaultdict, Counter
 import hashlib
 
-# Original imports
-from ...services.content import content_service
-from ...services.processing import processing_service
-from ...models.news import NewsResponse, Article
-from ...models.base import BaseResponse
-
-# New tracking imports
-from ...services.reels_analytics import reels_analytics
-from ...models.reels_tracking import (
-    TrackViewRequest, TrackViewResponse, UserReelStats, 
-    DailyProgress, ReelFeedItem, TrendPeriod, ViewStatus
+from ..models.reels_tracking import (
+    ReelView, UserReelStats, UserDailyStats, DailyProgress,
+    ReelAnalytics, ReelFeedItem, TrendingReels, TrendPeriod,
+    TrackViewRequest, TrackViewResponse, ViewStatus
 )
 
-# Router
-router = APIRouter(prefix="/api/reels", tags=["reels"])
-
-# ============ REQUEST/RESPONSE MODELS ============
-
-class ReelTrackingRequest(BaseModel):
-    """Reel tracking request - frontend'den gelecek"""
-    reel_id: str = Field(..., description="İzlenen reel ID'si")
-    duration_ms: int = Field(..., ge=0, description="İzleme süresi (milisaniye)")
-    completed: bool = Field(default=False, description="Tamamen izlendi mi (3sn+)")
-    category: Optional[str] = Field(None, description="Reel kategorisi")
-    session_id: Optional[str] = Field(None, description="Frontend session ID")
-
-class UserProgressResponse(BaseModel):
-    """Günlük progress response"""
-    success: bool = True
-    date: str
-    progress_percentage: float = Field(..., description="İlerleme yüzdesi")
-    total_published_today: int = Field(..., description="Bugün yayınlanan toplam")
-    watched_today: int = Field(..., description="Bugün izlenen")
-    category_breakdown: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+class ReelsAnalyticsService:
+    """Reels analytics ve tracking servisi"""
     
-class UserStatsResponse(BaseModel):
-    """Kullanıcı istatistikleri response"""
-    success: bool = True
-    user_id: str
-    total_reels_watched: int
-    total_screen_time_ms: int
-    total_screen_time_hours: float
-    completion_rate: float
-    favorite_categories: List[str]
-    last_activity: Optional[str] = None
-    current_streak_days: int = 0
-    avg_daily_reels: float = 0.0
-
-class FeedResponse(BaseModel):
-    """Feed response model"""
-    success: bool = True
-    reels: List[ReelFeedItem]
-    total_count: int
-    trending_count: int
-    recent_count: int
-    user_watched_count: int
-
-# ============ UTILITY FUNCTIONS ============
-
-def get_user_id_from_header(user_id: Optional[str] = Header(None, alias="X-User-ID")) -> str:
-    """Header'dan user ID al, yoksa default ver"""
-    return user_id or "anonymous_user"
-
-# ============ TRACKING ENDPOINTS ============
-
-@router.post("/track-view", response_model=TrackViewResponse)
-async def track_reel_view(
-    request: ReelTrackingRequest,
-    user_id: str = Depends(get_user_id_from_header)
-):
-    """
-    Reel izleme kaydı oluştur
+    def __init__(self):
+        # In-memory storage (production'da database olacak)
+        self.view_storage: Dict[str, List[ReelView]] = defaultdict(list)  # user_id -> views
+        self.user_stats: Dict[str, UserReelStats] = {}  # user_id -> stats
+        self.daily_progress: Dict[str, Dict[str, DailyProgress]] = defaultdict(dict)  # user_id -> date -> progress
+        self.reel_analytics: Dict[str, ReelAnalytics] = {}  # reel_id -> analytics
+        
+        # Cache for performance
+        self._trending_cache: Optional[TrendingReels] = None
+        self._cache_expiry: Optional[datetime] = None
+        
+        print("✅ Reels Analytics Service initialized (in-memory)")
     
-    **Frontend'den her reel izlendiğinde çağrılacak**
+    # ============ CORE TRACKING METHODS ============
     
-    - **reel_id**: İzlenen reel ID'si  
-    - **duration_ms**: Kaç milisaniye izlendi
-    - **completed**: 3 saniyeden fazla izlendiyse true
-    - **category**: Reel kategorisi
-    """
-    try:
-        # TrackViewRequest'e çevir
-        track_request = TrackViewRequest(
-            reel_id=request.reel_id,
-            duration_ms=request.duration_ms,
-            completed=request.completed,
-            category=request.category,
-            session_id=request.session_id
-        )
-        
-        # Analytics servisine gönder
-        response = await reels_analytics.track_reel_view(user_id, track_request)
-        
-        if response.success:
-            return response
-        else:
-            raise HTTPException(status_code=400, detail=response.message)
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Track view error: {str(e)}")
-
-@router.get("/user/{user_id}/watched")
-async def get_user_watched_reels(
-    user_id: str,
-    limit: int = Query(50, ge=1, le=200, description="Kaç reel döndürülecek"),
-    category: Optional[str] = Query(None, description="Kategori filtresi")
-):
-    """
-    Kullanıcının izlediği reels listesi
-    
-    - **user_id**: Kullanıcı ID'si
-    - **limit**: Döndürülecek reel sayısı
-    - **category**: Kategori filtresi (opsiyonel)
-    """
-    try:
-        watched_reels = await reels_analytics.get_user_watched_reels(user_id, limit)
-        
-        # Category filter
-        if category:
-            watched_reels = [reel for reel in watched_reels if reel.get("category") == category]
-        
-        # Duration'ları saniyeye çevir
-        for reel in watched_reels:
-            reel["duration_seconds"] = reel["duration_ms"] / 1000.0
-            reel["meaningful_view"] = reel["duration_ms"] >= 3000
-        
-        return {
-            "success": True,
-            "user_id": user_id,
-            "watched_reels": watched_reels,
-            "total_count": len(watched_reels),
-            "filter_applied": category
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Get watched reels error: {str(e)}")
-
-@router.get("/user/{user_id}/daily-progress", response_model=UserProgressResponse)
-async def get_user_daily_progress(
-    user_id: str,
-    target_date: Optional[str] = Query(None, description="Hedef tarih (YYYY-MM-DD), default bugün")
-):
-    """
-    Kullanıcının günlük progress bilgisi
-    
-    **O gün yayınlanan haberlerin %kaçını izlediği**
-    
-    - **user_id**: Kullanıcı ID'si
-    - **target_date**: Hedef tarih, default bugün
-    """
-    try:
-        # Date parsing
-        if target_date:
-            try:
-                parsed_date = datetime.strptime(target_date, "%Y-%m-%d").date()
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        else:
-            parsed_date = date.today()
-        
-        # Progress al
-        progress = await reels_analytics.get_user_daily_progress(user_id, parsed_date)
-        
-        # Category breakdown oluştur
-        category_breakdown = {}
-        for category, data in progress.category_progress.items():
-            published = data.get("published", 0)
-            watched = data.get("watched", 0)
-            percentage = (watched / published * 100) if published > 0 else 0.0
-            
-            category_breakdown[category] = {
-                "published": published,
-                "watched": watched,
-                "percentage": round(percentage, 1)
-            }
-        
-        return UserProgressResponse(
-            date=parsed_date.isoformat(),
-            progress_percentage=round(progress.progress_percentage, 1),
-            total_published_today=progress.total_published_today,
-            watched_today=progress.watched_today,
-            category_breakdown=category_breakdown
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Daily progress error: {str(e)}")
-
-@router.get("/user/{user_id}/stats", response_model=UserStatsResponse)
-async def get_user_stats(user_id: str):
-    """
-    Kullanıcının genel reel istatistikleri
-    
-    - **user_id**: Kullanıcı ID'si
-    
-    **Dönen bilgiler:**
-    - Toplam izlenen reel sayısı
-    - Toplam ekran süresi  
-    - Tamamlama oranı
-    - Favori kategoriler
-    - Son aktivite zamanı
-    """
-    try:
-        user_stats = await reels_analytics.get_user_stats(user_id)
-        
-        return UserStatsResponse(
-            user_id=user_id,
-            total_reels_watched=user_stats.total_reels_watched,
-            total_screen_time_ms=user_stats.total_screen_time_ms,
-            total_screen_time_hours=round(user_stats.get_total_screen_time_hours(), 2),
-            completion_rate=round(user_stats.completion_rate * 100, 1),  # Yüzde olarak
-            favorite_categories=user_stats.favorite_categories,
-            last_activity=user_stats.last_reel_viewed_at.isoformat() if user_stats.last_reel_viewed_at else None,
-            current_streak_days=user_stats.current_streak_days,
-            avg_daily_reels=round(user_stats.avg_daily_reels, 1)
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"User stats error: {str(e)}")
-
-# ============ FEED & DISCOVERY ENDPOINTS ============
-
-@router.get("/feed", response_model=FeedResponse)
-async def get_user_feed(
-    limit: int = Query(20, ge=1, le=50, description="Feed'de kaç reel gösterilecek"),
-    user_id: str = Depends(get_user_id_from_header),
-    include_watched: bool = Query(True, description="İzlenmiş reels dahil edilsin mi")
-):
-    """
-    Kullanıcı için kişiselleştirilmiş reel feed'i
-    
-    **Trending + Recent karışımı, izlenmiş flagları ile**
-    
-    - **limit**: Feed boyutu
-    - **include_watched**: İzlenmiş reels dahil et (ama flag ile işaretle)
-    """
-    try:
-        # Feed'i oluştur
-        feed_items = await reels_analytics.generate_user_feed(user_id, limit)
-        
-        # İzlenmiş reels'i filtrele (eğer istenmiyorsa)
-        if not include_watched:
-            feed_items = [item for item in feed_items if not item.is_watched]
-        
-        # İstatistikler
-        trending_count = sum(1 for item in feed_items if item.is_trending)
-        recent_count = len(feed_items) - trending_count
-        watched_count = sum(1 for item in feed_items if item.is_watched)
-        
-        return FeedResponse(
-            reels=feed_items,
-            total_count=len(feed_items),
-            trending_count=trending_count,
-            recent_count=recent_count,
-            user_watched_count=watched_count
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Feed generation error: {str(e)}")
-
-@router.get("/trending")
-async def get_trending_reels(
-    period: TrendPeriod = Query(TrendPeriod.DAILY, description="Trend periyodu"),
-    limit: int = Query(20, ge=1, le=50, description="Trending reel sayısı"),
-    user_id: str = Depends(get_user_id_from_header)
-):
-    """
-    Ekran süresine göre trend olan reels
-    
-    - **period**: Trend hesaplama periyodu (hourly, daily, weekly)
-    - **limit**: Kaç trend reel döndürülecek
-    """
-    try:
-        trending_reels = await reels_analytics.get_trending_reels(period, limit)
-        
-        # Kullanıcının izlediği reels'i işaretle
-        watched_reel_ids = await reels_analytics._get_user_watched_reel_ids(user_id)
-        for reel in trending_reels:
-            reel.is_watched = reel.reel_id in watched_reel_ids
-        
-        return {
-            "success": True,
-            "trending_reels": trending_reels,
-            "period": period,
-            "total_count": len(trending_reels),
-            "calculated_at": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Trending reels error: {str(e)}")
-
-@router.get("/latest-published")
-async def get_latest_published_reel():
-    """
-    En son yayınlanan reel
-    
-    **Sistem genelinde en son yayınlanan haber**
-    """
-    try:
-        latest_reel = await reels_analytics.get_latest_published_reel()
-        
-        if latest_reel:
-            return {
-                "success": True,
-                "latest_reel": latest_reel,
-                "message": "Latest published reel found"
-            }
-        else:
-            return {
-                "success": False,
-                "message": "No published reels found",
-                "latest_reel": None
-            }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Latest reel error: {str(e)}")
-
-# ============ ANALYTICS ENDPOINTS ============
-
-@router.get("/analytics/{reel_id}")
-async def get_reel_analytics(reel_id: str):
-    """
-    Belirli bir reel'in analytics bilgileri
-    
-    - **reel_id**: Reel ID'si
-    
-    **Admin/moderator için reel performans bilgileri**
-    """
-    try:
-        reel_analytics_data = await reels_analytics.get_reel_analytics(reel_id)
-        
-        if reel_analytics_data:
-            # Engagement score hesapla
-            engagement_score = reel_analytics_data.get_engagement_score()
-            
-            return {
-                "success": True,
-                "reel_id": reel_id,
-                "analytics": reel_analytics_data.dict(),
-                "engagement_score": round(engagement_score, 2),
-                "performance_level": "high" if engagement_score > 7 else "medium" if engagement_score > 4 else "low"
-            }
-        else:
-            raise HTTPException(status_code=404, detail="Reel analytics not found")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reel analytics error: {str(e)}")
-
-@router.get("/analytics/overview")
-async def get_analytics_overview(
-    period_days: int = Query(7, ge=1, le=30, description="Kaç günlük analiz")
-):
-    """
-    Genel sistem analytics özeti
-    
-    - **period_days**: Analiz periyodu (gün)
-    
-    **Sistem geneli istatistikler**
-    """
-    try:
-        # Basit overview - geliştirilecek
-        trending_reels = await reels_analytics.get_trending_reels(TrendPeriod.DAILY, 10)
-        latest_reel = await reels_analytics.get_latest_published_reel()
-        
-        return {
-            "success": True,
-            "period_days": period_days,
-            "overview": {
-                "top_trending_count": len(trending_reels),
-                "latest_reel_published": latest_reel.get("published_at") if latest_reel else None,
-                "total_categories": len(set(reel.category for reel in trending_reels)),
-                "avg_trend_score": round(sum(reel.recommendation_score for reel in trending_reels) / len(trending_reels), 2) if trending_reels else 0
-            },
-            "top_trending": trending_reels[:5]  # Top 5
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analytics overview error: {str(e)}")
-
-# ============ UTILITY ENDPOINTS ============
-
-@router.post("/mark-seen")
-async def mark_reel_as_seen(
-    reel_ids: List[str] = Field(..., description="Görüldü olarak işaretlenecek reel ID'leri"),
-    user_id: str = Depends(get_user_id_from_header)
-):
-    """
-    Reel'leri 'görüldü' olarak işaretle
-    
-    **Kullanıcı scroll yaparken arka planda çağrılabilir**
-    
-    - **reel_ids**: İşaretlenecek reel ID'leri
-    """
-    try:
-        marked_count = 0
-        
-        for reel_id in reel_ids:
-            # Kısa süre (100ms) ile "seen" kaydı oluştur
-            track_request = TrackViewRequest(
-                reel_id=reel_id,
-                duration_ms=100,  # Çok kısa süre
-                completed=False,
-                category=None
+    async def track_reel_view(self, user_id: str, request: TrackViewRequest) -> TrackViewResponse:
+        """
+        Reel izleme kaydı oluştur ve tüm istatistikleri güncelle
+        """
+        try:
+            # ReelView oluştur
+            view = ReelView(
+                reel_id=request.reel_id,
+                user_id=user_id,
+                viewed_at=datetime.now(),
+                duration_ms=request.duration_ms,
+                status=ViewStatus.COMPLETED if request.completed else ViewStatus.PARTIAL,
+                completed=request.completed,
+                category=request.category,
+                session_id=request.session_id
             )
             
-            response = await reels_analytics.track_reel_view(user_id, track_request)
-            if response.success:
-                marked_count += 1
-        
-        return {
-            "success": True,
-            "message": f"Marked {marked_count}/{len(reel_ids)} reels as seen",
-            "marked_count": marked_count,
-            "total_requested": len(reel_ids)
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Mark seen error: {str(e)}")
-
-@router.get("/user/{user_id}/session-summary")
-async def get_user_session_summary(
-    user_id: str,
-    session_id: Optional[str] = Query(None, description="Session ID (opsiyonel)")
-):
-    """
-    Kullanıcının session özetini al
+            # View'ı kaydet
+            self.view_storage[user_id].append(view)
+            
+            # Kullanıcı istatistiklerini güncelle
+            await self._update_user_stats(user_id, view)
+            
+            # Günlük progress'i güncelle
+            await self._update_daily_progress(user_id, view)
+            
+            # Reel analytics'i güncelle
+            await self._update_reel_analytics(request.reel_id, view)
+            
+            # Trending cache'i invalidate et
+            self._invalidate_trending_cache()
+            
+            # Response oluştur
+            view_id = f"{user_id}_{request.reel_id}_{int(datetime.now().timestamp())}"
+            meaningful_view = view.is_meaningful_view()
+            
+            return TrackViewResponse(
+                success=True,
+                message="View tracked successfully",
+                view_id=view_id,
+                meaningful_view=meaningful_view,
+                daily_progress_updated=True
+            )
+            
+        except Exception as e:
+            print(f"❌ Track view error: {e}")
+            return TrackViewResponse(
+                success=False,
+                message=f"Failed to track view: {str(e)}"
+            )
     
-    - **user_id**: Kullanıcı ID'si
-    - **session_id**: Session ID (opsiyonel)
+    async def get_user_watched_reels(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Kullanıcının izlediği reels listesi
+        """
+        try:
+            user_views = self.view_storage.get(user_id, [])
+            
+            # Son izlenen reels'i al (unique reel_id'ler)
+            seen_reels = set()
+            watched_reels = []
+            
+            for view in reversed(user_views):  # En yeniden başla
+                if view.reel_id not in seen_reels and len(watched_reels) < limit:
+                    seen_reels.add(view.reel_id)
+                    
+                    watched_reels.append({
+                        "reel_id": view.reel_id,
+                        "viewed_at": view.viewed_at.isoformat(),
+                        "duration_ms": view.duration_ms,
+                        "completed": view.completed,
+                        "category": view.category,
+                        "status": view.status
+                    })
+            
+            return watched_reels
+            
+        except Exception as e:
+            print(f"❌ Get watched reels error: {e}")
+            return []
     
-    **Kullanıcı uygulamadan çıkarken gösterilebilir**
-    """
-    try:
-        # Bugünkü stats al
-        today_progress = await reels_analytics.get_user_daily_progress(user_id)
-        user_stats = await reels_analytics.get_user_stats(user_id)
+    async def get_user_daily_progress(self, user_id: str, target_date: date = None) -> DailyProgress:
+        """
+        Kullanıcının günlük progress'ini al
+        """
+        if target_date is None:
+            target_date = date.today()
         
-        # Session summary
-        session_summary = {
-            "session_date": date.today().isoformat(),
-            "reels_watched_today": today_progress.watched_today,
-            "progress_percentage": round(today_progress.progress_percentage, 1),
-            "total_screen_time_today_minutes": round((user_stats.total_screen_time_ms / (1000 * 60)), 1),
-            "completion_rate": round(user_stats.completion_rate * 100, 1),
-            "favorite_category": user_stats.favorite_categories[0] if user_stats.favorite_categories else None,
-            "total_reels_all_time": user_stats.total_reels_watched
-        }
+        date_str = target_date.isoformat()
         
-        # Achievements check (basit)
-        achievements = []
-        if today_progress.progress_percentage >= 50:
-            achievements.append("Daily Explorer - %50+ progress")
-        if user_stats.completion_rate > 0.8:
-            achievements.append("Focused Viewer - %80+ completion")
+        # Mevcut progress'i al veya oluştur
+        if date_str not in self.daily_progress[user_id]:
+            self.daily_progress[user_id][date_str] = DailyProgress(
+                user_id=user_id,
+                progress_date=target_date,
+                total_published_today=await self._get_published_count_for_date(target_date),
+                watched_today=0
+            )
         
-        return {
-            "success": True,
-            "user_id": user_id,
-            "session_summary": session_summary,
-            "achievements": achievements,
-            "message": "Have a great day! 🎬"
-        }
+        progress = self.daily_progress[user_id][date_str]
         
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Session summary error: {str(e)}")
-
-# ============ ORIGINAL MOCKUP ENDPOINTS (Preserved) ============
-
-@router.get("/mockup/scraped-news")
-async def get_scraped_news_mockup(
-    count: int = Query(3, ge=1, le=10, description="Number of news items"),
-    category: Optional[str] = Query(None, description="Category filter")
-):
-    """
-    **[ORIGINAL MOCKUP ENDPOINT]**
-    Web scraping'den gelmiş gibi detaylı haber verisi
-    """
-    # Original implementation preserved
-    try:
-        from .reels_mockup import DETAILED_MOCKUP_NEWS, create_scraped_news_item
+        # Progress'i yeniden hesapla
+        progress.calculate_progress()
         
-        filtered_news = DETAILED_MOCKUP_NEWS
-        if category:
-            filtered_news = [news for news in DETAILED_MOCKUP_NEWS if news["category"] == category]
+        return progress
+    
+    async def get_user_stats(self, user_id: str) -> UserReelStats:
+        """
+        Kullanıcının genel istatistiklerini al
+        """
+        if user_id not in self.user_stats:
+            # Yeni kullanıcı için boş stats oluştur
+            self.user_stats[user_id] = UserReelStats(user_id=user_id)
         
-        if not filtered_news:
-            raise HTTPException(status_code=404, detail=f"No news found for category: {category}")
-        
-        selected_news = filtered_news[:count]
-        scraped_items = [create_scraped_news_item(news) for news in selected_news]
-        
-        return {
-            "success": True,
-            "message": f"Retrieved {len(scraped_items)} scraped news items",
-            "news_items": scraped_items,
-            "total_count": len(scraped_items),
-            "scraping_info": {
-                "scraping_time": datetime.now().isoformat(),
-                "source": "aa.com.tr",
-                "quality": "high",
-                "errors": 0
+        return self.user_stats[user_id]
+    
+    # ============ FEED & TRENDING METHODS ============
+    
+    async def generate_user_feed(self, user_id: str, limit: int = 20) -> List[ReelFeedItem]:
+        """
+        Kullanıcı için kişiselleştirilmiş feed oluştur
+        """
+        try:
+            # Trending reels al
+            trending = await self.get_trending_reels(TrendPeriod.DAILY, limit // 2)
+            
+            # Recent reels simülasyonu (gerçek implementation'da database'den gelecek)
+            recent_reels = await self._get_recent_reels(limit // 2)
+            
+            # Kullanıcının izlediği reels
+            watched_reel_ids = await self._get_user_watched_reel_ids(user_id)
+            
+            # Feed'i birleştir
+            feed_items = []
+            
+            # Trending'leri ekle
+            for reel in trending:
+                reel.is_watched = reel.reel_id in watched_reel_ids
+                reel.is_trending = True
+                feed_items.append(reel)
+            
+            # Recent'leri ekle
+            for reel in recent_reels:
+                if reel.reel_id not in [f.reel_id for f in feed_items]:  # Duplicate check
+                    reel.is_watched = reel.reel_id in watched_reel_ids
+                    reel.is_trending = False
+                    feed_items.append(reel)
+            
+            return feed_items[:limit]
+            
+        except Exception as e:
+            print(f"❌ Generate feed error: {e}")
+            return []
+    
+    async def get_trending_reels(self, period: TrendPeriod, limit: int = 20) -> List[ReelFeedItem]:
+        """
+        Trending reels'i al (cache'li)
+        """
+        try:
+            # Cache kontrolü
+            if (self._trending_cache and self._cache_expiry and 
+                datetime.now() < self._cache_expiry and 
+                self._trending_cache.period == period):
+                return self._trending_cache.get_top_trending(limit)
+            
+            # Trending'i hesapla
+            trending_reels = await self._calculate_trending_reels(period, limit * 2)
+            
+            # Cache'e kaydet
+            self._trending_cache = TrendingReels(
+                period=period,
+                trending_reels=trending_reels,
+                total_reels_analyzed=len(self.reel_analytics)
+            )
+            self._cache_expiry = datetime.now() + timedelta(minutes=15)  # 15 dakika cache
+            
+            return trending_reels[:limit]
+            
+        except Exception as e:
+            print(f"❌ Get trending reels error: {e}")
+            return []
+    
+    async def get_latest_published_reel(self) -> Optional[Dict[str, Any]]:
+        """
+        En son yayınlanan reel'i al
+        """
+        try:
+            # Simulated data (gerçek implementation'da database'den gelecek)
+            return {
+                "reel_id": "latest_001",
+                "title": "Son Dakika: Önemli Gelişme",
+                "category": "guncel",
+                "published_at": datetime.now().isoformat(),
+                "total_views": 0
             }
-        }
+            
+        except Exception as e:
+            print(f"❌ Get latest reel error: {e}")
+            return None
+    
+    async def get_reel_analytics(self, reel_id: str) -> Optional[ReelAnalytics]:
+        """
+        Belirli bir reel'in analytics'ini al
+        """
+        return self.reel_analytics.get(reel_id)
+    
+    # ============ PRIVATE HELPER METHODS ============
+    
+    async def _update_user_stats(self, user_id: str, view: ReelView):
+        """Kullanıcı istatistiklerini güncelle"""
+        if user_id not in self.user_stats:
+            self.user_stats[user_id] = UserReelStats(user_id=user_id)
         
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scraped news error: {str(e)}")
+        stats = self.user_stats[user_id]
+        
+        # Basic stats güncelle
+        stats.total_reels_watched += 1
+        stats.total_screen_time_ms += view.duration_ms
+        stats.last_reel_viewed_at = view.viewed_at
+        stats.last_viewed_reel_id = view.reel_id
+        
+        # Completion rate hesapla
+        user_views = self.view_storage[user_id]
+        completed_views = sum(1 for v in user_views if v.completed)
+        stats.completion_rate = completed_views / len(user_views) if user_views else 0
+        
+        # Favorite categories güncelle
+        if view.category:
+            category_counts = Counter(v.category for v in user_views if v.category)
+            stats.favorite_categories = [cat for cat, _ in category_counts.most_common(3)]
+        
+        # Average hesaplamaları
+        if stats.total_days_active > 0:
+            stats.avg_daily_reels = stats.total_reels_watched / stats.total_days_active
+            stats.avg_daily_screen_time_ms = stats.total_screen_time_ms / stats.total_days_active
+        
+        if user_views:
+            stats.avg_reel_duration_ms = sum(v.duration_ms for v in user_views) / len(user_views)
+    
+    async def _update_daily_progress(self, user_id: str, view: ReelView):
+        """Günlük progress'i güncelle"""
+        today = date.today()
+        date_str = today.isoformat()
+        
+        if date_str not in self.daily_progress[user_id]:
+            self.daily_progress[user_id][date_str] = DailyProgress(
+                user_id=user_id,
+                progress_date=today,
+                total_published_today=await self._get_published_count_for_date(today)
+            )
+        
+        progress = self.daily_progress[user_id][date_str]
+        
+        # Watched count güncelle (sadece meaningful view'lar için)
+        if view.is_meaningful_view():
+            progress.watched_today += 1
+        
+        # Category progress güncelle
+        if view.category:
+            if view.category not in progress.category_progress:
+                progress.category_progress[view.category] = {"published": 5, "watched": 0}  # Simulated
+            
+            if view.is_meaningful_view():
+                progress.category_progress[view.category]["watched"] += 1
+        
+        # First/last activity güncelle
+        if not progress.first_view_today:
+            progress.first_view_today = view.viewed_at
+        progress.last_view_today = view.viewed_at
+        
+        # Progress yüzdesini hesapla
+        progress.calculate_progress()
+    
+    async def _update_reel_analytics(self, reel_id: str, view: ReelView):
+        """Reel analytics'i güncelle"""
+        if reel_id not in self.reel_analytics:
+            self.reel_analytics[reel_id] = ReelAnalytics(
+                reel_id=reel_id,
+                published_at=datetime.now(),
+                category=view.category
+            )
+        
+        analytics = self.reel_analytics[reel_id]
+        
+        # Basic metrics güncelle
+        analytics.total_views += 1
+        analytics.total_screen_time_ms += view.duration_ms
+        
+        # Unique viewers (basit implementation)
+        analytics.unique_viewers = analytics.total_views  # Simulated
+        
+        # Completion rate hesapla
+        if view.completed:
+            # Basit completion rate hesaplama
+            analytics.completion_rate = min(1.0, analytics.completion_rate + 0.1)
+        
+        # Average duration güncelle
+        analytics.avg_view_duration_ms = analytics.total_screen_time_ms / analytics.total_views
+        
+        # Trend score hesapla (basit algoritma)
+        recency_factor = max(0, 10 - (datetime.now() - analytics.published_at).hours)
+        engagement_factor = min(10, analytics.total_views / 10)
+        analytics.trend_score = (recency_factor + engagement_factor) / 2
+        
+        # Hourly/daily views güncelle
+        if (datetime.now() - analytics.published_at).total_seconds() < 3600:  # Son 1 saat
+            analytics.hourly_views += 1
+        if (datetime.now() - analytics.published_at).total_seconds() < 86400:  # Son 24 saat
+            analytics.daily_views += 1
+    
+    async def _get_published_count_for_date(self, target_date: date) -> int:
+        """Belirli bir tarihte yayınlanan haber sayısı (simulated)"""
+        # Simulated data - gerçek implementation'da database'den gelecek
+        return 15  # Günde ortalama 15 haber
+    
+    async def _get_recent_reels(self, limit: int) -> List[ReelFeedItem]:
+        """Recent reels'i al (simulated)"""
+        recent_reels = []
+        
+        for i in range(limit):
+            reel = ReelFeedItem(
+                reel_id=f"recent_{i}",
+                title=f"Recent News {i+1}",
+                category="guncel",
+                published_at=datetime.now() - timedelta(hours=i),
+                total_views=10 - i
+            )
+            recent_reels.append(reel)
+        
+        return recent_reels
+    
+    async def _get_user_watched_reel_ids(self, user_id: str) -> Set[str]:
+        """Kullanıcının izlediği reel ID'lerini al"""
+        user_views = self.view_storage.get(user_id, [])
+        return {view.reel_id for view in user_views if view.is_meaningful_view()}
+    
+    async def _calculate_trending_reels(self, period: TrendPeriod, limit: int) -> List[ReelFeedItem]:
+        """Trending reels'i hesapla"""
+        trending_reels = []
+        
+        # Reel analytics'lerini trend score'a göre sırala
+        sorted_reels = sorted(
+            self.reel_analytics.values(),
+            key=lambda x: x.trend_score,
+            reverse=True
+        )
+        
+        for analytics in sorted_reels[:limit]:
+            reel = ReelFeedItem(
+                reel_id=analytics.reel_id,
+                title=f"Trending: {analytics.reel_id}",
+                category=analytics.category or "guncel",
+                published_at=analytics.published_at,
+                total_views=analytics.total_views,
+                is_trending=True,
+                trend_rank=len(trending_reels) + 1,
+                recommendation_score=analytics.trend_score
+            )
+            trending_reels.append(reel)
+        
+        return trending_reels
+    
+    def _invalidate_trending_cache(self):
+        """Trending cache'i temizle"""
+        self._trending_cache = None
+        self._cache_expiry = None
 
-@router.get("/mockup/generate-reels")
-async def generate_reels_from_scraped_mockup(
-    count: int = Query(3, ge=1, le=10, description="Number of reels to generate"),
-    voice: str = Query("alloy", description="TTS voice"),
-    category: Optional[str] = Query(None, description="Category filter")
-):
-    """
-    **[ORIGINAL MOCKUP ENDPOINT]**
-    Scraped news'dan reel generate et (mockup)
-    """
-    # Original implementation preserved with minor updates
-    try:
-        from .reels_mockup import DETAILED_MOCKUP_NEWS, create_scraped_news_item, create_mockup_reel_from_news
-        
-        filtered_news = DETAILED_MOCKUP_NEWS
-        if category:
-            filtered_news = [news for news in DETAILED_MOCKUP_NEWS if news["category"] == category]
-        
-        selected_news = filtered_news[:count]
-        
-        reels = []
-        for news_data in selected_news:
-            news_item = create_scraped_news_item(news_data)
-            reel = create_mockup_reel_from_news(news_item, voice)
-            reels.append(reel)
-        
-        total_chars = sum(reel.character_count for reel in reels)
-        total_cost = sum(reel.estimated_cost for reel in reels)
-        total_duration = sum(reel.duration_seconds for reel in reels)
-        
-        return {
-            "success": True,
-            "message": f"Generated {len(reels)} reels from scraped news",
-            "reels": reels,
-            "summary": {
-                "total_reels": len(reels),
-                "total_characters": total_chars,
-                "total_estimated_cost": round(total_cost, 6),
-                "total_duration_seconds": total_duration,
-                "average_duration": round(total_duration / len(reels), 1),
-                "voice_used": voice
-            }
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reel generation error: {str(e)}")
-
-# ============ API DOCUMENTATION HELPER ============
-
-@router.get("/endpoints")
-async def list_reel_endpoints():
-    """
-    Reels API endpoint'lerinin listesi
-    
-    **Geliştirici referansı için**
-    """
-    endpoints = {
-        "tracking": [
-            "POST /api/reels/track-view - Reel izleme kaydı",
-            "GET /api/reels/user/{id}/watched - İzlenen reels",
-            "POST /api/reels/mark-seen - Reels'i görüldü işaretle"
-        ],
-        "analytics": [
-            "GET /api/reels/user/{id}/daily-progress - Günlük progress",
-            "GET /api/reels/user/{id}/stats - Kullanıcı istatistikleri", 
-            "GET /api/reels/analytics/{reel_id} - Reel analytics",
-            "GET /api/reels/analytics/overview - Sistem overview"
-        ],
-        "feed": [
-            "GET /api/reels/feed - Kişiselleştirilmiş feed",
-            "GET /api/reels/trending - Trend reels",
-            "GET /api/reels/latest-published - En son reel"
-        ],
-        "utility": [
-            "GET /api/reels/user/{id}/session-summary - Session özeti",
-            "GET /api/reels/endpoints - Bu endpoint listesi"
-        ],
-        "mockup": [
-            "GET /api/reels/mockup/scraped-news - Test verisi",
-            "GET /api/reels/mockup/generate-reels - Test reel generation"
-        ]
-    }
-    
-    return {
-        "success": True,
-        "message": "Reels API endpoints",
-        "total_endpoints": sum(len(group) for group in endpoints.values()),
-        "endpoints": endpoints,
-        "base_url": "/api/reels",
-        "authentication": "X-User-ID header recommended"
-    }
-    
-    
+# Global instance
+reels_analytics = ReelsAnalyticsService()
     
 
 """

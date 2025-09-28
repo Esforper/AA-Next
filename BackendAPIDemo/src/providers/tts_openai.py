@@ -11,7 +11,7 @@ import hashlib
 from pathlib import Path
 from datetime import datetime
 import json
-
+from typing import List, Dict, Any
 from ..models.tts import TTSRequest, AudioResult
 from ..config import settings
 from . import register_provider
