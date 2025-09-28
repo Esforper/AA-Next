@@ -40,26 +40,26 @@ export const HomeView: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
-      <div className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">
+    <div className="min-h-screen bg-gray-50 pb-20 sm:pb-24">
+      {/* Header - Responsive */}
+      <div className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-40 border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
             Haberler
           </h1>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Articles Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Content - Responsive Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+        {/* Articles Grid - Enhanced Responsive */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {articles.map((article) => (
             <ArticleCard
               key={article.id}
               article={article}
               onClick={() => handleArticleClick(article.id)}
-              className="hover:scale-105 transition-transform duration-200"
+              className="hover:scale-105 hover:shadow-lg transition-all duration-300 ease-in-out"
             />
           ))}
         </div>

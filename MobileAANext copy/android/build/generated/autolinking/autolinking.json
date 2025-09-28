@@ -1,0 +1,297 @@
+{
+  "root": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy",
+  "reactNativePath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native",
+  "dependencies": {
+    "react-native-gesture-handler": {
+      "root": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-gesture-handler",
+      "name": "react-native-gesture-handler",
+      "platforms": {
+        "ios": {
+          "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-gesture-handler\\ios",
+          "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-gesture-handler",
+          "pbxprojPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-gesture-handler\\ios\\RNGestureHandler.xcodeproj\\project.pbxproj",
+          "podfile": null,
+          "podspecPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-gesture-handler\\RNGestureHandler.podspec",
+          "projectPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-gesture-handler\\ios\\RNGestureHandler.xcodeproj",
+          "projectName": "RNGestureHandler.xcodeproj",
+          "libraryFolder": "Libraries",
+          "sharedLibraries": [],
+          "plist": [],
+          "scriptPhases": [],
+          "configurations": []
+        },
+        "android": {
+          "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-gesture-handler\\android",
+          "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-gesture-handler",
+          "packageImportPath": "import com.swmansion.gesturehandler.react.RNGestureHandlerPackage;",
+          "packageInstance": "new RNGestureHandlerPackage()",
+          "buildTypes": []
+        }
+      },
+      "assets": [],
+      "hooks": {},
+      "params": []
+    },
+    "react-native-reanimated": {
+      "root": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-reanimated",
+      "name": "react-native-reanimated",
+      "platforms": {
+        "ios": {
+          "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-reanimated\\ios",
+          "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-reanimated",
+          "pbxprojPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-reanimated\\ios\\RNReanimated.xcodeproj\\project.pbxproj",
+          "podfile": null,
+          "podspecPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-reanimated\\RNReanimated.podspec",
+          "projectPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-reanimated\\ios\\RNReanimated.xcodeproj",
+          "projectName": "RNReanimated.xcodeproj",
+          "libraryFolder": "Libraries",
+          "sharedLibraries": [],
+          "plist": [],
+          "scriptPhases": [],
+          "configurations": []
+        },
+        "android": {
+          "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-reanimated\\android",
+          "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-reanimated",
+          "packageImportPath": "import com.swmansion.reanimated.ReanimatedPackage;",
+          "packageInstance": "new ReanimatedPackage()",
+          "buildTypes": []
+        }
+      },
+      "assets": [],
+      "hooks": {},
+      "params": []
+    },
+    "react-native-safe-area-context": {
+      "root": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-safe-area-context",
+      "name": "react-native-safe-area-context",
+      "platforms": {
+        "ios": {
+          "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-safe-area-context\\ios",
+          "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-safe-area-context",
+          "pbxprojPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-safe-area-context\\ios\\SafeAreaView.xcodeproj\\project.pbxproj",
+          "podfile": null,
+          "podspecPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-safe-area-context\\react-native-safe-area-context.podspec",
+          "projectPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-safe-area-context\\ios\\SafeAreaView.xcodeproj",
+          "projectName": "SafeAreaView.xcodeproj",
+          "libraryFolder": "Libraries",
+          "sharedLibraries": [],
+          "plist": [],
+          "scriptPhases": [],
+          "configurations": []
+        },
+        "android": {
+          "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-safe-area-context\\android",
+          "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-safe-area-context",
+          "packageImportPath": "import com.th3rdwave.safeareacontext.SafeAreaContextPackage;",
+          "packageInstance": "new SafeAreaContextPackage()",
+          "buildTypes": []
+        }
+      },
+      "assets": [],
+      "hooks": {},
+      "params": []
+    },
+    "react-native-screens": {
+      "root": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-screens",
+      "name": "react-native-screens",
+      "platforms": {
+        "ios": {
+          "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-screens\\ios",
+          "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-screens",
+          "pbxprojPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-screens\\ios\\RNScreens.xcodeproj\\project.pbxproj",
+          "podfile": null,
+          "podspecPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-screens\\RNScreens.podspec",
+          "projectPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-screens\\ios\\RNScreens.xcodeproj",
+          "projectName": "RNScreens.xcodeproj",
+          "libraryFolder": "Libraries",
+          "sharedLibraries": [],
+          "plist": [],
+          "scriptPhases": [],
+          "configurations": []
+        },
+        "android": {
+          "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-screens\\android",
+          "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\node_modules\\react-native-screens",
+          "packageImportPath": "import undefined.RNScreensPackage;",
+          "packageInstance": "new RNScreensPackage()",
+          "buildTypes": []
+        }
+      },
+      "assets": [],
+      "hooks": {},
+      "params": []
+    }
+  },
+  "commands": [
+    {
+      "name": "log-ios",
+      "description": "starts iOS device syslog tail"
+    },
+    {
+      "name": "run-ios",
+      "description": "builds your app and starts it on iOS simulator",
+      "examples": [
+        {
+          "desc": "Run on a different simulator, e.g. iPhone SE (1st generation)",
+          "cmd": "react-native run-ios --simulator \"iPhone SE (1st generation)\""
+        },
+        {
+          "desc": "Pass a non-standard location of iOS directory",
+          "cmd": "react-native run-ios --project-path \"./app/ios\""
+        },
+        {
+          "desc": "Run on a connected device, e.g. Max's iPhone",
+          "cmd": "react-native run-ios --device \"Max's iPhone\""
+        },
+        {
+          "desc": "Run on the AppleTV simulator",
+          "cmd": "react-native run-ios --simulator \"Apple TV\"  --scheme \"helloworld-tvOS\""
+        }
+      ],
+      "options": [
+        {
+          "name": "--simulator <string>",
+          "description": "Explicitly set simulator to use. Optionally include iOS version between parenthesis at the end to match an exact version: \"iPhone 6 (10.0)\"",
+          "default": "iPhone 12"
+        },
+        {
+          "name": "--configuration <string>",
+          "description": "Explicitly set the scheme configuration to use",
+          "default": "Debug"
+        },
+        {
+          "name": "--scheme <string>",
+          "description": "Explicitly set Xcode scheme to use"
+        },
+        {
+          "name": "--project-path <string>",
+          "description": "Path relative to project root where the Xcode project (.xcodeproj) lives.",
+          "default": "ios"
+        },
+        {
+          "name": "--device [string]",
+          "description": "Explicitly set device to use by name.  The value is not required if you have a single device connected."
+        },
+        {
+          "name": "--udid <string>",
+          "description": "Explicitly set device to use by udid"
+        },
+        {
+          "name": "--no-packager",
+          "description": "Do not launch packager while building"
+        },
+        {
+          "name": "--verbose",
+          "description": "Do not use xcpretty even if installed"
+        },
+        {
+          "name": "--port <number>",
+          "default": 8081
+        },
+        {
+          "name": "--terminal <string>",
+          "description": "Launches the Metro Bundler in a new window using the specified terminal path."
+        }
+      ]
+    },
+    {
+      "name": "log-android",
+      "description": "starts logkitty"
+    },
+    {
+      "name": "run-android",
+      "description": "builds your app and starts it on a connected Android emulator or device",
+      "options": [
+        {
+          "name": "--root <string>",
+          "description": "[DEPRECATED - root is discovered automatically] Override the root directory for the android build (which contains the android directory)",
+          "default": ""
+        },
+        {
+          "name": "--variant <string>",
+          "description": "Specify your app's build variant",
+          "default": "debug"
+        },
+        {
+          "name": "--appFolder <string>",
+          "description": "[DEPRECATED – use \"project.android.appName\" in react-native.config.js] Specify a different application folder name for the android source. If not, we assume is \"app\""
+        },
+        {
+          "name": "--appId <string>",
+          "description": "Specify an applicationId to launch after build. If not specified, `package` from AndroidManifest.xml will be used.",
+          "default": ""
+        },
+        {
+          "name": "--appIdSuffix <string>",
+          "description": "Specify an applicationIdSuffix to launch after build.",
+          "default": ""
+        },
+        {
+          "name": "--main-activity <string>",
+          "description": "Name of the activity to start",
+          "default": "MainActivity"
+        },
+        {
+          "name": "--deviceId <string>",
+          "description": "builds your app and starts it on a specific device/simulator with the given device id (listed by running \"adb devices\" on the command line)."
+        },
+        {
+          "name": "--no-packager",
+          "description": "Do not launch packager while building"
+        },
+        {
+          "name": "--port <number>",
+          "default": 8081
+        },
+        {
+          "name": "--terminal <string>",
+          "description": "Launches the Metro Bundler in a new window using the specified terminal path."
+        },
+        {
+          "name": "--tasks <list>",
+          "description": "Run custom Gradle tasks. By default it's \"installDebug\""
+        },
+        {
+          "name": "--no-jetifier",
+          "description": "Do not run \"jetifier\" – the AndroidX transition tool. By default it runs before Gradle to ease working with libraries that don't support AndroidX yet. See more at: https://www.npmjs.com/package/jetifier."
+        }
+      ]
+    }
+  ],
+  "assets": [],
+  "healthChecks": [],
+  "platforms": {
+    "ios": {},
+    "android": {}
+  },
+  "project": {
+    "ios": {
+      "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\ios",
+      "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy",
+      "pbxprojPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\ios\\tempnative.xcodeproj\\project.pbxproj",
+      "podfile": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\ios\\Podfile",
+      "podspecPath": null,
+      "projectPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\ios\\tempnative.xcodeproj",
+      "projectName": "tempnative.xcodeproj",
+      "libraryFolder": "Libraries",
+      "sharedLibraries": [],
+      "plist": [],
+      "scriptPhases": []
+    },
+    "android": {
+      "sourceDir": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\android",
+      "isFlat": true,
+      "folder": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy",
+      "stringsPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\android\\app\\src\\main\\res\\values\\strings.xml",
+      "manifestPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\android\\app\\src\\main\\AndroidManifest.xml",
+      "buildGradlePath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\android\\build.gradle",
+      "settingsGradlePath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\android\\settings.gradle",
+      "assetsPath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\android\\app\\src\\main\\assets",
+      "mainFilePath": "C:\\Users\\Asus\\Downloads\\AA-Next-main\\MobileAANext copy\\android\\app\\src\\main\\java\\com\\tempnative\\MainApplication.java",
+      "packageName": "com.tempnative",
+      "packageFolder": "com\\tempnative",
+      "appName": "app"
+    }
+  }
+}
