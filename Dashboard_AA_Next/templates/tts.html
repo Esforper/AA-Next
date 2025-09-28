@@ -1,0 +1,237 @@
+<!-- templates/tts.html -->
+{% extends "base.html" %}
+
+{% block title %}TTS Manager - AA News API{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1><i class="fas fa-volume-up"></i> TTS Manager</h1>
+        <p class="text-muted">Text-to-Speech dönüştürme ve ses dosyası yönetimi</p>
+    </div>
+</div>
+
+<!-- TTS Converter -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-microphone"></i> Metin → Ses</h5>
+            </div>
+            <div class="card-body">
+                <form id="text-tts-form">
+                    <div class="mb-3">
+                        <label class="form-label">Metin</label>
+                        <textarea class="form-control" name="text" rows="4" placeholder="Dönüştürülecek metin..."></textarea>
+                        <div class="form-text">Karakter sayısı: <span id="char-count">0</span></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Ses</label>
+                            <select class="form-select" name="voice">
+                                {% for voice_id, voice_data in voices.items() %}
+                                <option value="{{ voice_id }}">{{ voice_data.name }} ({{ voice_data.gender }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Model</label>
+                            <select class="form-select" name="model">
+                                <option value="tts-1">TTS-1 (Standard)</option>
+                                <option value="tts-1-hd">TTS-1 HD (High Quality)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-play"></i> TTS Oluştur
+                        </button>
+                        <span class="ms-3 text-muted">
+                            Tahmini maliyet: $<span id="estimated-cost">0.000</span>
+                        </span>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-link"></i> URL → Ses</h5>
+            </div>
+            <div class="card-body">
+                <form id="url-tts-form">
+                    <div class="mb-3">
+                        <label class="form-label">Haber URL'i</label>
+                        <input type="url" class="form-control" name="url" placeholder="https://aa.com.tr/tr/...">
+                        <div class="form-text">AA.com.tr haber linkini yapıştırın</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ses</label>
+                        <select class="form-select" name="voice">
+                            {% for voice_id, voice_data in voices.items() %}
+                            <option value="{{ voice_id }}">{{ voice_data.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-download"></i> Haber → TTS
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Audio Files -->
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-music"></i> Ses Dosyaları</h5>
+                <div class="float-end">
+                    <span class="badge bg-info">{{ audio_files|length }} dosya</span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if audio_files %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Dosya</th>
+                                <th>Boyut</th>
+                                <th>Oluşturma</th>
+                                <th>İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for file in audio_files %}
+                            <tr>
+                                <td>
+                                    <i class="fas fa-file-audio text-primary"></i>
+                                    {{ file.filename }}
+                                </td>
+                                <td>{{ file.size_mb }} MB</td>
+                                <td>{{ file.created_at[:19] }}</td>
+                                <td>
+                                    <a href="{{ file.download_url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="fas fa-play"></i> Oynat
+                                    </a>
+                                    <a href="{{ file.download_url }}" download class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-music fa-3x mb-3"></i>
+                    <p>Henüz ses dosyası oluşturulmamış</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TTS Statistics -->
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-bar"></i> TTS İstatistikleri</h5>
+            </div>
+            <div class="card-body">
+                {% if stats_result.success %}
+                <div class="json-container">
+                    <pre>{{ stats_result.data | tojson(indent=2) }}</pre>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    İstatistik verisi alınamadı: {{ stats_result.error }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Character count and cost estimation
+    $('textarea[name="text"]').on('input', function() {
+        const text = $(this).val();
+        const charCount = text.length;
+        const estimatedCost = (charCount / 1000000) * 0.015;
+        
+        $('#char-count').text(charCount);
+        $('#estimated-cost').text(estimatedCost.toFixed(6));
+    });
+    
+    // Text to TTS
+    $('#text-tts-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> İşleniyor...');
+        
+        fetch('/tts/convert', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('TTS başarıyla oluşturuldu!');
+                location.reload();
+            } else {
+                alert('TTS hatası: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(err => {
+            alert('TTS hatası: ' + err.message);
+        })
+        .finally(() => {
+            submitBtn.prop('disabled', false).html('<i class="fas fa-play"></i> TTS Oluştur');
+        });
+    });
+    
+    // URL to TTS
+    $('#url-tts-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> İşleniyor...');
+        
+        fetch('/tts/convert-url', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('TTS başarıyla oluşturuldu!');
+                location.reload();
+            } else {
+                alert('TTS hatası: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(err => {
+            alert('TTS hatası: ' + err.message);
+        })
+        .finally(() => {
+            submitBtn.prop('disabled', false).html('<i class="fas fa-download"></i> Haber → TTS');
+        });
+    });
+</script>
+{% endblock %}

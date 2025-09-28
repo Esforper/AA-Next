@@ -1,0 +1,267 @@
+<!-- templates/reels.html -->
+{% extends "base.html" %}
+
+{% block title %}Reels Manager - AA News API{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1><i class="fas fa-film"></i> Reels Manager</h1>
+        <p class="text-muted">Reels oluşturma, yönetme ve analytics</p>
+    </div>
+</div>
+
+<!-- Reels Generator -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-magic"></i> Reels Oluştur</h5>
+            </div>
+            <div class="card-body">
+                <form id="generate-reels-form">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">Reel Sayısı</label>
+                            <input type="number" class="form-control" name="count" value="3" min="1" max="10">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Ses</label>
+                            <select class="form-select" name="voice">
+                                <option value="alloy">Alloy</option>
+                                <option value="echo">Echo</option>
+                                <option value="fable">Fable</option>
+                                <option value="nova">Nova</option>
+                                <option value="shimmer">Shimmer</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Kategori</label>
+                            <select class="form-select" name="category">
+                                <option value="">Tüm kategoriler</option>
+                                <option value="guncel">Güncel</option>
+                                <option value="spor">Spor</option>
+                                <option value="ekonomi">Ekonomi</option>
+                                <option value="kultur">Kültür</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-cogs"></i> Reels Oluştur
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-fire"></i> Trending Info</h5>
+            </div>
+            <div class="card-body">
+                {% if trending_result.success %}
+                <p><strong>{{ trending_result.data.total_count }}</strong> trending reel</p>
+                <p class="text-muted small">Son güncelleme: {{ trending_result.data.calculated_at[:19] }}</p>
+                {% else %}
+                <p class="text-muted">Trending verisi alınamadı</p>
+                {% endif %}
+                
+                {% if latest_result.success and latest_result.data.latest_reel %}
+                <hr>
+                <p><strong>Son Yayın:</strong></p>
+                <p class="small">{{ latest_result.data.latest_reel.title }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mockup News Data -->
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-newspaper"></i> Mevcut Haberler (Mockup Data)</h5>
+            </div>
+            <div class="card-body">
+                {% if mockup_result.success %}
+                <div class="row">
+                    {% for news in mockup_result.data.news_items %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ news.title }}</h6>
+                                <p class="card-text small text-muted">{{ news.summary[:150] }}...</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-tag"></i> {{ news.category }}
+                                        <br><i class="fas fa-map-marker-alt"></i> {{ news.location }}
+                                    </small>
+                                    <button class="btn btn-sm btn-outline-primary generate-single-reel" 
+                                            data-title="{{ news.title }}" 
+                                            data-category="{{ news.category }}">
+                                        <i class="fas fa-film"></i> Reel Yap
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    Mockup verisi alınamadı: {{ mockup_result.error }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generated Reels -->
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Oluşturulan Reels</h5>
+            </div>
+            <div class="card-body">
+                <div id="generated-reels">
+                    <p class="text-muted text-center">Henüz reel oluşturulmamış. Yukarıdaki formu kullanarak reel oluşturabilirsiniz.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Generate reels
+    $('#generate-reels-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Oluşturuluyor...');
+        
+        fetch('/reels/generate', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayGeneratedReels(data.data);
+            } else {
+                alert('Reels oluşturma hatası: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        })
+        .catch(err => {
+            alert('Reels hatası: ' + err.message);
+        })
+        .finally(() => {
+            submitBtn.prop('disabled', false).html('<i class="fas fa-cogs"></i> Reels Oluştur');
+        });
+    });
+    
+    // Display generated reels
+    function displayGeneratedReels(result) {
+        const container = document.getElementById('generated-reels');
+        
+        if (result.reels && result.reels.length > 0) {
+            let html = '<div class="row">';
+            
+            result.reels.forEach(reel => {
+                html += `
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between">
+                                <span><i class="fas fa-film"></i> ${reel.id}</span>
+                                <span class="badge bg-success">${reel.status}</span>
+                            </div>
+                            <div class="card-body">
+                                <h6>${reel.news_data.title}</h6>
+                                <p class="small text-muted">${reel.tts_content.substring(0, 100)}...</p>
+                                <div class="row text-center">
+                                    <div class="col">
+                                        <small class="text-muted">Süre</small><br>
+                                        <strong>${reel.duration_seconds}s</strong>
+                                    </div>
+                                    <div class="col">
+                                        <small class="text-muted">Boyut</small><br>
+                                        <strong>${reel.file_size_mb}MB</strong>
+                                    </div>
+                                    <div class="col">
+                                        <small class="text-muted">Maliyet</small><br>
+                                        <strong>${reel.estimated_cost}</strong>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <a href="${reel.audio_url}" class="btn btn-sm btn-primary" target="_blank">
+                                        <i class="fas fa-play"></i> Oynat
+                                    </a>
+                                    <span class="text-muted small">Ses: ${reel.voice_used}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            // Summary
+            html += `
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-chart-bar"></i> Özet</h6>
+                    <div class="row">
+                        <div class="col-md-3">Toplam Reel: <strong>${result.summary.total_reels}</strong></div>
+                        <div class="col-md-3">Toplam Süre: <strong>${result.summary.total_duration_seconds}s</strong></div>
+                        <div class="col-md-3">Ortalama Süre: <strong>${result.summary.average_duration}s</strong></div>
+                        <div class="col-md-3">Toplam Maliyet: <strong>${result.summary.total_estimated_cost}</strong></div>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div class="alert alert-warning">Reel oluşturulamadı</div>';
+        }
+    }
+    
+    // Generate single reel
+    $(document).on('click', '.generate-single-reel', function() {
+        const title = $(this).data('title');
+        const category = $(this).data('category');
+        
+        if (confirm(`"${title}" için reel oluşturulsun mu?`)) {
+            const formData = new FormData();
+            formData.append('count', '1');
+            formData.append('voice', 'alloy');
+            formData.append('category', category);
+            
+            fetch('/reels/generate', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Reel başarıyla oluşturuldu!');
+                    displayGeneratedReels(data.data);
+                } else {
+                    alert('Reel oluşturma hatası: ' + (data.error || 'Bilinmeyen hata'));
+                }
+            })
+            .catch(err => {
+                alert('Reel hatası: ' + err.message);
+            });
+        }
+    });
+</script>
+{% endblock %}
