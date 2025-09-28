@@ -28,6 +28,7 @@ export const ReelsView: React.FC = () => {
   const [slideOffset, setSlideOffset] = useState({ x: 0, y: 0 });
   const [nextReelData, setNextReelData] = useState<ReelData | null>(null);
   const [prevReelData, setPrevReelData] = useState<ReelData | null>(null);
+  const [imageAnimation, setImageAnimation] = useState<'slide-left-in' | 'slide-right-in' | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const currentReel = reels[currentReelIndex];
@@ -66,35 +67,55 @@ export const ReelsView: React.FC = () => {
     return reel.images[imageIndex] || reel.main_image || '';
   };
 
-  // Handle image navigation with slide animations
+  // Handle image navigation with side-by-side slide animations
   const nextImage = () => {
     if (!currentReel?.images || currentReel.images.length === 0 || isTransitioning) return;
     setIsTransitioning(true);
     setSwipeDirection('left');
+    setImageAnimation('slide-left-in');
+    
+    // Start sliding current image out to left
     setSlideOffset({ x: -100, y: 0 });
     
     setTimeout(() => {
+      // Change image and start sliding new image in from right
       setCurrentImageIndex((prev) => (prev + 1) % currentReel.images.length);
-      setSlideOffset({ x: 0, y: 0 });
-      setIsTransitioning(false);
-      setSwipeDirection(null);
-    }, 300);
+      setSlideOffset({ x: 100, y: 0 }); // New image starts from right
+      
+      // Smooth slide new image to center
+      setTimeout(() => {
+        setSlideOffset({ x: 0, y: 0 }); // New image slides to center
+        setIsTransitioning(false);
+        setSwipeDirection(null);
+        setImageAnimation(null);
+      }, 100); // Longer delay for smoother transition
+    }, 400); // Slower, more user-friendly timing
   };
 
   const prevImage = () => {
     if (!currentReel?.images || currentReel.images.length === 0 || isTransitioning) return;
     setIsTransitioning(true);
     setSwipeDirection('right');
+    setImageAnimation('slide-right-in');
+    
+    // Start sliding current image out to right
     setSlideOffset({ x: 100, y: 0 });
     
     setTimeout(() => {
+      // Change image and start sliding new image in from left
       setCurrentImageIndex((prev) => 
         prev === 0 ? currentReel.images.length - 1 : prev - 1
       );
-      setSlideOffset({ x: 0, y: 0 });
-      setIsTransitioning(false);
-      setSwipeDirection(null);
-    }, 300);
+      setSlideOffset({ x: -100, y: 0 }); // New image starts from left
+      
+      // Smooth slide new image to center
+      setTimeout(() => {
+        setSlideOffset({ x: 0, y: 0 }); // New image slides to center
+        setIsTransitioning(false);
+        setSwipeDirection(null);
+        setImageAnimation(null);
+      }, 100); // Longer delay for smoother transition
+    }, 400); // Slower, more user-friendly timing
   };
 
   // YouTube Shorts style navigation
@@ -367,7 +388,8 @@ export const ReelsView: React.FC = () => {
       style={{
         userSelect: 'none', 
         WebkitUserSelect: 'none',
-        WebkitTouchCallout: 'none'
+        WebkitTouchCallout: 'none',
+        minHeight: '100dvh' // Dynamic viewport height for mobile
       } as React.CSSProperties}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -403,7 +425,55 @@ export const ReelsView: React.FC = () => {
           </div>
         )}
 
-        {/* Current Reel (Main) */}
+        {/* Left Preview Image - Instagram Stories Style */}
+        {currentReel?.images && currentReel.images.length > 1 && (
+          <div 
+            className="absolute inset-0 w-full h-full"
+            style={{
+              transform: `translateX(-20%) scale(0.85)`,
+              zIndex: 1,
+              filter: 'blur(3px)',
+              opacity: 0.3
+            }}
+          >
+            <ReelItem
+              reel={{
+                ...currentReel,
+                main_image: getReelImage(currentReel, currentImageIndex === 0 ? currentReel.images.length - 1 : currentImageIndex - 1)
+              }}
+              isActive={false}
+              onPlay={() => {}}
+              onImageClick={() => {}}
+              className="absolute inset-0 w-full h-full"
+            />
+          </div>
+        )}
+
+        {/* Right Preview Image - Instagram Stories Style */}
+        {currentReel?.images && currentReel.images.length > 1 && (
+          <div 
+            className="absolute inset-0 w-full h-full"
+            style={{
+              transform: `translateX(20%) scale(0.85)`,
+              zIndex: 1,
+              filter: 'blur(3px)',
+              opacity: 0.3
+            }}
+          >
+            <ReelItem
+              reel={{
+                ...currentReel,
+                main_image: getReelImage(currentReel, (currentImageIndex + 1) % currentReel.images.length)
+              }}
+              isActive={false}
+              onPlay={() => {}}
+              onImageClick={() => {}}
+              className="absolute inset-0 w-full h-full"
+            />
+          </div>
+        )}
+
+        {/* Current Reel (Main) - Enhanced with Overflow Blur */}
         <div 
           className={`absolute inset-0 w-full h-full ${
             isTransitioning && swipeDirection === 'left' ? 'animate-slide-left-out' :
@@ -411,9 +481,10 @@ export const ReelsView: React.FC = () => {
             ''
           }`}
           style={{
-            transform: `translate(${slideOffset.x}%, ${slideOffset.y}%)`,
-            transition: isTransitioning ? 'transform 0.3s ease-out' : 'none',
-            zIndex: 2
+            transform: `translate(${slideOffset.x}%, ${slideOffset.y}%) scale(${isTransitioning ? 0.98 : 1})`,
+            transition: isTransitioning ? 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
+            zIndex: 2,
+            filter: isTransitioning ? 'blur(0.3px)' : 'blur(0px)'
           }}
         >
           <ReelItem
@@ -424,8 +495,40 @@ export const ReelsView: React.FC = () => {
             isActive={true}
             onPlay={togglePlayPause}
             onImageClick={togglePlayPause}
-            className="absolute inset-0 w-full h-full"
+            className={`absolute inset-0 w-full h-full ${
+              imageAnimation ? `animate-${imageAnimation}` : ''
+            }`}
           />
+          
+          {/* Enhanced Edge Blur Effects - YouTube Shorts Style */}
+          <div className="absolute inset-0 pointer-events-none z-10">
+            {/* Left Edge Blur - Enhanced */}
+            <div 
+              className="absolute left-0 top-0 w-16 h-full"
+              style={{
+                background: 'linear-gradient(90deg, rgba(0,0,0,0.3) 0%, transparent 100%)',
+                filter: 'blur(2px)'
+              }}
+            />
+            
+            {/* Right Edge Blur - Enhanced */}
+            <div 
+              className="absolute right-0 top-0 w-16 h-full"
+              style={{
+                background: 'linear-gradient(270deg, rgba(0,0,0,0.3) 0%, transparent 100%)',
+                filter: 'blur(2px)'
+              }}
+            />
+            
+            {/* Top Edge Blur - Instagram Stories Style */}
+            <div 
+              className="absolute top-0 left-0 right-0 h-20"
+              style={{
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, transparent 100%)',
+                filter: 'blur(1px)'
+              }}
+            />
+          </div>
         </div>
 
         {/* Next Reel (Behind) */}
@@ -453,42 +556,65 @@ export const ReelsView: React.FC = () => {
 
 
 
-        {/* UI Overlay - Fixed Position */}
+        {/* Modern UI Overlay - YouTube Shorts & Instagram Style */}
         <div className="absolute inset-0 z-30 pointer-events-none">
-          {/* Reel Counter */}
-          <div className="absolute top-4 left-4 pointer-events-auto">
-            <div className="bg-black bg-opacity-70 rounded-full px-3 py-1 text-white text-sm backdrop-blur-sm">
-              {currentReelIndex + 1} / {reels.length}
-            </div>
-          </div>
-
-          {/* Image Indicators */}
-          {currentReel?.images && currentReel.images.length > 1 && (
-            <div className="absolute top-4 right-4 pointer-events-auto">
-              <div className="bg-black bg-opacity-70 rounded-full px-3 py-1 text-white text-sm backdrop-blur-sm">
-                {currentImageIndex + 1} / {currentReel.images.length}
-              </div>
-            </div>
-          )}
-
-          {/* Image Dots */}
-          {currentReel?.images && currentReel.images.length > 1 && (
-            <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 pointer-events-auto">
-              <div className="flex space-x-2">
+          {/* Top Status Bar - YouTube Shorts Style */}
+          <div className="absolute top-0 left-0 right-0 pointer-events-none">
+            {/* Progress Indicators for Multiple Images */}
+            {currentReel?.images && currentReel.images.length > 1 && (
+              <div className="flex space-x-1 p-2">
                 {currentReel.images.map((_, index) => (
-                  <button
+                  <div
                     key={index}
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
                       index === currentImageIndex 
-                        ? 'bg-white scale-125' 
-                        : 'bg-white bg-opacity-50 scale-100'
+                        ? 'bg-white' 
+                        : index < currentImageIndex 
+                          ? 'bg-white/60' 
+                          : 'bg-white/20'
                     }`}
                   />
                 ))}
               </div>
+            )}
+          </div>
+
+
+          {/* Bottom Progress Bar - YouTube Shorts Style */}
+          <div className="absolute bottom-0 left-0 right-0 pointer-events-auto">
+            <div className="h-1 bg-black/20">
+              <div 
+                className="h-full bg-gradient-to-r from-red-500 via-pink-500 to-purple-500 transition-all duration-700 ease-out shadow-lg"
+                style={{ width: `${((currentReelIndex + 1) / reels.length) * 100}%` }}
+              />
             </div>
-          )}
+          </div>
+
+          {/* Navigation Controls - Desktop Only */}
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 pointer-events-none hidden lg:block">
+            <div className="bg-black/40 backdrop-blur-lg rounded-full px-4 py-2 text-white/80 text-xs font-medium border border-white/20">
+              <div className="flex items-center space-x-4">
+                <span className="flex items-center space-x-1">
+                  <span>↑↓</span>
+                  <span>Reels</span>
+                </span>
+                <span>•</span>
+                <span className="flex items-center space-x-1">
+                  <span>←→</span>
+                  <span>Images</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Swipe Indicators - Mobile Only */}
+          <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 pointer-events-none sm:hidden">
+            <div className="flex space-x-2">
+              <div className="w-1 h-1 bg-white/40 rounded-full animate-bounce"></div>
+              <div className="w-1 h-1 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-1 h-1 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -78,20 +78,20 @@ export const NewsDetailView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      {/* Header - Responsive */}
+      <div className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-40 border-b border-gray-200">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <button
               onClick={handleBack}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors active:scale-95"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" />
               </svg>
-              <span>Geri</span>
+              <span className="hidden sm:inline">Geri</span>
             </button>
-            <h1 className="text-lg font-semibold text-gray-900">
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
               Haber Detayı
             </h1>
             <div className="w-16" /> {/* Spacer */}
@@ -99,8 +99,8 @@ export const NewsDetailView: React.FC = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      {/* Content - Responsive */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         <Card padding="lg" shadow="lg">
           {/* Category Badge */}
           <div className="mb-4">
@@ -109,79 +109,79 @@ export const NewsDetailView: React.FC = () => {
             </span>
           </div>
 
-          {/* Title */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          {/* Title - Responsive */}
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
             {article.title}
           </h1>
 
-          {/* Meta Information */}
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6 pb-6 border-b border-gray-200">
+          {/* Meta Information - Responsive */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4 text-sm text-gray-600 mb-6 pb-6 border-b border-gray-200">
             {article.author && (
               <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
                 </svg>
-                <span>{article.author}</span>
+                <span className="truncate">{article.author}</span>
               </div>
             )}
             
             {article.location && (
               <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" />
                 </svg>
-                <span>{article.location}</span>
+                <span className="truncate">{article.location}</span>
               </div>
             )}
             
             <div className="flex items-center space-x-1">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" />
               </svg>
               <span>{formatDate(article.published_date)}</span>
             </div>
           </div>
 
-          {/* Main Image */}
+          {/* Main Image - Responsive */}
           {article.main_image && (
             <div className="mb-6">
               <img
                 src={article.main_image}
                 alt={article.title}
-                className="w-full h-96 object-cover rounded-lg"
+                className="w-full h-64 sm:h-80 lg:h-96 object-cover rounded-lg shadow-lg"
               />
             </div>
           )}
 
-          {/* Summary */}
+          {/* Summary - Responsive */}
           {article.summary && (
             <div className="mb-6">
-              <p className="text-lg text-gray-700 leading-relaxed font-medium">
+              <p className="text-base sm:text-lg text-gray-700 leading-relaxed font-medium">
                 {article.summary}
               </p>
             </div>
           )}
 
-          {/* Content */}
-          <div className="prose prose-lg max-w-none mb-8">
-            <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+          {/* Content - Responsive */}
+          <div className="prose prose-sm sm:prose-base lg:prose-lg max-w-none mb-8">
+            <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-sm sm:text-base">
               {article.content}
             </div>
           </div>
 
-          {/* Additional Images */}
+          {/* Additional Images - Responsive */}
           {article.images && article.images.length > 1 && (
             <div className="mb-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 İlgili Görseller
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {article.images.slice(1).map((image, index) => (
                   <img
                     key={index}
                     src={image}
                     alt={`${article.title} - ${index + 2}`}
-                    className="w-full h-40 object-cover rounded-lg"
+                    className="w-full h-32 sm:h-40 object-cover rounded-lg shadow-md hover:shadow-lg transition-shadow"
                   />
                 ))}
               </div>
