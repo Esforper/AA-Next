@@ -221,3 +221,13 @@
 2025-09-29 18:07:23,019 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
 2025-09-29 18:07:24,984 - rss_worker - INFO - ✅ Reel created: Zeynep Sönmez, Çin Açık Tenis Turnuvası'...
 2025-09-29 18:07:24,993 - rss_worker - INFO - ✅ Worker iteration completed: 10 processed, 10 reels created, $0.0000 cost
+2025-09-29 19:13:07,675 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:13:11,088 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:13:14,244 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:13:17,341 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:13:20,376 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:57:03,626 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:57:07,461 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:57:10,623 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:57:13,681 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"
+2025-09-29 19:57:20,177 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/audio/speech "HTTP/1.1 200 OK"

@@ -23,6 +23,70 @@ session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 })
 
+
+def filter_aa_images(soup, base_url: str):
+    """AA.com.tr'ye özel minimal görsel filtreleme"""
+    images = []
+    main_image = None
+    
+    # AA.com.tr için base domain
+    AA_DOMAIN = 'https://www.aa.com.tr'
+    AA_CDN = 'https://cdnuploads.aa.com.tr'
+    
+    def normalize_url(src):
+        """URL'i normalize et"""
+        if not src:
+            return None
+            
+        # Zaten tam URL ise direkt döndür
+        if src.startswith('http://') or src.startswith('https://'):
+            return src
+            
+        # // ile başlıyorsa https: ekle
+        if src.startswith('//'):
+            return 'https:' + src
+            
+        # / ile başlıyorsa (relative path)
+        if src.startswith('/'):
+            # /uploads/ ile başlayanlar CDN'den gelir
+            if src.startswith('/uploads/'):
+                return AA_CDN + src
+            # Diğerleri ana domainden
+            else:
+                return AA_DOMAIN + src
+        
+        return None
+    
+    # 1. Ana görseli bul (detay-buyukFoto)
+    main_img = soup.select_one('img.detay-buyukFoto, img[class*="detay-buyuk"]')
+    if main_img and main_img.get('src'):
+        src = normalize_url(main_img.get('src'))
+        if src:
+            main_image = src
+            images.append(src)
+    
+    # 2. İçerik görsellerini bul (detay-icerik içinde)
+    content_div = soup.select_one('div.detay-icerik')
+    if content_div:
+        for img in content_div.find_all('img'):
+            src = normalize_url(img.get('src'))
+            
+            if src and src != main_image:
+                # AA'nın uploads klasöründen gelenleri tercih et
+                if any(keyword in src.lower() for keyword in ['/uploads/', 'cdnuploads.aa.com.tr', '/thumbs_']):
+                    images.append(src)
+    
+    # 3. Eğer hiç görsel yoksa eski yöntemi dene
+    if not images:
+        for img in soup.find_all('img'):
+            src = normalize_url(img.get('src'))
+            if src:
+                # İstenmeyen pattern'leri filtrele
+                if not any(pattern in src.lower() for pattern in ['logo', 'icon', 'button', 'social', 'facebook', 'twitter', 'instagram']):
+                    images.append(src)
+    
+    return list(set(images))  # Duplicate'ları çıkar
+
 async def get_latest_news(count: int = 10, category: str = "guncel", **kwargs) -> List[Article]:
     """
     AA'dan son haberleri çek
@@ -67,8 +131,7 @@ async def get_latest_news(count: int = 10, category: str = "guncel", **kwargs) -
 
 async def scrape_article(url: str) -> Dict:
     """
-    Basit web scraping
-    Mevcut scraping kodunu buraya kopyala
+    Basit web scraping - İyileştirilmiş görsel filtreleme ile
     """
     try:
         response = session.get(url, timeout=20)
@@ -91,12 +154,8 @@ async def scrape_article(url: str) -> Dict:
         if author_elem:
             author = author_elem.get_text().strip()
         
-        # Basit images
-        images = []
-        for img in soup.find_all('img'):
-            src = img.get('src')
-            if src and 'http' in src:
-                images.append(src)
+        # İyileştirilmiş görsel filtreleme
+        images = filter_aa_images(soup, url)
         
         return {
             'content': content,
