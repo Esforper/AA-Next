@@ -27,3 +27,29 @@ curl "http://localhost:8000/api/reels/feed?limit=10"
 curl -X POST "http://localhost:8000/api/reels/track-view" \
   -H "X-User-ID: test_user" \
   -d '{"reel_id":"aa_123", "duration_ms":30000, "completed":true}'
+
+
+
+
+
+
+
+
+
+
+  test amaçlı feed oluşturma
+
+  # 50 haber çevir (manuel)
+python main.py rss-reels --count 50 --category guncel
+
+# Diğer kategorilerde de çevir
+python main.py rss-reels --count 20 --category ekonomi
+python main.py rss-reels --count 20 --category spor
+
+
+Ayarları Artır (config değiştir):
+python# config.py'da artır
+rss_worker_max_articles_per_run: int = 50  # 10 → 50
+rss_worker_categories: List[str] = ["guncel", "ekonomi", "spor"]  # Çoklu kategori
+
+python main.py worker start # sürekli çalıştırır.

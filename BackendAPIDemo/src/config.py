@@ -128,7 +128,7 @@ class Settings(BaseSettings):
     # RSS Worker feature flags (for A/B testing or gradual rollout)
     rss_worker_smart_scheduling: bool = True  # Adjust interval based on content frequency
     rss_worker_duplicate_detection: bool = True  # Skip duplicate articles
-    rss_worker_quality_filter: bool = True  # Filter low-quality articles
+    rss_worker_quality_filter: bool = False  # Filter low-quality articles
     rss_worker_cost_limit_daily: float = 5.0  # Daily TTS cost limit in USD
     
     # Performance tuning

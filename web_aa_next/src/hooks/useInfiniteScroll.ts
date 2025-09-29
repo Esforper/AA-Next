@@ -1,0 +1,251 @@
+// src/hooks/useInfiniteScroll.ts
+
+import { useState, useCallback, useRef } from 'react';
+import { ReelData } from '../models';
+
+interface FeedPagination {
+  current_page: number;
+  has_next: boolean;
+  has_previous: boolean;
+  next_cursor: string | null;
+  total_available: number;
+}
+
+interface FeedMetadata {
+  trending_count: number;
+  personalized_count: number;
+  fresh_count: number;
+  algorithm_version: string;
+}
+
+interface BackendReelItem {
+  id: string;
+  news_data: {
+    title: string;
+    summary: string;
+    full_content: string;
+    url: string;
+    category: string;
+    author?: string;
+    location?: string;
+    main_image?: string;
+    images: string[];
+    tags: string[];
+  };
+  audio_url: string;
+  duration_seconds: number;
+  status: string;
+  published_at: string;
+  is_watched?: boolean;
+  is_trending?: boolean;
+  is_fresh?: boolean;
+}
+
+interface FeedResponse {
+  success: boolean;
+  reels: BackendReelItem[];
+  pagination: FeedPagination;
+  feed_metadata: FeedMetadata;
+  generated_at: string;
+  message?: string;
+}
+
+interface UseInfiniteScrollReturn {
+  // Data
+  reels: ReelData[];
+  currentIndex: number;
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  
+  // Pagination info
+  totalAvailable: number;
+  loadedCount: number;
+  feedMetadata: FeedMetadata | null;
+  
+  // Actions
+  loadMore: () => Promise<void>;
+  refreshFeed: () => Promise<void>;
+  goToNext: () => void;
+  goToPrev: () => void;
+  
+  // Internal state
+  isLoadingMore: boolean;
+}
+
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+const USER_ID = 'web_user_' + Math.random().toString(36).substr(2, 9); // Generate random user ID
+
+export const useInfiniteScroll = (
+  initialLimit: number = 20,
+  preloadThreshold: number = 3 // Load more when 3 reels left before end
+): UseInfiniteScrollReturn => {
+  
+  // State
+  const [reels, setReels] = useState<ReelData[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalAvailable, setTotalAvailable] = useState(0);
+  const [feedMetadata, setFeedMetadata] = useState<FeedMetadata | null>(null);
+  
+  // Prevent duplicate API calls
+  const isLoadingRef = useRef(false);
+  
+  const fetchReels = useCallback(async (isRefresh: boolean = false): Promise<void> => {
+    // Prevent duplicate calls
+    if (isLoadingRef.current) return;
+    
+    try {
+      isLoadingRef.current = true;
+      
+      if (isRefresh) {
+        setLoading(true);
+        setError(null);
+      } else {
+        setIsLoadingMore(true);
+      }
+      
+      // Build API URL
+      const params = new URLSearchParams({
+        limit: initialLimit.toString()
+      });
+      
+      // Add cursor for pagination (not for refresh)
+      if (!isRefresh && cursor) {
+        params.append('cursor', cursor);
+      }
+      
+      const url = `${API_BASE}/api/reels/feed?${params.toString()}`;
+      
+      console.log(`🔄 Fetching reels: ${url}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-ID': USER_ID // Backend requires this for user tracking
+        },
+        signal: AbortSignal.timeout(30000)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data: FeedResponse = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || 'API returned error');
+      }
+      
+      console.log(`✅ Fetched ${data.reels.length} reels, has_next: ${data.pagination.has_next}`);
+      
+      // Convert backend ReelFeedItem to frontend ReelData format
+      const convertedReels: ReelData[] = data.reels.map(backendReel => ({
+        id: backendReel.id,
+        title: backendReel.news_data?.title || 'Untitled',
+        content: backendReel.news_data?.full_content || '',
+        summary: backendReel.news_data?.summary || '',
+        category: backendReel.news_data?.category || 'general',
+        images: backendReel.news_data?.images || [],
+        main_image: backendReel.news_data?.main_image || '',
+        audio_url: backendReel.audio_url,
+        subtitles: [], // Backend doesn't provide subtitles yet
+        estimated_duration: backendReel.duration_seconds,
+        tags: backendReel.news_data?.tags || [],
+        author: backendReel.news_data?.author || '',
+        location: backendReel.news_data?.location || '',
+        
+        // Additional backend data
+        is_watched: backendReel.is_watched || false,
+        is_trending: backendReel.is_trending || false,
+        is_fresh: backendReel.is_fresh || false,
+        published_at: backendReel.published_at
+      }));
+      
+      if (isRefresh) {
+        // Replace all reels
+        setReels(convertedReels);
+        setCurrentIndex(0);
+      } else {
+        // Append new reels
+        setReels(prev => [...prev, ...convertedReels]);
+      }
+      
+      // Update pagination state
+      setCursor(data.pagination.next_cursor);
+      setHasMore(data.pagination.has_next);
+      setTotalAvailable(data.pagination.total_available);
+      setFeedMetadata(data.feed_metadata);
+      
+    } catch (err) {
+      console.error('Failed to fetch reels:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load reels';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+      setIsLoadingMore(false);
+      isLoadingRef.current = false;
+    }
+  }, [cursor, initialLimit]);
+  
+  const loadMore = useCallback(async (): Promise<void> => {
+    if (!hasMore || isLoadingRef.current) {
+      console.log(`⏭️ Skip loadMore: hasMore=${hasMore}, isLoading=${isLoadingRef.current}`);
+      return;
+    }
+    
+    console.log('📥 Loading more reels...');
+    await fetchReels(false);
+  }, [hasMore, fetchReels]);
+  
+  const refreshFeed = useCallback(async (): Promise<void> => {
+    console.log('🔄 Refreshing feed...');
+    setCursor(null); // Reset cursor for fresh start
+    await fetchReels(true);
+  }, [fetchReels]);
+  
+  const goToNext = useCallback((): void => {
+    const nextIndex = Math.min(currentIndex + 1, reels.length - 1);
+    setCurrentIndex(nextIndex);
+    
+    // Auto-load more when approaching end
+    const reelsRemaining = reels.length - nextIndex - 1;
+    if (reelsRemaining <= preloadThreshold && hasMore && !isLoadingRef.current) {
+      console.log(`🔄 Auto-loading: ${reelsRemaining} reels remaining`);
+      loadMore();
+    }
+  }, [currentIndex, reels.length, preloadThreshold, hasMore, loadMore]);
+  
+  const goToPrev = useCallback((): void => {
+    const prevIndex = Math.max(currentIndex - 1, 0);
+    setCurrentIndex(prevIndex);
+  }, [currentIndex]);
+  
+  return {
+    // Data
+    reels,
+    currentIndex,
+    loading,
+    error,
+    hasMore,
+    
+    // Pagination info
+    totalAvailable,
+    loadedCount: reels.length,
+    feedMetadata,
+    
+    // Actions
+    loadMore,
+    refreshFeed,
+    goToNext,
+    goToPrev,
+    
+    // Internal state
+    isLoadingMore
+  };
+};

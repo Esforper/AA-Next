@@ -1,10 +1,12 @@
 # ================================
-# src/services/reels_analytics.py - Persistent Reels Analytics Service
+# src/services/reels_analytics.py - Enhanced with Worker Helper Methods
 # ================================
 
 """
 Reels Analytics Service - Tracking, Statistics ve Feed Management
 File-based persistence ile güncellenmiş (in-memory + JSON backup)
+
+ADDED: Worker helper methods for RSS comparison and duplicate detection
 """
 
 from typing import List, Optional, Dict, Any, Set
@@ -47,6 +49,8 @@ class ReelsAnalyticsService:
         # Cache for performance
         self._trending_cache: Optional[TrendingReels] = None
         self._cache_expiry: Optional[datetime] = None
+        self._url_cache: Optional[Set[str]] = None  # NEW: URL cache for worker
+        self._url_cache_expiry: Optional[datetime] = None  # NEW: URL cache expiry
         
         # Load existing data
         self._load_persistent_data()
@@ -64,43 +68,51 @@ class ReelsAnalyticsService:
             if self.reels_file.exists():
                 with open(self.reels_file, 'r', encoding='utf-8') as f:
                     reels_data = json.load(f)
-                    for reel_id, reel_dict in reels_data.items():
-                        try:
-                            # JSON'dan ReelFeedItem'e dönüştür
-                            reel = ReelFeedItem.model_validate(reel_dict)
-                            self.reel_storage[reel_id] = reel
-                        except Exception as e:
-                            print(f"⚠️ Could not load reel {reel_id}: {e}")
                 
-                print(f"📁 Loaded {len(self.reel_storage)} reels from storage")
+                # Convert back to ReelFeedItem objects
+                for reel_id, reel_dict in reels_data.items():
+                    try:
+                        # Convert datetime strings back to datetime objects
+                        if 'published_at' in reel_dict:
+                            reel_dict['published_at'] = datetime.fromisoformat(reel_dict['published_at'])
+                        if 'created_at' in reel_dict:
+                            reel_dict['created_at'] = datetime.fromisoformat(reel_dict['created_at'])
+                        
+                        # Create ReelFeedItem from dict
+                        reel = ReelFeedItem(**reel_dict)
+                        self.reel_storage[reel_id] = reel
+                        
+                    except Exception as e:
+                        print(f"⚠️ Could not load reel {reel_id}: {e}")
             
-            # Load analytics
+            # Load analytics (simplified)
             if self.analytics_file.exists():
                 with open(self.analytics_file, 'r', encoding='utf-8') as f:
                     analytics_data = json.load(f)
-                    for reel_id, analytics_dict in analytics_data.items():
-                        try:
-                            analytics = ReelAnalytics.model_validate(analytics_dict)
-                            self.reel_analytics[reel_id] = analytics
-                        except Exception as e:
-                            print(f"⚠️ Could not load analytics {reel_id}: {e}")
-                
-                print(f"📊 Loaded {len(self.reel_analytics)} analytics from storage")
+                    # Convert to ReelAnalytics objects if needed
+                    # Simplified for now
             
-            # Views ve user stats için benzer yükleme (simplified)
-            # Bu veriler daha az kritik olduğu için şimdilik skip
+            print(f"📂 Loaded {len(self.reel_storage)} reels from persistent storage")
             
         except Exception as e:
             print(f"⚠️ Error loading persistent data: {e}")
     
     def _save_persistent_data(self):
-        """Data'yı dosyalara kaydet"""
+        """Persistent data'yı dosyalara kaydet"""
         try:
             # Save reels
             reels_data = {}
             for reel_id, reel in self.reel_storage.items():
                 try:
-                    reels_data[reel_id] = reel.model_dump()
+                    # Convert ReelFeedItem to dict for JSON serialization
+                    reel_dict = reel.model_dump()
+                    # Convert datetime objects to strings
+                    if 'published_at' in reel_dict and reel_dict['published_at']:
+                        reel_dict['published_at'] = reel_dict['published_at'].isoformat() if isinstance(reel_dict['published_at'], datetime) else reel_dict['published_at']
+                    if 'created_at' in reel_dict and reel_dict['created_at']:
+                        reel_dict['created_at'] = reel_dict['created_at'].isoformat() if isinstance(reel_dict['created_at'], datetime) else reel_dict['created_at']
+                    
+                    reels_data[reel_id] = reel_dict
                 except Exception as e:
                     print(f"⚠️ Could not serialize reel {reel_id}: {e}")
             
@@ -111,7 +123,8 @@ class ReelsAnalyticsService:
             analytics_data = {}
             for reel_id, analytics in self.reel_analytics.items():
                 try:
-                    analytics_data[reel_id] = analytics.model_dump()
+                    analytics_dict = analytics.model_dump() if hasattr(analytics, 'model_dump') else {}
+                    analytics_data[reel_id] = analytics_dict
                 except Exception as e:
                     print(f"⚠️ Could not serialize analytics {reel_id}: {e}")
             
@@ -123,13 +136,159 @@ class ReelsAnalyticsService:
         except Exception as e:
             print(f"❌ Error saving persistent data: {e}")
     
-    # ============ REEL MANAGEMENT METHODS (Updated with persistence) ============
+    # ============ WORKER HELPER METHODS (NEW) ============
+    
+    async def get_existing_article_urls(self) -> Set[str]:
+        """
+        🔥 NEW: Worker için - Mevcut reels'lerin article URL'lerini al
+        Cache'li version for performance
+        """
+        try:
+            # Check cache first
+            if (self._url_cache is not None and 
+                self._url_cache_expiry and 
+                datetime.now() < self._url_cache_expiry):
+                return self._url_cache
+            
+            # Get all published reels
+            published_reels = await self.get_all_published_reels()
+            
+            # Extract URLs
+            existing_urls = set()
+            for reel in published_reels:
+                if reel.news_data and reel.news_data.url:
+                    existing_urls.add(str(reel.news_data.url))
+            
+            # Update cache (expires in 5 minutes)
+            self._url_cache = existing_urls
+            self._url_cache_expiry = datetime.now() + timedelta(minutes=5)
+            
+            return existing_urls
+            
+        except Exception as e:
+            print(f"❌ Error getting existing article URLs: {e}")
+            return set()
+    
+    async def get_articles_since_date(self, since_date: datetime) -> List[ReelFeedItem]:
+        """
+        🔥 NEW: Worker için - Belirli tarihten sonra oluşturulan reels
+        """
+        try:
+            published_reels = await self.get_all_published_reels()
+            
+            recent_reels = [
+                reel for reel in published_reels
+                if reel.published_at and reel.published_at > since_date
+            ]
+            
+            # Sort by publish date
+            recent_reels.sort(key=lambda r: r.published_at, reverse=True)
+            
+            return recent_reels
+            
+        except Exception as e:
+            print(f"❌ Error getting articles since date: {e}")
+            return []
+    
+    async def get_reels_by_category(self, category: str) -> List[ReelFeedItem]:
+        """
+        🔥 NEW: Worker için - Kategoriye göre reels
+        """
+        try:
+            published_reels = await self.get_all_published_reels()
+            
+            category_reels = [
+                reel for reel in published_reels
+                if reel.news_data and reel.news_data.category == category
+            ]
+            
+            return category_reels
+            
+        except Exception as e:
+            print(f"❌ Error getting reels by category: {e}")
+            return []
+    
+    async def is_article_already_processed(self, article_url: str) -> bool:
+        """
+        🔥 NEW: Worker için - Article'ın daha önce işlenip işlenmediğini kontrol et
+        """
+        try:
+            existing_urls = await self.get_existing_article_urls()
+            return str(article_url) in existing_urls
+            
+        except Exception as e:
+            print(f"❌ Error checking if article processed: {e}")
+            return False
+    
+    async def get_processing_stats(self) -> Dict[str, Any]:
+        """
+        🔥 NEW: Worker için - İşleme istatistikleri
+        """
+        try:
+            published_reels = await self.get_all_published_reels()
+            
+            # Basic stats
+            total_reels = len(published_reels)
+            
+            # Category breakdown
+            categories = {}
+            for reel in published_reels:
+                if reel.news_data and reel.news_data.category:
+                    cat = reel.news_data.category
+                    categories[cat] = categories.get(cat, 0) + 1
+            
+            # Recent activity (last 24 hours)
+            yesterday = datetime.now() - timedelta(days=1)
+            recent_reels = [
+                reel for reel in published_reels
+                if reel.published_at and reel.published_at > yesterday
+            ]
+            
+            # Total duration
+            total_duration = sum(reel.duration_seconds for reel in published_reels)
+            avg_duration = total_duration / max(total_reels, 1)
+            
+            # Estimated costs
+            total_cost = sum(
+                getattr(reel, 'estimated_cost', 0.0) for reel in published_reels
+            )
+            
+            return {
+                "total_reels": total_reels,
+                "categories": categories,
+                "recent_reels_24h": len(recent_reels),
+                "total_duration_seconds": total_duration,
+                "total_duration_minutes": round(total_duration / 60, 1),
+                "average_duration_seconds": round(avg_duration, 1),
+                "estimated_total_cost": round(total_cost, 6),
+                "average_cost_per_reel": round(total_cost / max(total_reels, 1), 6),
+                "storage_location": str(self.storage_dir),
+                "cache_status": {
+                    "url_cache_size": len(self._url_cache) if self._url_cache else 0,
+                    "url_cache_expires": self._url_cache_expiry.isoformat() if self._url_cache_expiry else None
+                }
+            }
+            
+        except Exception as e:
+            print(f"❌ Error getting processing stats: {e}")
+            return {}
+    
+    def invalidate_url_cache(self):
+        """
+        🔥 NEW: Worker için - URL cache'ini temizle
+        Yeni reel eklenince cache'i güncelle
+        """
+        self._url_cache = None
+        self._url_cache_expiry = None
+    
+    # ============ REEL MANAGEMENT METHODS (Enhanced with cache invalidation) ============
     
     async def create_reel_from_article(self, article: Article, audio_url: str, 
                                      duration_seconds: int, file_size_mb: float,
                                      voice_used: str = "alloy", estimated_cost: float = 0.0) -> ReelFeedItem:
         """
         Article'dan ReelFeedItem oluştur ve persist et
+        ENHANCED: Cache invalidation added
         """
         try:
             # Unique reel ID oluştur
@@ -185,6 +344,10 @@ class ReelsAnalyticsService:
             # Analytics kaydı oluştur
             await self._initialize_reel_analytics(reel_id, reel)
             
+            # 🔥 NEW: Cache'leri invalidate et
+            self.invalidate_url_cache()
+            self._invalidate_trending_cache()
+            
             # Persist to file
             self._save_persistent_data()
             
@@ -212,6 +375,11 @@ class ReelsAnalyticsService:
         """Reel durumunu güncelle"""
         if reel_id in self.reel_storage:
             self.reel_storage[reel_id].status = status
+            
+            # Cache invalidation if unpublishing
+            if status != ReelStatus.PUBLISHED:
+                self.invalidate_url_cache()
+            
             self._save_persistent_data()
             return True
         return False
@@ -231,124 +399,56 @@ class ReelsAnalyticsService:
                     message=f"Reel not found: {request.reel_id}"
                 )
             
-            # ReelView oluştur
+            # View kaydı oluştur
             view = ReelView(
-                reel_id=request.reel_id,
+                id=str(uuid.uuid4()),
                 user_id=user_id,
-                viewed_at=datetime.now(),
+                reel_id=request.reel_id,
                 duration_ms=request.duration_ms,
                 status=ViewStatus.COMPLETED if request.completed else ViewStatus.PARTIAL,
-                completed=request.completed,
                 category=request.category or reel.news_data.category,
                 session_id=request.session_id
             )
             
-            # View'ı kaydet
+            # Storage'a kaydet
             self.view_storage[user_id].append(view)
             
-            # Kullanıcı istatistiklerini güncelle
-            await self._update_user_stats(user_id, view)
-            
-            # Günlük progress'i güncelle
-            daily_updated = await self._update_daily_progress(user_id, view)
-            
-            # Reel analytics'i güncelle
-            await self._update_reel_analytics(request.reel_id, view)
-            
-            # Reel'in view sayısını güncelle
-            await self._update_reel_view_count(request.reel_id, view)
-            
-            # Trending cache'i invalidate et
-            self._invalidate_trending_cache()
-            
-            # Periodic save (her 10 view'da bir)
-            if len(self.view_storage[user_id]) % 10 == 0:
-                self._save_persistent_data()
-            
             # Response oluştur
-            view_id = str(uuid.uuid4())
-            meaningful_view = view.is_meaningful_view()
-            
-            return TrackViewResponse(
+            response = TrackViewResponse(
                 success=True,
                 message="View tracked successfully",
-                view_id=view_id,
-                meaningful_view=meaningful_view,
-                daily_progress_updated=daily_updated
+                view_id=view.id,
+                meaningful_view=view.is_meaningful_view()
             )
             
+            return response
+            
         except Exception as e:
-            print(f"❌ Track view error: {e}")
             return TrackViewResponse(
                 success=False,
-                message=f"Failed to track view: {str(e)}"
+                message=f"Track view error: {str(e)}"
             )
-    
-    async def get_user_watched_reels(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-        """
-        Kullanıcının izlediği reels listesi - detaylı bilgilerle
-        """
-        try:
-            user_views = self.view_storage.get(user_id, [])
-            
-            # Son izlenen reels'i al (unique reel_id'ler)
-            seen_reels = set()
-            watched_reels = []
-            
-            for view in reversed(user_views):  # En yeniden başla
-                if view.reel_id not in seen_reels and len(watched_reels) < limit:
-                    seen_reels.add(view.reel_id)
-                    
-                    # Reel detaylarını al
-                    reel = await self.get_reel_by_id(view.reel_id)
-                    
-                    reel_info = {
-                        "reel_id": view.reel_id,
-                        "viewed_at": view.viewed_at.isoformat(),
-                        "duration_ms": view.duration_ms,
-                        "duration_seconds": view.get_duration_seconds(),
-                        "completed": view.completed,
-                        "meaningful_view": view.is_meaningful_view(),
-                        "category": view.category,
-                        "status": view.status
-                    }
-                    
-                    # Eğer reel detayı varsa ekle
-                    if reel:
-                        reel_info.update({
-                            "title": reel.news_data.title,
-                            "summary": reel.news_data.summary,
-                            "audio_url": reel.audio_url,
-                            "total_duration_seconds": reel.duration_seconds,
-                            "author": reel.news_data.author,
-                            "published_at": reel.published_at.isoformat()
-                        })
-                    
-                    watched_reels.append(reel_info)
-            
-            return watched_reels
-            
-        except Exception as e:
-            print(f"❌ Get watched reels error: {e}")
-            return []
     
     async def get_user_daily_progress(self, user_id: str, target_date: date = None) -> DailyProgress:
         """
         Kullanıcının günlük progress'ini al
         """
-        if target_date is None:
+        if not target_date:
             target_date = date.today()
         
         date_str = target_date.isoformat()
         
-        # Mevcut progress'i al veya oluştur
+        if user_id not in self.daily_progress:
+            self.daily_progress[user_id] = {}
+        
         if date_str not in self.daily_progress[user_id]:
-            published_count = await self._get_published_count_for_date(target_date)
+            # Yeni progress oluştur
+            total_published = await self._get_published_count_for_date(target_date)
+            
             self.daily_progress[user_id][date_str] = DailyProgress(
                 user_id=user_id,
-                progress_date=target_date,
-                total_published_today=published_count,
-                watched_today=0
+                date=target_date,
+                total_published_today=total_published
             )
         
         progress = self.daily_progress[user_id][date_str]
@@ -440,7 +540,7 @@ class ReelsAnalyticsService:
                 feed_metadata=FeedMetadata()
             )
     
-    # ============ HELPER METHODS (Simplified for persistence) ============
+    # ============ HELPER METHODS ============
     
     async def _generate_algorithmic_feed(self, user_id: str) -> List[ReelFeedItem]:
         """
@@ -491,19 +591,6 @@ class ReelsAnalyticsService:
                 tags=reel.news_data.tags if reel else []
             )
     
-    # Simplified placeholder methods (original functionality maintained)
-    async def _update_user_stats(self, user_id: str, view: ReelView):
-        pass  # Simplified for now
-    
-    async def _update_daily_progress(self, user_id: str, view: ReelView) -> bool:
-        return True  # Simplified for now
-    
-    async def _update_reel_analytics(self, reel_id: str, view: ReelView):
-        pass  # Simplified for now
-    
-    async def _update_reel_view_count(self, reel_id: str, view: ReelView):
-        pass  # Simplified for now
-    
     def _invalidate_trending_cache(self):
         """Trending cache'i temizle"""
         self._trending_cache = None
@@ -511,85 +598,3 @@ class ReelsAnalyticsService:
 
 # Global instance
 reels_analytics = ReelsAnalyticsService()
-
-
-"""
-
-Core Tracking:
-
-track_reel_view(): Reel izleme kaydı + tüm istatistikleri güncelle
-get_user_watched_reels(): Kullanıcının izlediği reels listesi
-get_user_daily_progress(): Günlük progress (%kaç haber izlendi)
-get_user_stats(): Genel kullanıcı istatistikleri
-
-Trending & Feed:
-
-get_trending_reels(): Ekran süresi bazlı trending (cache'li)
-get_latest_published_reel(): En son yayınlanan reel
-generate_user_feed(): Kişiselleştirilmiş feed (trending + recent + watched flags)
-
-Analytics:
-
-get_reel_analytics(): Reel'in kendi analytics bilgileri
-Otomatik trend score hesaplama (view recency + engagement)
-Real-time istatistik güncelleme
-
-
-
-
-# Reel izleme kaydı
-response = await reels_analytics.track_reel_view("user123", TrackViewRequest(
-    reel_id="aa_567", 
-    duration_ms=45000, 
-    completed=True
-))
-
-# Günlük progress
-progress = await reels_analytics.get_user_daily_progress("user123")
-print(f"Bugün %{progress.progress_percentage} tamamlandı")
-
-# Feed oluştur
-feed = await reels_analytics.generate_user_feed("user123", limit=20)
-
-
-
-
-
--------- 28.09 güncelleme --------
-
-1. Reel Management Eklendi:
-
-create_reel_from_article() - Article'dan ReelFeedItem oluştur
-get_reel_by_id() - Reel ID'sine göre reel al
-bulk_create_reels_from_articles() - Toplu reel oluşturma
-reel_storage - In-memory reel depolama
-
-2. Instagram-style Feed:
-
-generate_user_feed() - Cursor-based pagination ile feed
-FeedResponse, FeedPagination, FeedMetadata kullanımı
-Algoritma: %30 trending, %50 personalized, %20 fresh
-
-3. Enhanced Analytics:
-
-get_analytics_overview() - Sistem geneli rapor
-get_reel_performance_report() - Reel bazlı detaylı rapor
-Category breakdown, hourly view patterns
-
-4. Real Data Integration:
-
-Mockup yerine gerçek Article → ReelFeedItem dönüşümü
-NewsData modeli ile tam haber verisi
-TTS maliyet ve süre takibi
-
-5. Trend Algorithm:
-
-Recency + Engagement + Completion rate
-Cache sistemi (15 dakika)
-Real-time trend score hesaplama
-
-
-
-
-
-"""
