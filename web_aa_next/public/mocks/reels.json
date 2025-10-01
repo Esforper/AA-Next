@@ -1,0 +1,70 @@
+{
+  "success": true,
+  "reels": [
+    {
+      "id": "mock-1",
+      "news_data": {
+        "title": "Örnek Reel 1",
+        "summary": "Kısa özet",
+        "full_content": "Detay içerik",
+        "url": "https://example.com/1",
+        "category": "gundem",
+        "author": "AA",
+        "location": "İstanbul",
+        "main_image": "https://picsum.photos/800/1400?random=1",
+        "images": [
+          "https://picsum.photos/800/1400?random=11",
+          "https://picsum.photos/800/1400?random=12"
+        ],
+        "tags": ["sondakika", "gundem"]
+      },
+      "audio_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+      "duration_seconds": 30,
+      "status": "ready",
+      "published_at": "2025-10-01T10:00:00Z",
+      "is_watched": false,
+      "is_trending": true,
+      "is_fresh": true
+    },
+    {
+      "id": "mock-2",
+      "news_data": {
+        "title": "Örnek Reel 2",
+        "summary": "Kısa özet 2",
+        "full_content": "Detay içerik 2",
+        "url": "https://example.com/2",
+        "category": "spor",
+        "author": "AA",
+        "location": "Ankara",
+        "main_image": "https://picsum.photos/800/1400?random=2",
+        "images": [
+          "https://picsum.photos/800/1400?random=21",
+          "https://picsum.photos/800/1400?random=22"
+        ],
+        "tags": ["spor"]
+      },
+      "audio_url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+      "duration_seconds": 28,
+      "status": "ready",
+      "published_at": "2025-10-01T11:00:00Z",
+      "is_watched": false,
+      "is_trending": false,
+      "is_fresh": true
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "has_next": false,
+    "has_previous": false,
+    "next_cursor": null,
+    "total_available": 2
+  },
+  "feed_metadata": {
+    "trending_count": 1,
+    "personalized_count": 0,
+    "fresh_count": 2,
+    "algorithm_version": "mock"
+  },
+  "generated_at": "2025-10-01T10:00:00Z"
+}
+

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useReelsViewModel } from '../viewmodels';
-import { LoadingSpinner, Button } from '../components';
+import { LoadingSpinner, Button, ReelItem } from '../components';
 import { ReelData } from '../models';
 
 export const ReelsView: React.FC = () => {
@@ -37,6 +37,8 @@ export const ReelsView: React.FC = () => {
   const [swipeDirection, setSwipeDirection] = useState<'up' | 'down' | 'left' | 'right' | null>(null);
   const [slideOffset, setSlideOffset] = useState({ x: 0, y: 0 });
   const [imageAnimation, setImageAnimation] = useState<'slide-left-in' | 'slide-right-in' | null>(null);
+  const [incomingImageIndex, setIncomingImageIndex] = useState<number | null>(null);
+  const [incomingDirection, setIncomingDirection] = useState<'left' | 'right' | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const currentReel = getCurrentReel();
@@ -78,40 +80,33 @@ export const ReelsView: React.FC = () => {
   // Handle image navigation
   const nextImage = () => {
     if (!currentReel?.images || currentReel.images.length <= 1) return;
-    
     if (isTransitioning) return;
     setIsTransitioning(true);
-    setImageAnimation('slide-left-in');
-    setSlideOffset({ x: 100, y: 0 });
-    
+    const nextIdx = (currentImageIndex + 1) % currentReel.images.length;
+    setIncomingImageIndex(nextIdx);
+    setIncomingDirection('left');
+    // After brief transition, commit switch
     setTimeout(() => {
-      setCurrentImageIndex(prev => 
-        prev === currentReel.images.length - 1 ? 0 : prev + 1
-      );
-      setSlideOffset({ x: 0, y: 0 });
+      setCurrentImageIndex(nextIdx);
+      setIncomingImageIndex(null);
+      setIncomingDirection(null);
       setIsTransitioning(false);
-      setSwipeDirection(null);
-      setImageAnimation(null);
-    }, 300);
+    }, 250);
   };
 
   const prevImage = () => {
     if (!currentReel?.images || currentReel.images.length <= 1) return;
-    
     if (isTransitioning) return;
     setIsTransitioning(true);
-    setImageAnimation('slide-right-in');
-    setSlideOffset({ x: -100, y: 0 });
-    
+    const prevIdx = currentImageIndex === 0 ? currentReel.images.length - 1 : currentImageIndex - 1;
+    setIncomingImageIndex(prevIdx);
+    setIncomingDirection('right');
     setTimeout(() => {
-      setCurrentImageIndex(prev => 
-        prev === 0 ? currentReel.images.length - 1 : prev - 1
-      );
-      setSlideOffset({ x: 0, y: 0 });
+      setCurrentImageIndex(prevIdx);
+      setIncomingImageIndex(null);
+      setIncomingDirection(null);
       setIsTransitioning(false);
-      setSwipeDirection(null);
-      setImageAnimation(null);
-    }, 300);
+    }, 250);
   };
 
   // YouTube Shorts style navigation with infinite scroll
@@ -407,14 +402,64 @@ export const ReelsView: React.FC = () => {
               zIndex: 1
             }}
           >
-            <div className="relative h-full w-full">
-              <img
-                src={getReelImage(prevReelData)}
-                alt={prevReelData.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-            </div>
+            <ReelItem
+              reel={{
+                ...prevReelData,
+                main_image: getReelImage(prevReelData)
+              }}
+              isActive={false}
+              onPlay={() => {}}
+              onImageClick={() => {}}
+              className="absolute inset-0 w-full h-full opacity-50"
+            />
+          </div>
+        )}
+
+        {/* Left Preview Image - Instagram Stories Style */}
+        {currentReel?.images && currentReel.images.length > 1 && (
+          <div 
+            className="absolute inset-0 w-full h-full"
+            style={{
+              transform: `translateX(-20%) scale(0.85)`,
+              zIndex: 1,
+              filter: 'blur(3px)',
+              opacity: 0.3
+            }}
+          >
+            <ReelItem
+              reel={{
+                ...(currentReel || ({} as ReelData)),
+                main_image: getReelImage(currentReel as ReelData, currentImageIndex === 0 ? (currentReel!.images.length - 1) : (currentImageIndex - 1))
+              }}
+              isActive={false}
+              onPlay={() => {}}
+              onImageClick={() => {}}
+              className="absolute inset-0 w-full h-full"
+            />
+          </div>
+        )}
+
+        {/* Right Preview Image - Instagram Stories Style */}
+        {currentReel?.images && currentReel.images.length > 1 && (
+          <div 
+            className="absolute inset-0 w-full h-full"
+            style={{
+              transform: `translateX(20%) scale(0.85)`,
+              zIndex: 1,
+              filter: 'blur(3px)',
+              opacity: 0.3
+            }}
+          >
+            <ReelItem
+              reel={{
+                ...(currentReel || ({} as ReelData)),
+                main_image: getReelImage(currentReel as ReelData, (currentImageIndex + 1) % (currentReel!.images.length))
+              }}
+              isActive={false}
+              onPlay={() => {}}
+              onImageClick={() => {}}
+              className="absolute inset-0 w-full h-full"
+            />
           </div>
         )}
 
@@ -422,113 +467,110 @@ export const ReelsView: React.FC = () => {
         <div 
           className="absolute inset-0 w-full h-full"
           style={{
-            transform: `translateY(${slideOffset.y}%)`,
-            transition: isTransitioning ? 'transform 0.3s ease-out' : 'none',
-            zIndex: 2
+            transform: `translate(0%, ${slideOffset.y}%)`,
+            transition: isTransitioning ? 'all 0.25s ease-out' : 'none',
+            zIndex: 2,
+            perspective: '1200px'
           }}
         >
-          <div className="relative h-full w-full">
-            {/* Background Image with Animation */}
-            <div className="relative h-full w-full overflow-hidden">
-              <img
-                key={`${currentReel?.id}-${currentImageIndex}`}
-                src={getCurrentImage()}
-                alt={currentReel?.title || 'Reel image'}
-                className={`w-full h-full object-cover transition-transform duration-500 ${
-                  imageAnimation === 'slide-left-in' ? 'animate-slide-left-in' : ''
-                } ${
-                  imageAnimation === 'slide-right-in' ? 'animate-slide-right-in' : ''
-                }`}
-                style={{
-                  transform: `translateX(${slideOffset.x}%)`
-                }}
-              />
-            </div>
+          {currentReel && currentReel.images && currentReel.images.length > 0 ? (
+            <>
+              {(() => {
+                const count = currentReel.images.length;
+                const leftIdx = (currentImageIndex - 1 + count) % count;
+                const centerIdx = currentImageIndex;
+                const rightIdx = (currentImageIndex + 1) % count;
 
-            {/* Gradient Overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
-            
-            {/* Content Overlay */}
-            <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-6 text-white">
-              
-              {/* Main Content */}
-              <div className="space-y-3 max-w-2xl">
-                <h1 className="text-lg md:text-2xl font-bold leading-tight">
-                  {currentReel?.title}
-                </h1>
-                
-                {currentReel?.summary && (
-                  <p className="text-sm md:text-base text-gray-200 leading-relaxed line-clamp-3">
-                    {currentReel.summary}
-                  </p>
-                )}
-                
-                {/* Metadata */}
-                <div className="flex items-center space-x-4 text-xs text-gray-300">
-                  {currentReel?.category && (
-                    <span className="px-2 py-1 bg-white/20 rounded-full">
-                      #{currentReel.category}
-                    </span>
-                  )}
-                  {currentReel?.author && (
-                    <span>📝 {currentReel.author}</span>
-                  )}
-                  {currentReel?.location && (
-                    <span>📍 {currentReel.location}</span>
-                  )}
-                </div>
-                
-                {/* Audio Controls */}
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={togglePlayPause}
-                    className="bg-white/20 backdrop-blur-lg rounded-full p-3 hover:bg-white/30 transition-colors"
-                  >
-                    {audioState.isPlaying ? (
-                      <span className="text-2xl">⏸️</span>
-                    ) : (
-                      <span className="text-2xl">▶️</span>
-                    )}
-                  </button>
-                  
-                  {audioState.isLoaded && (
-                    <div className="flex-1 text-xs text-gray-300">
-                      <div className="flex justify-between mb-1">
-                        <span>{Math.floor(audioState.position)}s</span>
-                        <span>{Math.floor(audioState.duration)}s</span>
-                      </div>
-                      <div className="w-full bg-gray-600 rounded-full h-1">
-                        <div
-                          className="bg-white h-1 rounded-full transition-all duration-100"
-                          style={{
-                            width: `${(audioState.position / audioState.duration) * 100}%`
-                          }}
-                        />
-                      </div>
+                const baseLeft = { tx: -30, scale: 0.9, blur: 6, rotY: 15, z: 1 };
+                const baseCenter = { tx: 0, scale: 1, blur: 0, rotY: 0, z: 3 };
+                const baseRight = { tx: 30, scale: 0.9, blur: 6, rotY: -15, z: 2 };
+
+                let left = { ...baseLeft };
+                let center = { ...baseCenter };
+                let right = { ...baseRight };
+
+                if (isTransitioning && incomingDirection === 'right') {
+                  // Move left -> center, center -> right
+                  left = { ...baseCenter };
+                  center = { ...baseRight };
+                  right = { ...baseRight };
+                } else if (isTransitioning && incomingDirection === 'left') {
+                  // Move right -> center, center -> left
+                  right = { ...baseCenter };
+                  center = { ...baseLeft };
+                  left = { ...baseLeft };
+                }
+
+                const styleFor = (slot: typeof baseCenter) => ({
+                  transform: `translateX(${slot.tx}%) scale(${slot.scale}) rotateY(${slot.rotY}deg)`,
+                  filter: `blur(${slot.blur}px)`,
+                  transition: 'transform 0.25s ease-out, filter 0.25s ease-out',
+                  zIndex: slot.z as unknown as number,
+                  boxShadow: slot.blur === 0 ? '0 10px 30px rgba(0,0,0,0.35)' : 'none'
+                } as React.CSSProperties);
+
+                return (
+                  <>
+                    {/* LEFT (prev) */}
+                    <ReelItem
+                      reel={{
+                        ...(currentReel || ({} as ReelData)),
+                        main_image: getReelImage(currentReel as ReelData, leftIdx)
+                      }}
+                      isActive={false}
+                      onPlay={() => {}}
+                      onImageClick={() => {}}
+                      className="absolute inset-0 w-full h-full"
+                      style={styleFor(left)}
+                    />
+
+                    {/* CENTER (current) */}
+                    <ReelItem
+                      reel={{
+                        ...(currentReel || ({} as ReelData)),
+                        main_image: getReelImage(currentReel as ReelData, centerIdx)
+                      }}
+                      isActive={true}
+                      onPlay={togglePlayPause}
+                      onImageClick={togglePlayPause}
+                      className="absolute inset-0 w-full h-full"
+                      style={styleFor(center)}
+                    />
+
+                    {/* RIGHT (next) */}
+                    <ReelItem
+                      reel={{
+                        ...(currentReel || ({} as ReelData)),
+                        main_image: getReelImage(currentReel as ReelData, rightIdx)
+                      }}
+                      isActive={false}
+                      onPlay={() => {}}
+                      onImageClick={() => {}}
+                      className="absolute inset-0 w-full h-full"
+                      style={styleFor(right)}
+                    />
+
+                    {/* Overlay for readability */}
+                    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 4 }}>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Image Navigation Dots */}
-            {currentReel?.images && currentReel.images.length > 1 && (
-              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-10">
-                {currentReel.images.map((_, index) => (
-                  <div
-                    key={index}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      index === currentImageIndex 
-                        ? 'bg-white' 
-                        : index < currentImageIndex 
-                          ? 'bg-white/60' 
-                          : 'bg-white/20'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+                  </>
+                );
+              })()}
+            </>
+          ) : (
+            // Fallback single image
+            <ReelItem
+              reel={{
+                ...(currentReel || ({} as ReelData)),
+                main_image: getReelImage(currentReel as ReelData, 0)
+              }}
+              isActive={true}
+              onPlay={togglePlayPause}
+              onImageClick={togglePlayPause}
+              className="absolute inset-0 w-full h-full"
+            />
+          )}
         </div>
 
         {/* Next Reel (Front) */}
@@ -541,14 +583,16 @@ export const ReelsView: React.FC = () => {
               zIndex: 1
             }}
           >
-            <div className="relative h-full w-full">
-              <img
-                src={getReelImage(nextReelData)}
-                alt={nextReelData.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-            </div>
+            <ReelItem
+              reel={{
+                ...nextReelData,
+                main_image: getReelImage(nextReelData)
+              }}
+              isActive={false}
+              onPlay={() => {}}
+              onImageClick={() => {}}
+              className="absolute inset-0 w-full h-full opacity-50"
+            />
           </div>
         )}
 
@@ -618,6 +662,26 @@ export const ReelsView: React.FC = () => {
           </div>
         </div>
         
+        {/* Image Navigation Dots */}
+        {currentReel?.images && currentReel.images.length > 1 && (
+          <div className="absolute top-2 left-0 right-0 z-30 px-2">
+            <div className="flex space-x-1">
+              {currentReel.images.map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
+                    index === currentImageIndex 
+                      ? 'bg-white' 
+                      : index < currentImageIndex 
+                        ? 'bg-white/60' 
+                        : 'bg-white/20'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

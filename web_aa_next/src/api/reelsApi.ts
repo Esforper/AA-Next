@@ -5,6 +5,7 @@ import {
   PaginationParams,
   ReelData
 } from '../models';
+import { API_CONFIG as APP_API_CONFIG } from './config';
 
 // Backend API Response Types
 interface BackendReelItem {
@@ -73,7 +74,7 @@ interface TrackViewResponse {
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: process.env.REACT_APP_API_BASE || 'http://localhost:8000',
+  BASE_URL: APP_API_CONFIG.BASE_URL,
   TIMEOUT: 30000,
   DEFAULT_LIMIT: 20
 };

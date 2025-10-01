@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { ReelData } from '../models';
+import { API_CONFIG } from '../api/config';
 
 interface FeedPagination {
   current_page: number;
@@ -73,7 +74,7 @@ interface UseInfiniteScrollReturn {
   isLoadingMore: boolean;
 }
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+const API_BASE = API_CONFIG.BASE_URL;
 const USER_ID = 'web_user_' + Math.random().toString(36).substr(2, 9); // Generate random user ID
 
 export const useInfiniteScroll = (
@@ -184,6 +185,49 @@ export const useInfiniteScroll = (
       
     } catch (err) {
       console.error('Failed to fetch reels:', err);
+
+      // Fallback to public mock when backend is unreachable
+      try {
+        const mockRes = await fetch('/mocks/reels.json', {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (mockRes.ok) {
+          const mockData: FeedResponse = await mockRes.json();
+          const convertedReels: ReelData[] = mockData.reels.map(backendReel => ({
+            id: backendReel.id,
+            title: backendReel.news_data?.title || 'Untitled',
+            content: backendReel.news_data?.full_content || '',
+            summary: backendReel.news_data?.summary || '',
+            category: backendReel.news_data?.category || 'general',
+            images: backendReel.news_data?.images || [],
+            main_image: backendReel.news_data?.main_image || '',
+            audio_url: backendReel.audio_url,
+            subtitles: [],
+            estimated_duration: backendReel.duration_seconds,
+            tags: backendReel.news_data?.tags || [],
+            author: backendReel.news_data?.author || '',
+            location: backendReel.news_data?.location || ''
+          }));
+
+          if (isRefresh) {
+            setReels(convertedReels);
+            setCurrentIndex(0);
+          } else {
+            setReels(prev => [...prev, ...convertedReels]);
+          }
+
+          setCursor(mockData.pagination.next_cursor);
+          setHasMore(mockData.pagination.has_next);
+          setTotalAvailable(mockData.pagination.total_available);
+          setFeedMetadata(mockData.feed_metadata);
+
+          setError(null);
+          return;
+        }
+      } catch (mockErr) {
+        console.error('Failed to load mock reels:', mockErr);
+      }
+
       const errorMessage = err instanceof Error ? err.message : 'Failed to load reels';
       setError(errorMessage);
     } finally {
