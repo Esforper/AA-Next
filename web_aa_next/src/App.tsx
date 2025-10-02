@@ -1,6 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { HomeView, ReelsView, GamesView, ProfileView, NewsDetailView, TestView, SimpleHomeView, BackendTestView } from './views';
+import { 
+  HomeView, 
+  ReelsView, 
+  GamesView, 
+  ProfileView, 
+  NewsDetailView, 
+  TestView, 
+  SimpleHomeView, 
+  BackendTestView,
+  GameRaceView  // ✅ Import ekle
+} from './views';
 import { TabBar } from './components';
 import { useNavigationViewModel } from './viewmodels';
 
@@ -18,6 +28,8 @@ const AppContent: React.FC = () => {
       setActiveTab('reels');
     } else if (currentPath === '/games') {
       setActiveTab('games');
+    } else if (currentPath === '/race') {  // ✅ Race route
+      setActiveTab('games');  // Race'i games tab'ı altında göster
     } else if (currentPath === '/profile') {
       setActiveTab('profile');
     }
@@ -45,8 +57,9 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Don't show tab bar on news detail pages
-  const showTabBar = !location.pathname.startsWith('/news/');
+  // Don't show tab bar on news detail pages or race view
+  const showTabBar = !location.pathname.startsWith('/news/') && 
+                     !location.pathname.startsWith('/race');  // ✅ Race'de tab bar gizle
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -57,6 +70,7 @@ const AppContent: React.FC = () => {
           <Route path="/home" element={<SimpleHomeView />} />
           <Route path="/reels" element={<ReelsView />} />
           <Route path="/games" element={<GamesView />} />
+          <Route path="/race" element={<GameRaceView />} />  {/* ✅ Yeni route */}
           <Route path="/profile" element={<ProfileView />} />
           <Route path="/news/:id" element={<NewsDetailView />} />
           <Route path="/backend-test" element={<BackendTestView />} />
