@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AA Haber Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            background: #e74c3c;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 3em;
+            font-weight: bold;
+            color: #3498db;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .filters {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 1em;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .chart-container h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .news-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .news-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.3);
+        }
+
+        .news-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .news-content {
+            padding: 20px;
+        }
+
+        .news-category {
+            display: inline-block;
+            background: #e74c3c;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-bottom: 10px;
+        }
+
+        .news-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .news-description {
+            opacity: 0.9;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .news-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+
+        .news-link {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .news-link:hover {
+            background: #2980b9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.5em;
+        }
+
+        .error {
+            background: #e74c3c;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        #refreshBtn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #refreshBtn:hover {
+            background: #229954;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <span class="logo">AA</span>
+                Anadolu Ajansı Haber Dashboard
+            </h1>
+            <p>Gerçek zamanlı haber takip ve analiz sistemi</p>
+            <div class="auto-refresh">
+                <button id="refreshBtn" onclick="loadData()">🔄 Yenile</button>
+                <label>
+                    <input type="checkbox" id="autoRefresh" checked>
+                    Otomatik yenileme (30 saniye)
+                </label>
+            </div>
+        </header>
+
+        <div id="errorContainer"></div>
+
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-label">Toplam Haber</div>
+                <div class="stat-number" id="totalNews">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Kategori Sayısı</div>
+                <div class="stat-number" id="totalCategories">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Son Güncelleme</div>
+                <div class="stat-number" id="lastUpdate" style="font-size: 1.2em;">-</div>
+            </div>
+        </div>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label>Kategori Filtrele</label>
+                <select id="categoryFilter" onchange="filterNews()">
+                    <option value="">Tüm Kategoriler</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Arama</label>
+                <input type="text" id="searchInput" placeholder="Haber başlığında ara..." oninput="filterNews()">
+            </div>
+            <div class="filter-group">
+                <label>Sıralama</label>
+                <select id="sortOrder" onchange="filterNews()">
+                    <option value="newest">En Yeni</option>
+                    <option value="oldest">En Eski</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h2>📊 Kategori Dağılımı</h2>
+            <canvas id="categoryChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>📈 Zaman İçinde Haber Akışı</h2>
+            <canvas id="timelineChart"></canvas>
+        </div>
+
+        <h2 style="margin-bottom: 20px; font-size: 2em;">📰 Haberler</h2>
+        <div class="news-grid" id="newsGrid">
+            <div class="loading">Veriler yükleniyor...</div>
+        </div>
+    </div>
+
+    <script>
+        let allNews = [];
+        let filteredNews = [];
+        let categoryChart = null;
+        let timelineChart = null;
+        let autoRefreshInterval = null;
+
+        async function loadData() {
+            try {
+                const response = await fetch('aa_news_data.json');
+                const data = await response.json();
+                
+                allNews = Object.values(data);
+                filteredNews = [...allNews];
+                
+                updateStats();
+                updateCategoryFilter();
+                updateCharts();
+                filterNews();
+                
+                document.getElementById('errorContainer').innerHTML = '';
+            } catch (error) {
+                document.getElementById('errorContainer').innerHTML = 
+                    `<div class="error">❌ Veri yüklenemedi: ${error.message}</div>`;
+            }
+        }
+
+        function updateStats() {
+            const total = allNews.length;
+            const categories = new Set(allNews.map(n => n.category)).size;
+            const latest = allNews.length > 0 ? new Date(allNews[0].collected_at).toLocaleString('tr-TR') : '-';
+            
+            document.getElementById('totalNews').textContent = total.toLocaleString();
+            document.getElementById('totalCategories').textContent = categories;
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('tr-TR');
+        }
+
+        function updateCategoryFilter() {
+            const categories = [...new Set(allNews.map(n => n.category))].sort();
+            const select = document.getElementById('categoryFilter');
+            
+            select.innerHTML = '<option value="">Tüm Kategoriler</option>';
+            categories.forEach(cat => {
+                select.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+        }
+
+        function updateCharts() {
+            updateCategoryChart();
+            updateTimelineChart();
+        }
+
+        function updateCategoryChart() {
+            const categoryCount = {};
+            allNews.forEach(news => {
+                categoryCount[news.category] = (categoryCount[news.category] || 0) + 1;
+            });
+
+            const sortedCategories = Object.entries(categoryCount)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15);
+
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            
+            if (categoryChart) categoryChart.destroy();
+            
+            categoryChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedCategories.map(c => c[0]),
+                    datasets: [{
+                        label: 'Haber Sayısı',
+                        data: sortedCategories.map(c => c[1]),
+                        backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                        borderColor: 'rgba(231, 76, 60, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTimelineChart() {
+            const timeData = {};
+            
+            allNews.forEach(news => {
+                const date = new Date(news.collected_at).toLocaleDateString('tr-TR');
+                timeData[date] = (timeData[date] || 0) + 1;
+            });
+
+            const sortedDates = Object.entries(timeData).sort((a, b) => 
+                new Date(a[0]) - new Date(b[0])
+            ).slice(-30);
+
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            
+            if (timelineChart) timelineChart.destroy();
+            
+            timelineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates.map(d => d[0]),
+                    datasets: [{
+                        label: 'Günlük Haber Sayısı',
+                        data: sortedDates.map(d => d[1]),
+                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function filterNews() {
+            const category = document.getElementById('categoryFilter').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const sort = document.getElementById('sortOrder').value;
+
+            filteredNews = allNews.filter(news => {
+                const matchCategory = !category || news.category === category;
+                const matchSearch = !search || 
+                    news.title.toLowerCase().includes(search) ||
+                    (news.description && news.description.toLowerCase().includes(search));
+                return matchCategory && matchSearch;
+            });
+
+            if (sort === 'newest') {
+                filteredNews.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+            } else {
+                filteredNews.sort((a, b) => new Date(a.pubDate) - new Date(b.pubDate));
+            }
+
+            displayNews();
+        }
+
+        function displayNews() {
+            const grid = document.getElementById('newsGrid');
+            
+            if (filteredNews.length === 0) {
+                grid.innerHTML = '<div class="loading">Gösterilecek haber bulunamadı</div>';
+                return;
+            }
+
+            grid.innerHTML = filteredNews.slice(0, 50).map(news => `
+                <div class="news-card">
+                    ${news.image ? `<img src="${news.image}" alt="${news.title}" class="news-image" onerror="this.style.display='none'">` : ''}
+                    <div class="news-content">
+                        <span class="news-category">${news.category}</span>
+                        <div class="news-title">${news.title}</div>
+                        ${news.description ? `<div class="news-description">${news.description}</div>` : ''}
+                        <div class="news-meta">
+                            <span>📅 ${new Date(news.pubDate).toLocaleString('tr-TR')}</span>
+                            <a href="${news.link}" target="_blank" class="news-link">Haberi Oku →</a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Otomatik yenileme
+        document.getElementById('autoRefresh').addEventListener('change', function(e) {
+            if (e.target.checked) {
+                autoRefreshInterval = setInterval(loadData, 30000);
+            } else {
+                clearInterval(autoRefreshInterval);
+            }
+        });
+
+        // İlk yükleme
+        loadData();
+        autoRefreshInterval = setInterval(loadData, 30000);
+    </script>
+</body>
+</html>
