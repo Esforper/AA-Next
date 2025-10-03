@@ -1,6 +1,6 @@
 // src/views/ReelsView.tsx - Updated with Infinite Scroll & View Tracking
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReelsViewModel } from '../viewmodels';
 import { LoadingSpinner, Button, ReelItem } from '../components';
 import { ReelData } from '../models';
@@ -42,6 +42,31 @@ export const ReelsView: React.FC = () => {
   
   const containerRef = useRef<HTMLDivElement>(null);
   const currentReel = getCurrentReel();
+
+  // Fullscreen UI state and bottom bar visibility
+  const [isFullscreenControlsHidden, setIsFullscreenControlsHidden] = useState(false);
+  const [autoAdvanceTimerId, setAutoAdvanceTimerId] = useState<number | null>(null);
+
+  const resetAutoAdvance = useCallback(() => {
+    if (autoAdvanceTimerId) {
+      window.clearTimeout(autoAdvanceTimerId);
+    }
+    const id = window.setTimeout(() => {
+      nextReel();
+    }, 10000);
+    setAutoAdvanceTimerId(id);
+  }, [autoAdvanceTimerId, nextReel]);
+
+  useEffect(() => {
+    resetAutoAdvance();
+    return () => {
+      if (autoAdvanceTimerId) window.clearTimeout(autoAdvanceTimerId);
+    };
+  }, [currentReelIndex, resetAutoAdvance]);
+
+  const handleAnyInteraction = () => {
+    resetAutoAdvance();
+  };
   
   // Progress tracking
   const [viewStartTime, setViewStartTime] = useState<number | null>(null);
@@ -80,24 +105,18 @@ export const ReelsView: React.FC = () => {
   // Handle image navigation
   const nextImage = () => {
     if (!currentReel?.images || currentReel.images.length <= 1) return;
-    if (isTransitioning) return;
-    setIsTransitioning(true);
     const nextIdx = (currentImageIndex + 1) % currentReel.images.length;
     setIncomingImageIndex(nextIdx);
     setIncomingDirection('left');
-    // After brief transition, commit switch
     setTimeout(() => {
       setCurrentImageIndex(nextIdx);
       setIncomingImageIndex(null);
       setIncomingDirection(null);
-      setIsTransitioning(false);
-    }, 250);
+    }, 300);
   };
 
   const prevImage = () => {
     if (!currentReel?.images || currentReel.images.length <= 1) return;
-    if (isTransitioning) return;
-    setIsTransitioning(true);
     const prevIdx = currentImageIndex === 0 ? currentReel.images.length - 1 : currentImageIndex - 1;
     setIncomingImageIndex(prevIdx);
     setIncomingDirection('right');
@@ -105,8 +124,7 @@ export const ReelsView: React.FC = () => {
       setCurrentImageIndex(prevIdx);
       setIncomingImageIndex(null);
       setIncomingDirection(null);
-      setIsTransitioning(false);
-    }, 250);
+    }, 300);
   };
 
   // YouTube Shorts style navigation with infinite scroll
@@ -158,57 +176,42 @@ export const ReelsView: React.FC = () => {
     setViewStartTime(Date.now());
   }, [currentReelIndex]);
 
-  // Touch event handlers
+  // Gesture thresholds
+  const H_SWIPE_THRESHOLD = 50; // px for horizontal image change
+  const V_SWIPE_THRESHOLD = 50; // px for vertical reel change
+
+  // Touch handlers: detect primary axis and trigger actions
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();
     const touch = e.touches[0];
     setTouchStartY(touch.clientY);
     setTouchStartX(touch.clientX);
-    setIsScrolling(false);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    // optional: prevent default to keep consistent feel
     e.preventDefault();
-    const touch = e.touches[0];
-    const deltaY = touch.clientY - touchStartY;
-    const deltaX = touch.clientX - touchStartX;
-    
-    const absDeltaY = Math.abs(deltaY);
-    const absDeltaX = Math.abs(deltaX);
-    
-    if (absDeltaY > 10 || absDeltaX > 10) {
-      if (absDeltaY > absDeltaX) {
-        setIsScrolling(true); // Vertical scroll
-      } else {
-        setIsScrolling(false); // Horizontal scroll
-      }
-    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     e.preventDefault();
-    
     const touch = e.changedTouches[0];
     const deltaY = touch.clientY - touchStartY;
     const deltaX = touch.clientX - touchStartX;
     const absDeltaY = Math.abs(deltaY);
     const absDeltaX = Math.abs(deltaX);
-    
-    const minSwipeDistance = 50;
-    
-    if (absDeltaY < minSwipeDistance && absDeltaX < minSwipeDistance) {
-      return;
-    }
-    
+
+    if (absDeltaY < V_SWIPE_THRESHOLD && absDeltaX < H_SWIPE_THRESHOLD) return;
+
     if (absDeltaY > absDeltaX) {
-      // Vertical swipe - Reels navigation
+      // Vertical: reel navigation
       if (deltaY > 0) {
         animatedPrevReel();
       } else {
         animatedNextReel();
       }
     } else {
-      // Horizontal swipe - Image navigation
+      // Horizontal: image navigation
       if (deltaX > 0) {
         prevImage();
       } else {
@@ -217,79 +220,49 @@ export const ReelsView: React.FC = () => {
     }
   };
 
-  // Mouse event handlers
+  // Mouse handlers: simple swipe on mouse up based on delta
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setMouseStartY(e.clientY);
+    setTouchStartY(e.clientY);
     setMouseStartX(e.clientX);
+    setTouchStartX(e.clientX);
     setIsMouseDown(true);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isMouseDown) return;
-    e.preventDefault();
+    // no-op for now; using mouse up for decision
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!isMouseDown) return;
     e.preventDefault();
-    
-    const deltaY = e.clientY - mouseStartY;
-    const deltaX = e.clientX - mouseStartX;
+    const deltaY = e.clientY - touchStartY;
+    const deltaX = e.clientX - touchStartX;
     const absDeltaY = Math.abs(deltaY);
     const absDeltaX = Math.abs(deltaX);
-    
-    const minSwipeDistance = 50;
-    
-    if (absDeltaY < minSwipeDistance && absDeltaX < minSwipeDistance) {
-      setIsMouseDown(false);
-      return;
-    }
-    
-    if (absDeltaY > absDeltaX) {
-      if (deltaY > 0) {
-        animatedPrevReel();
+
+    if (absDeltaY >= V_SWIPE_THRESHOLD || absDeltaX >= H_SWIPE_THRESHOLD) {
+      if (absDeltaY > absDeltaX) {
+        if (deltaY > 0) animatedPrevReel(); else animatedNextReel();
       } else {
-        animatedNextReel();
-      }
-    } else {
-      if (deltaX > 0) {
-        prevImage();
-      } else {
-        nextImage();
+        if (deltaX > 0) prevImage(); else nextImage();
       }
     }
-    
     setIsMouseDown(false);
   };
 
-  // Wheel event handler
+  // Wheel handler: vertical only (like Shorts)
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    
-    const deltaY = e.deltaY;
-    const deltaX = e.deltaX;
-    const absDeltaY = Math.abs(deltaY);
-    const absDeltaX = Math.abs(deltaX);
-    
-    if (absDeltaY > absDeltaX) {
-      if (deltaY > 0) {
-        animatedNextReel();
-      } else {
-        animatedPrevReel();
-      }
-    } else {
-      if (deltaX > 0) {
-        nextImage();
-      } else {
-        prevImage();
-      }
-    }
+    if (Math.abs(e.deltaY) < 10) return;
+    if (e.deltaY > 0) animatedNextReel(); else animatedPrevReel();
   };
 
   // Keyboard navigation
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
@@ -299,10 +272,6 @@ export const ReelsView: React.FC = () => {
           e.preventDefault();
           animatedNextReel();
           break;
-        case ' ':
-          e.preventDefault();
-          togglePlayPause();
-          break;
         case 'ArrowLeft':
           e.preventDefault();
           prevImage();
@@ -311,12 +280,15 @@ export const ReelsView: React.FC = () => {
           e.preventDefault();
           nextImage();
           break;
+        case ' ':
+          e.preventDefault();
+          togglePlayPause();
+          break;
       }
     };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [animatedNextReel, animatedPrevReel, nextImage, prevImage, togglePlayPause]);
 
   // Loading state
   if (loading && reels.length === 0) {
@@ -380,15 +352,25 @@ export const ReelsView: React.FC = () => {
         WebkitTouchCallout: 'none',
         minHeight: '100dvh'
       } as React.CSSProperties}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onWheel={handleWheel}
+      onTouchStart={(e) => { handleAnyInteraction(); handleTouchStart(e); }}
+      onTouchMove={(e) => { handleAnyInteraction(); handleTouchMove(e); }}
+      onTouchEnd={(e) => { handleAnyInteraction(); handleTouchEnd(e); }}
+      onMouseDown={(e) => { handleAnyInteraction(); handleMouseDown(e); }}
+      onMouseMove={(e) => { handleAnyInteraction(); handleMouseMove(e); }}
+      onMouseUp={(e) => { handleAnyInteraction(); handleMouseUp(e); }}
+      onWheel={(e) => { handleAnyInteraction(); handleWheel(e); }}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {/* Top-left UI toggle button */}
+      <button
+        onClick={() => setIsFullscreenControlsHidden(prev => !prev)}
+        className="fixed top-3 left-3 z-[60] px-3 py-2 rounded-full bg-black/60 text-white text-sm hover:bg-black/80 backdrop-blur-md border border-white/20 shadow-md transition-colors"
+        style={{ WebkitTapHighlightColor: 'transparent' }}
+        aria-label={isFullscreenControlsHidden ? 'Arayüzü göster' : 'Arayüzü gizle'}
+      >
+        {isFullscreenControlsHidden ? '🔽 UI' : '🔼 UI'}
+      </button>
+
       {/* YouTube Shorts Style Container */}
       <div className="relative h-full w-full">
         
@@ -397,9 +379,10 @@ export const ReelsView: React.FC = () => {
           <div 
             className="absolute inset-0 w-full h-full"
             style={{
-              transform: `translateY(${100 + slideOffset.y}%)`,
-              transition: isTransitioning ? 'transform 0.3s ease-out' : 'none',
-              zIndex: 1
+              transform: `translateY(${100 + slideOffset.y + (isMouseDown ? Math.max(0, mouseStartY - mouseStartY) : 0)}%)`,
+              transition: isMouseDown ? 'none' : (isTransitioning ? 'transform 0.3s ease-out' : 'none'),
+              zIndex: 1,
+              opacity: isMouseDown ? Math.min(1, Math.max(0, mouseStartY - mouseStartY)) : 1
             }}
           >
             <ReelItem
@@ -415,161 +398,120 @@ export const ReelsView: React.FC = () => {
           </div>
         )}
 
-        {/* Left Preview Image - Instagram Stories Style */}
-        {currentReel?.images && currentReel.images.length > 1 && (
-          <div 
-            className="absolute inset-0 w-full h-full"
-            style={{
-              transform: `translateX(-20%) scale(0.85)`,
-              zIndex: 1,
-              filter: 'blur(3px)',
-              opacity: 0.3
-            }}
-          >
-            <ReelItem
-              reel={{
-                ...(currentReel || ({} as ReelData)),
-                main_image: getReelImage(currentReel as ReelData, currentImageIndex === 0 ? (currentReel!.images.length - 1) : (currentImageIndex - 1))
-              }}
-              isActive={false}
-              onPlay={() => {}}
-              onImageClick={() => {}}
-              className="absolute inset-0 w-full h-full"
-            />
-          </div>
-        )}
+        {/* Side blurred previews (conditional) */}
+        {currentReel?.images && currentReel.images.length > 0 && (
+          <>
+            {(() => {
+              const imgCount = currentReel.images.length;
+              const prevIdx = imgCount > 0 ? (currentImageIndex === 0 ? imgCount - 1 : currentImageIndex - 1) : 0;
+              const nextIdx = imgCount > 0 ? ((currentImageIndex + 1) % imgCount) : 0;
 
-        {/* Right Preview Image - Instagram Stories Style */}
-        {currentReel?.images && currentReel.images.length > 1 && (
-          <div 
-            className="absolute inset-0 w-full h-full"
-            style={{
-              transform: `translateX(20%) scale(0.85)`,
-              zIndex: 1,
-              filter: 'blur(3px)',
-              opacity: 0.3
-            }}
-          >
-            <ReelItem
-              reel={{
-                ...(currentReel || ({} as ReelData)),
-                main_image: getReelImage(currentReel as ReelData, (currentImageIndex + 1) % (currentReel!.images.length))
-              }}
-              isActive={false}
-              onPlay={() => {}}
-              onImageClick={() => {}}
-              className="absolute inset-0 w-full h-full"
-            />
-          </div>
+              const isIncomingLeft = incomingDirection === 'right' && incomingImageIndex === prevIdx;
+              const isIncomingRight = incomingDirection === 'left' && incomingImageIndex === nextIdx;
+
+              const transition = 'transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), filter 0.45s, opacity 0.45s';
+
+              const leftStyle: React.CSSProperties = isIncomingLeft
+                ? {
+                    transform: 'translateX(0%) rotateY(0deg) scale(1)',
+                    filter: 'blur(0px)',
+                    opacity: 1,
+                    zIndex: 3,
+                    transition
+                  }
+                : {
+                    transform: 'translateX(-35%) rotateY(25deg) scale(0.9)',
+                    filter: 'blur(8px)',
+                    opacity: 0.35,
+                    zIndex: 1,
+                    transition
+                  };
+
+              const rightStyle: React.CSSProperties = isIncomingRight
+                ? {
+                    transform: 'translateX(0%) rotateY(0deg) scale(1)',
+                    filter: 'blur(0px)',
+                    opacity: 1,
+                    zIndex: 3,
+                    transition
+                  }
+                : {
+                    transform: 'translateX(35%) rotateY(-25deg) scale(0.9)',
+                    filter: 'blur(8px)',
+                    opacity: 0.35,
+                    zIndex: 1,
+                    transition
+                  };
+
+              return (
+                <>
+                  {/* Left preview only if 2+ images */}
+                  {imgCount > 1 && (
+                    <ReelItem
+                      reel={{
+                        ...(currentReel || ({} as ReelData)),
+                        main_image: getReelImage(currentReel as ReelData, prevIdx)
+                      }}
+                      isActive={false}
+                      onPlay={() => {}}
+                      onImageClick={() => {}}
+                      className="absolute inset-0 w-full h-full"
+                      style={leftStyle}
+                    />
+                  )}
+
+                  {/* Right preview: always (if 1 image, shows same but blurred) */}
+                  <ReelItem
+                    reel={{
+                      ...(currentReel || ({} as ReelData)),
+                      main_image: getReelImage(currentReel as ReelData, nextIdx)
+                    }}
+                    isActive={false}
+                    onPlay={() => {}}
+                    onImageClick={() => {}}
+                    className="absolute inset-0 w-full h-full"
+                    style={rightStyle}
+                  />
+                </>
+              );
+            })()}
+          </>
         )}
 
         {/* Current Reel (Active) */}
         <div 
           className="absolute inset-0 w-full h-full"
           style={{
-            transform: `translate(0%, ${slideOffset.y}%)`,
-            transition: isTransitioning ? 'all 0.25s ease-out' : 'none',
-            zIndex: 2,
-            perspective: '1200px'
+            transform: `translateY(${slideOffset.y}%)`,
+            transition: isTransitioning ? 'transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1)' : 'none',
+            zIndex: 4,
+            perspective: '1200px',
+            transformStyle: 'preserve-3d'
           }}
         >
-          {currentReel && currentReel.images && currentReel.images.length > 0 ? (
+          {currentReel && (
             <>
-              {(() => {
-                const count = currentReel.images.length;
-                const leftIdx = (currentImageIndex - 1 + count) % count;
-                const centerIdx = currentImageIndex;
-                const rightIdx = (currentImageIndex + 1) % count;
-
-                const baseLeft = { tx: -30, scale: 0.9, blur: 6, rotY: 15, z: 1 };
-                const baseCenter = { tx: 0, scale: 1, blur: 0, rotY: 0, z: 3 };
-                const baseRight = { tx: 30, scale: 0.9, blur: 6, rotY: -15, z: 2 };
-
-                let left = { ...baseLeft };
-                let center = { ...baseCenter };
-                let right = { ...baseRight };
-
-                if (isTransitioning && incomingDirection === 'right') {
-                  // Move left -> center, center -> right
-                  left = { ...baseCenter };
-                  center = { ...baseRight };
-                  right = { ...baseRight };
-                } else if (isTransitioning && incomingDirection === 'left') {
-                  // Move right -> center, center -> left
-                  right = { ...baseCenter };
-                  center = { ...baseLeft };
-                  left = { ...baseLeft };
-                }
-
-                const styleFor = (slot: typeof baseCenter) => ({
-                  transform: `translateX(${slot.tx}%) scale(${slot.scale}) rotateY(${slot.rotY}deg)`,
-                  filter: `blur(${slot.blur}px)`,
-                  transition: 'transform 0.25s ease-out, filter 0.25s ease-out',
-                  zIndex: slot.z as unknown as number,
-                  boxShadow: slot.blur === 0 ? '0 10px 30px rgba(0,0,0,0.35)' : 'none'
-                } as React.CSSProperties);
-
-                return (
-                  <>
-                    {/* LEFT (prev) */}
-                    <ReelItem
-                      reel={{
-                        ...(currentReel || ({} as ReelData)),
-                        main_image: getReelImage(currentReel as ReelData, leftIdx)
-                      }}
-                      isActive={false}
-                      onPlay={() => {}}
-                      onImageClick={() => {}}
-                      className="absolute inset-0 w-full h-full"
-                      style={styleFor(left)}
-                    />
-
-                    {/* CENTER (current) */}
-                    <ReelItem
-                      reel={{
-                        ...(currentReel || ({} as ReelData)),
-                        main_image: getReelImage(currentReel as ReelData, centerIdx)
-                      }}
-                      isActive={true}
-                      onPlay={togglePlayPause}
-                      onImageClick={togglePlayPause}
-                      className="absolute inset-0 w-full h-full"
-                      style={styleFor(center)}
-                    />
-
-                    {/* RIGHT (next) */}
-                    <ReelItem
-                      reel={{
-                        ...(currentReel || ({} as ReelData)),
-                        main_image: getReelImage(currentReel as ReelData, rightIdx)
-                      }}
-                      isActive={false}
-                      onPlay={() => {}}
-                      onImageClick={() => {}}
-                      className="absolute inset-0 w-full h-full"
-                      style={styleFor(right)}
-                    />
-
-                    {/* Overlay for readability */}
-                    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 4 }}>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                    </div>
-                  </>
-                );
-              })()}
+              {/* Foreground layer: circular slide out on horizontal change */}
+              <ReelItem
+                reel={{
+                  ...(currentReel || ({} as ReelData)),
+                  main_image: getReelImage(currentReel as ReelData, currentImageIndex)
+                }}
+                isActive={true}
+                onPlay={togglePlayPause}
+                onImageClick={togglePlayPause}
+                className="absolute inset-0 w-full h-full"
+                style={{
+                  transform: incomingDirection
+                    ? `translateX(${incomingDirection === 'left' ? '-35%' : '35%'}) rotateY(${incomingDirection === 'left' ? 25 : -25}deg) scale(0.9)`
+                    : 'translateX(0%) rotateY(0deg) scale(1.2)',
+                  filter: incomingDirection ? 'blur(8px)' : 'none',
+                  opacity: incomingDirection ? 0.65 : 1,
+                  transition: 'transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), filter 0.45s, opacity 0.45s',
+                  boxShadow: '0 12px 36px rgba(0,0,0,0.4)'
+                }}
+              />
             </>
-          ) : (
-            // Fallback single image
-            <ReelItem
-              reel={{
-                ...(currentReel || ({} as ReelData)),
-                main_image: getReelImage(currentReel as ReelData, 0)
-              }}
-              isActive={true}
-              onPlay={togglePlayPause}
-              onImageClick={togglePlayPause}
-              className="absolute inset-0 w-full h-full"
-            />
           )}
         </div>
 
@@ -578,9 +520,10 @@ export const ReelsView: React.FC = () => {
           <div 
             className="absolute inset-0 w-full h-full"
             style={{
-              transform: `translateY(${-100 + slideOffset.y}%)`,
-              transition: isTransitioning ? 'transform 0.3s ease-out' : 'none',
-              zIndex: 1
+              transform: `translateY(${-100 + slideOffset.y + (isMouseDown ? Math.min(0, mouseStartY - mouseStartY) : 0)}%)`,
+              transition: isMouseDown ? 'none' : (isTransitioning ? 'transform 0.3s ease-out' : 'none'),
+              zIndex: 1,
+              opacity: isMouseDown ? Math.min(1, Math.max(0, -mouseStartY + mouseStartY)) : 1
             }}
           >
             <ReelItem
@@ -596,9 +539,16 @@ export const ReelsView: React.FC = () => {
           </div>
         )}
 
-        {/* Infinite Scroll Progress Bar */}
-        <div className="absolute bottom-0 left-0 right-0 pointer-events-auto">
-          <div className="h-1 bg-black/20">
+        {/* Bottom Progress Bar (Animated hide/show) */}
+        <div
+          className={`fixed bottom-0 left-0 right-0 transition-all duration-500 ${
+            isFullscreenControlsHidden ? 'opacity-0 translate-y-10 pointer-events-none' : 'opacity-100 translate-y-0 pointer-events-auto'
+          }`}
+          onMouseMove={handleAnyInteraction}
+          onTouchStart={handleAnyInteraction}
+          style={{ zIndex: 50 }}
+        >
+          <div className="h-1 bg-black/30">
             <div 
               className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-700 ease-out"
               style={{ 
