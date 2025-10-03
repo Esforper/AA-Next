@@ -1,0 +1,41 @@
+name: mobile_aanext
+description: "A new Flutter project."
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.1 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- YENİ EKLENEN PAKETLER ---
+  http: ^1.2.1                  # API istekleri için
+  provider: ^6.1.2              # State management için
+  cached_network_image: ^3.3.1  # Resimleri verimli yüklemek için
+  webview_flutter: ^4.8.0
+  # --- YENİ EKLENEN PAKETLER SONU ---
+
+  cupertino_icons: ^1.0.6f
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  # assets:
+  #   - images/a_dot_burr.jpeg
+  #   - images/a_dot_ham.jpeg
+
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
