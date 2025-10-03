@@ -50,6 +50,15 @@ from .realtime import (
     MessageType
 )
 
+from .user import (
+    User, UserCreate, UserLogin, UserUpdate,
+    UserResponse, UserPublicProfile,
+    Token, TokenData,
+    LoginResponse, RegisterResponse,
+    UserRole, UserStatus
+)
+
+
 # Reels Tracking models - Updated with new models
 try:
     from .reels_tracking import (

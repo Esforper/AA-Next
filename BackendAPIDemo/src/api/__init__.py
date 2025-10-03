@@ -132,6 +132,15 @@ def _register_routers(app: FastAPI):
         
         
     try:
+        from .endpoints.auth import router as auth_router
+        app.include_router(auth_router)
+        print("✅ Auth router registered")
+    except ImportError as e:
+        print(f"⚠️  Auth router import failed: {e}")
+        
+        
+        
+    try:
         from .endpoints.reels import router as reels_router
         app.include_router(reels_router)
         print("✅ Reels router registered")

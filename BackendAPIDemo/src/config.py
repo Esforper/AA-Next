@@ -140,6 +140,11 @@ class Settings(BaseSettings):
     # ecommerce_payment_provider: str = "stripe"
     # ecommerce_currency: str = "USD"
     
+    jwt_secret_key: str = "your-secret-key-change-this-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 24  # Token 24 saat geçerli
+
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
