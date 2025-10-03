@@ -6,3 +6,4 @@ export * from './TabBar';
 export * from './LoadingSpinner';
 export * from './ArticleCard';
 export * from './ArticleNode';
+export { default as NewsCard } from './NewsCard.jsx';

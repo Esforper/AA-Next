@@ -3,3 +3,4 @@ export * from './useReelsViewModel';
 export * from './useArticlesViewModel';
 export * from './useArticleDetailViewModel';
 export * from './useNavigationViewModel';
+export * from './useNewsViewModel';

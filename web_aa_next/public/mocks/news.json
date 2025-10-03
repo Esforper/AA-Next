@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": "1",
+      "title": "Ekonomi: Enflasyon Beklentileri Güncellendi",
+      "description": "Piyasalarda yıl sonu enflasyon beklentisi yukarı yönlü revize edildi.",
+      "imageUrl": "/logo512.png",
+      "url": "https://example.com/news/1",
+      "category": "Economy",
+      "publishedAt": "2025-10-03T08:00:00Z",
+      "source": "AA"
+    },
+    {
+      "id": "2",
+      "title": "Siyaset: Mecliste Yeni Düzenleme",
+      "description": "Teknoloji yatırımlarını teşvik eden yasa teklifi komisyondan geçti.",
+      "imageUrl": "/logo192.png",
+      "url": "https://example.com/news/2",
+      "category": "Politics",
+      "publishedAt": "2025-10-03T09:30:00Z",
+      "source": "AA"
+    }
+  ],
+  "pagination": { "limit": 12, "offset": 0, "total": 2, "hasMore": false }
+}
+
+
+
