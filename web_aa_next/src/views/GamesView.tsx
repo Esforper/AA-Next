@@ -1,7 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';  // ✅ Import ekle
 import { Card } from '../components';
 
 export const GamesView: React.FC = () => {
+  const navigate = useNavigate();  // ✅ Hook ekle
+  
   const plannedFeatures = [
     'Mini kelime oyunları',
     'Haber bilgi yarışması',
@@ -24,11 +27,33 @@ export const GamesView: React.FC = () => {
 
       {/* Content - Responsive */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        
+        {/* ✅ YENI: Race Demo Kartı */}
+        <Card padding="lg" shadow="lg" className="mb-6 bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+          <div className="text-center">
+            <div className="text-4xl sm:text-6xl mb-4">🏁</div>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-4">
+              Haber Yarış Oyunu
+            </h2>
+            <p className="text-blue-100 text-base sm:text-lg leading-relaxed mb-6">
+              5 oyuncu, paralel şeritler, haftalık haber takip yarışı!
+            </p>
+            
+            <button
+              onClick={() => navigate('/race')}
+              className="px-8 py-4 bg-white text-blue-600 rounded-lg font-bold text-lg hover:bg-blue-50 transition-colors shadow-lg hover:shadow-xl"
+            >
+              Yarışa Başla →
+            </button>
+          </div>
+        </Card>
+        
+        {/* Mevcut kart */}
         <Card padding="lg" shadow="lg" className="text-center">
           <div className="mb-6 sm:mb-8">
             <div className="text-4xl sm:text-6xl mb-4">🎮</div>
             <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 sm:mb-4">
-              Oyunlar Çok Yakında!
+              Diğer Oyunlar Çok Yakında!
             </h2>
             <p className="text-gray-600 text-base sm:text-lg leading-relaxed">
               Bu sayfa yakında eğlenceli mini oyunlar ile dolu olacak

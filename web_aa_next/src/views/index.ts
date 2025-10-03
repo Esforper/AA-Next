@@ -7,3 +7,5 @@ export * from './GamesView';
 export * from './ProfileView';
 export * from './NewsDetailView';
 export * from './BackendTestView';
+export * from './NewsGraphView';
+export { default as GameRaceView } from './GameRaceView';

@@ -1,8 +1,8 @@
 // src/views/ReelsView.tsx - Updated with Infinite Scroll & View Tracking
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReelsViewModel } from '../viewmodels';
-import { LoadingSpinner, Button } from '../components';
+import { LoadingSpinner, Button, ReelItem } from '../components';
 import { ReelData } from '../models';
 
 export const ReelsView: React.FC = () => {
@@ -37,9 +37,36 @@ export const ReelsView: React.FC = () => {
   const [swipeDirection, setSwipeDirection] = useState<'up' | 'down' | 'left' | 'right' | null>(null);
   const [slideOffset, setSlideOffset] = useState({ x: 0, y: 0 });
   const [imageAnimation, setImageAnimation] = useState<'slide-left-in' | 'slide-right-in' | null>(null);
+  const [incomingImageIndex, setIncomingImageIndex] = useState<number | null>(null);
+  const [incomingDirection, setIncomingDirection] = useState<'left' | 'right' | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const currentReel = getCurrentReel();
+
+  // Fullscreen UI state and bottom bar visibility
+  const [isFullscreenControlsHidden, setIsFullscreenControlsHidden] = useState(false);
+  const [autoAdvanceTimerId, setAutoAdvanceTimerId] = useState<number | null>(null);
+
+  const resetAutoAdvance = useCallback(() => {
+    if (autoAdvanceTimerId) {
+      window.clearTimeout(autoAdvanceTimerId);
+    }
+    const id = window.setTimeout(() => {
+      nextReel();
+    }, 10000);
+    setAutoAdvanceTimerId(id);
+  }, [autoAdvanceTimerId, nextReel]);
+
+  useEffect(() => {
+    resetAutoAdvance();
+    return () => {
+      if (autoAdvanceTimerId) window.clearTimeout(autoAdvanceTimerId);
+    };
+  }, [currentReelIndex, resetAutoAdvance]);
+
+  const handleAnyInteraction = () => {
+    resetAutoAdvance();
+  };
   
   // Progress tracking
   const [viewStartTime, setViewStartTime] = useState<number | null>(null);
@@ -78,39 +105,25 @@ export const ReelsView: React.FC = () => {
   // Handle image navigation
   const nextImage = () => {
     if (!currentReel?.images || currentReel.images.length <= 1) return;
-    
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setImageAnimation('slide-left-in');
-    setSlideOffset({ x: 100, y: 0 });
-    
+    const nextIdx = (currentImageIndex + 1) % currentReel.images.length;
+    setIncomingImageIndex(nextIdx);
+    setIncomingDirection('left');
     setTimeout(() => {
-      setCurrentImageIndex(prev => 
-        prev === currentReel.images.length - 1 ? 0 : prev + 1
-      );
-      setSlideOffset({ x: 0, y: 0 });
-      setIsTransitioning(false);
-      setSwipeDirection(null);
-      setImageAnimation(null);
+      setCurrentImageIndex(nextIdx);
+      setIncomingImageIndex(null);
+      setIncomingDirection(null);
     }, 300);
   };
 
   const prevImage = () => {
     if (!currentReel?.images || currentReel.images.length <= 1) return;
-    
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setImageAnimation('slide-right-in');
-    setSlideOffset({ x: -100, y: 0 });
-    
+    const prevIdx = currentImageIndex === 0 ? currentReel.images.length - 1 : currentImageIndex - 1;
+    setIncomingImageIndex(prevIdx);
+    setIncomingDirection('right');
     setTimeout(() => {
-      setCurrentImageIndex(prev => 
-        prev === 0 ? currentReel.images.length - 1 : prev - 1
-      );
-      setSlideOffset({ x: 0, y: 0 });
-      setIsTransitioning(false);
-      setSwipeDirection(null);
-      setImageAnimation(null);
+      setCurrentImageIndex(prevIdx);
+      setIncomingImageIndex(null);
+      setIncomingDirection(null);
     }, 300);
   };
 
@@ -163,57 +176,42 @@ export const ReelsView: React.FC = () => {
     setViewStartTime(Date.now());
   }, [currentReelIndex]);
 
-  // Touch event handlers
+  // Gesture thresholds
+  const H_SWIPE_THRESHOLD = 50; // px for horizontal image change
+  const V_SWIPE_THRESHOLD = 50; // px for vertical reel change
+
+  // Touch handlers: detect primary axis and trigger actions
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();
     const touch = e.touches[0];
     setTouchStartY(touch.clientY);
     setTouchStartX(touch.clientX);
-    setIsScrolling(false);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    // optional: prevent default to keep consistent feel
     e.preventDefault();
-    const touch = e.touches[0];
-    const deltaY = touch.clientY - touchStartY;
-    const deltaX = touch.clientX - touchStartX;
-    
-    const absDeltaY = Math.abs(deltaY);
-    const absDeltaX = Math.abs(deltaX);
-    
-    if (absDeltaY > 10 || absDeltaX > 10) {
-      if (absDeltaY > absDeltaX) {
-        setIsScrolling(true); // Vertical scroll
-      } else {
-        setIsScrolling(false); // Horizontal scroll
-      }
-    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     e.preventDefault();
-    
     const touch = e.changedTouches[0];
     const deltaY = touch.clientY - touchStartY;
     const deltaX = touch.clientX - touchStartX;
     const absDeltaY = Math.abs(deltaY);
     const absDeltaX = Math.abs(deltaX);
-    
-    const minSwipeDistance = 50;
-    
-    if (absDeltaY < minSwipeDistance && absDeltaX < minSwipeDistance) {
-      return;
-    }
-    
+
+    if (absDeltaY < V_SWIPE_THRESHOLD && absDeltaX < H_SWIPE_THRESHOLD) return;
+
     if (absDeltaY > absDeltaX) {
-      // Vertical swipe - Reels navigation
+      // Vertical: reel navigation
       if (deltaY > 0) {
         animatedPrevReel();
       } else {
         animatedNextReel();
       }
     } else {
-      // Horizontal swipe - Image navigation
+      // Horizontal: image navigation
       if (deltaX > 0) {
         prevImage();
       } else {
@@ -222,79 +220,49 @@ export const ReelsView: React.FC = () => {
     }
   };
 
-  // Mouse event handlers
+  // Mouse handlers: simple swipe on mouse up based on delta
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setMouseStartY(e.clientY);
+    setTouchStartY(e.clientY);
     setMouseStartX(e.clientX);
+    setTouchStartX(e.clientX);
     setIsMouseDown(true);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isMouseDown) return;
-    e.preventDefault();
+    // no-op for now; using mouse up for decision
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!isMouseDown) return;
     e.preventDefault();
-    
-    const deltaY = e.clientY - mouseStartY;
-    const deltaX = e.clientX - mouseStartX;
+    const deltaY = e.clientY - touchStartY;
+    const deltaX = e.clientX - touchStartX;
     const absDeltaY = Math.abs(deltaY);
     const absDeltaX = Math.abs(deltaX);
-    
-    const minSwipeDistance = 50;
-    
-    if (absDeltaY < minSwipeDistance && absDeltaX < minSwipeDistance) {
-      setIsMouseDown(false);
-      return;
-    }
-    
-    if (absDeltaY > absDeltaX) {
-      if (deltaY > 0) {
-        animatedPrevReel();
+
+    if (absDeltaY >= V_SWIPE_THRESHOLD || absDeltaX >= H_SWIPE_THRESHOLD) {
+      if (absDeltaY > absDeltaX) {
+        if (deltaY > 0) animatedPrevReel(); else animatedNextReel();
       } else {
-        animatedNextReel();
-      }
-    } else {
-      if (deltaX > 0) {
-        prevImage();
-      } else {
-        nextImage();
+        if (deltaX > 0) prevImage(); else nextImage();
       }
     }
-    
     setIsMouseDown(false);
   };
 
-  // Wheel event handler
+  // Wheel handler: vertical only (like Shorts)
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    
-    const deltaY = e.deltaY;
-    const deltaX = e.deltaX;
-    const absDeltaY = Math.abs(deltaY);
-    const absDeltaX = Math.abs(deltaX);
-    
-    if (absDeltaY > absDeltaX) {
-      if (deltaY > 0) {
-        animatedNextReel();
-      } else {
-        animatedPrevReel();
-      }
-    } else {
-      if (deltaX > 0) {
-        nextImage();
-      } else {
-        prevImage();
-      }
-    }
+    if (Math.abs(e.deltaY) < 10) return;
+    if (e.deltaY > 0) animatedNextReel(); else animatedPrevReel();
   };
 
   // Keyboard navigation
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
@@ -304,10 +272,6 @@ export const ReelsView: React.FC = () => {
           e.preventDefault();
           animatedNextReel();
           break;
-        case ' ':
-          e.preventDefault();
-          togglePlayPause();
-          break;
         case 'ArrowLeft':
           e.preventDefault();
           prevImage();
@@ -316,12 +280,15 @@ export const ReelsView: React.FC = () => {
           e.preventDefault();
           nextImage();
           break;
+        case ' ':
+          e.preventDefault();
+          togglePlayPause();
+          break;
       }
     };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [animatedNextReel, animatedPrevReel, nextImage, prevImage, togglePlayPause]);
 
   // Loading state
   if (loading && reels.length === 0) {
@@ -385,15 +352,25 @@ export const ReelsView: React.FC = () => {
         WebkitTouchCallout: 'none',
         minHeight: '100dvh'
       } as React.CSSProperties}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onWheel={handleWheel}
+      onTouchStart={(e) => { handleAnyInteraction(); handleTouchStart(e); }}
+      onTouchMove={(e) => { handleAnyInteraction(); handleTouchMove(e); }}
+      onTouchEnd={(e) => { handleAnyInteraction(); handleTouchEnd(e); }}
+      onMouseDown={(e) => { handleAnyInteraction(); handleMouseDown(e); }}
+      onMouseMove={(e) => { handleAnyInteraction(); handleMouseMove(e); }}
+      onMouseUp={(e) => { handleAnyInteraction(); handleMouseUp(e); }}
+      onWheel={(e) => { handleAnyInteraction(); handleWheel(e); }}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {/* Top-left UI toggle button */}
+      <button
+        onClick={() => setIsFullscreenControlsHidden(prev => !prev)}
+        className="fixed top-3 left-3 z-[60] px-3 py-2 rounded-full bg-black/60 text-white text-sm hover:bg-black/80 backdrop-blur-md border border-white/20 shadow-md transition-colors"
+        style={{ WebkitTapHighlightColor: 'transparent' }}
+        aria-label={isFullscreenControlsHidden ? 'Arayüzü göster' : 'Arayüzü gizle'}
+      >
+        {isFullscreenControlsHidden ? '🔽 UI' : '🔼 UI'}
+      </button>
+
       {/* YouTube Shorts Style Container */}
       <div className="relative h-full w-full">
         
@@ -402,20 +379,103 @@ export const ReelsView: React.FC = () => {
           <div 
             className="absolute inset-0 w-full h-full"
             style={{
-              transform: `translateY(${100 + slideOffset.y}%)`,
-              transition: isTransitioning ? 'transform 0.3s ease-out' : 'none',
-              zIndex: 1
+              transform: `translateY(${100 + slideOffset.y + (isMouseDown ? Math.max(0, mouseStartY - mouseStartY) : 0)}%)`,
+              transition: isMouseDown ? 'none' : (isTransitioning ? 'transform 0.3s ease-out' : 'none'),
+              zIndex: 1,
+              opacity: isMouseDown ? Math.min(1, Math.max(0, mouseStartY - mouseStartY)) : 1
             }}
           >
-            <div className="relative h-full w-full">
-              <img
-                src={getReelImage(prevReelData)}
-                alt={prevReelData.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-            </div>
+            <ReelItem
+              reel={{
+                ...prevReelData,
+                main_image: getReelImage(prevReelData)
+              }}
+              isActive={false}
+              onPlay={() => {}}
+              onImageClick={() => {}}
+              className="absolute inset-0 w-full h-full opacity-50"
+            />
           </div>
+        )}
+
+        {/* Side blurred previews (conditional) */}
+        {currentReel?.images && currentReel.images.length > 0 && (
+          <>
+            {(() => {
+              const imgCount = currentReel.images.length;
+              const prevIdx = imgCount > 0 ? (currentImageIndex === 0 ? imgCount - 1 : currentImageIndex - 1) : 0;
+              const nextIdx = imgCount > 0 ? ((currentImageIndex + 1) % imgCount) : 0;
+
+              const isIncomingLeft = incomingDirection === 'right' && incomingImageIndex === prevIdx;
+              const isIncomingRight = incomingDirection === 'left' && incomingImageIndex === nextIdx;
+
+              const transition = 'transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), filter 0.45s, opacity 0.45s';
+
+              const leftStyle: React.CSSProperties = isIncomingLeft
+                ? {
+                    transform: 'translateX(0%) rotateY(0deg) scale(1)',
+                    filter: 'blur(0px)',
+                    opacity: 1,
+                    zIndex: 3,
+                    transition
+                  }
+                : {
+                    transform: 'translateX(-35%) rotateY(25deg) scale(0.9)',
+                    filter: 'blur(8px)',
+                    opacity: 0.35,
+                    zIndex: 1,
+                    transition
+                  };
+
+              const rightStyle: React.CSSProperties = isIncomingRight
+                ? {
+                    transform: 'translateX(0%) rotateY(0deg) scale(1)',
+                    filter: 'blur(0px)',
+                    opacity: 1,
+                    zIndex: 3,
+                    transition
+                  }
+                : {
+                    transform: 'translateX(35%) rotateY(-25deg) scale(0.9)',
+                    filter: 'blur(8px)',
+                    opacity: 0.35,
+                    zIndex: 1,
+                    transition
+                  };
+
+              return (
+                <>
+                  {/* Left preview only if 2+ images */}
+                  {imgCount > 1 && (
+                    <ReelItem
+                      reel={{
+                        ...(currentReel || ({} as ReelData)),
+                        main_image: getReelImage(currentReel as ReelData, prevIdx)
+                      }}
+                      isActive={false}
+                      onPlay={() => {}}
+                      onImageClick={() => {}}
+                      className="absolute inset-0 w-full h-full"
+                      style={leftStyle}
+                    />
+                  )}
+
+                  {/* Right preview: always (if 1 image, shows same but blurred) */}
+                  <ReelItem
+                    reel={{
+                      ...(currentReel || ({} as ReelData)),
+                      main_image: getReelImage(currentReel as ReelData, nextIdx)
+                    }}
+                    isActive={false}
+                    onPlay={() => {}}
+                    onImageClick={() => {}}
+                    className="absolute inset-0 w-full h-full"
+                    style={rightStyle}
+                  />
+                </>
+              );
+            })()}
+          </>
         )}
 
         {/* Current Reel (Active) */}
@@ -423,112 +483,36 @@ export const ReelsView: React.FC = () => {
           className="absolute inset-0 w-full h-full"
           style={{
             transform: `translateY(${slideOffset.y}%)`,
-            transition: isTransitioning ? 'transform 0.3s ease-out' : 'none',
-            zIndex: 2
+            transition: isTransitioning ? 'transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1)' : 'none',
+            zIndex: 4,
+            perspective: '1200px',
+            transformStyle: 'preserve-3d'
           }}
         >
-          <div className="relative h-full w-full">
-            {/* Background Image with Animation */}
-            <div className="relative h-full w-full overflow-hidden">
-              <img
-                key={`${currentReel?.id}-${currentImageIndex}`}
-                src={getCurrentImage()}
-                alt={currentReel?.title || 'Reel image'}
-                className={`w-full h-full object-cover transition-transform duration-500 ${
-                  imageAnimation === 'slide-left-in' ? 'animate-slide-left-in' : ''
-                } ${
-                  imageAnimation === 'slide-right-in' ? 'animate-slide-right-in' : ''
-                }`}
+          {currentReel && (
+            <>
+              {/* Foreground layer: circular slide out on horizontal change */}
+              <ReelItem
+                reel={{
+                  ...(currentReel || ({} as ReelData)),
+                  main_image: getReelImage(currentReel as ReelData, currentImageIndex)
+                }}
+                isActive={true}
+                onPlay={togglePlayPause}
+                onImageClick={togglePlayPause}
+                className="absolute inset-0 w-full h-full"
                 style={{
-                  transform: `translateX(${slideOffset.x}%)`
+                  transform: incomingDirection
+                    ? `translateX(${incomingDirection === 'left' ? '-35%' : '35%'}) rotateY(${incomingDirection === 'left' ? 25 : -25}deg) scale(0.9)`
+                    : 'translateX(0%) rotateY(0deg) scale(1.2)',
+                  filter: incomingDirection ? 'blur(8px)' : 'none',
+                  opacity: incomingDirection ? 0.65 : 1,
+                  transition: 'transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), filter 0.45s, opacity 0.45s',
+                  boxShadow: '0 12px 36px rgba(0,0,0,0.4)'
                 }}
               />
-            </div>
-
-            {/* Gradient Overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
-            
-            {/* Content Overlay */}
-            <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-6 text-white">
-              
-              {/* Main Content */}
-              <div className="space-y-3 max-w-2xl">
-                <h1 className="text-lg md:text-2xl font-bold leading-tight">
-                  {currentReel?.title}
-                </h1>
-                
-                {currentReel?.summary && (
-                  <p className="text-sm md:text-base text-gray-200 leading-relaxed line-clamp-3">
-                    {currentReel.summary}
-                  </p>
-                )}
-                
-                {/* Metadata */}
-                <div className="flex items-center space-x-4 text-xs text-gray-300">
-                  {currentReel?.category && (
-                    <span className="px-2 py-1 bg-white/20 rounded-full">
-                      #{currentReel.category}
-                    </span>
-                  )}
-                  {currentReel?.author && (
-                    <span>📝 {currentReel.author}</span>
-                  )}
-                  {currentReel?.location && (
-                    <span>📍 {currentReel.location}</span>
-                  )}
-                </div>
-                
-                {/* Audio Controls */}
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={togglePlayPause}
-                    className="bg-white/20 backdrop-blur-lg rounded-full p-3 hover:bg-white/30 transition-colors"
-                  >
-                    {audioState.isPlaying ? (
-                      <span className="text-2xl">⏸️</span>
-                    ) : (
-                      <span className="text-2xl">▶️</span>
-                    )}
-                  </button>
-                  
-                  {audioState.isLoaded && (
-                    <div className="flex-1 text-xs text-gray-300">
-                      <div className="flex justify-between mb-1">
-                        <span>{Math.floor(audioState.position)}s</span>
-                        <span>{Math.floor(audioState.duration)}s</span>
-                      </div>
-                      <div className="w-full bg-gray-600 rounded-full h-1">
-                        <div
-                          className="bg-white h-1 rounded-full transition-all duration-100"
-                          style={{
-                            width: `${(audioState.position / audioState.duration) * 100}%`
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Image Navigation Dots */}
-            {currentReel?.images && currentReel.images.length > 1 && (
-              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-10">
-                {currentReel.images.map((_, index) => (
-                  <div
-                    key={index}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      index === currentImageIndex 
-                        ? 'bg-white' 
-                        : index < currentImageIndex 
-                          ? 'bg-white/60' 
-                          : 'bg-white/20'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
         {/* Next Reel (Front) */}
@@ -536,25 +520,35 @@ export const ReelsView: React.FC = () => {
           <div 
             className="absolute inset-0 w-full h-full"
             style={{
-              transform: `translateY(${-100 + slideOffset.y}%)`,
-              transition: isTransitioning ? 'transform 0.3s ease-out' : 'none',
-              zIndex: 1
+              transform: `translateY(${-100 + slideOffset.y + (isMouseDown ? Math.min(0, mouseStartY - mouseStartY) : 0)}%)`,
+              transition: isMouseDown ? 'none' : (isTransitioning ? 'transform 0.3s ease-out' : 'none'),
+              zIndex: 1,
+              opacity: isMouseDown ? Math.min(1, Math.max(0, -mouseStartY + mouseStartY)) : 1
             }}
           >
-            <div className="relative h-full w-full">
-              <img
-                src={getReelImage(nextReelData)}
-                alt={nextReelData.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-            </div>
+            <ReelItem
+              reel={{
+                ...nextReelData,
+                main_image: getReelImage(nextReelData)
+              }}
+              isActive={false}
+              onPlay={() => {}}
+              onImageClick={() => {}}
+              className="absolute inset-0 w-full h-full opacity-50"
+            />
           </div>
         )}
 
-        {/* Infinite Scroll Progress Bar */}
-        <div className="absolute bottom-0 left-0 right-0 pointer-events-auto">
-          <div className="h-1 bg-black/20">
+        {/* Bottom Progress Bar (Animated hide/show) */}
+        <div
+          className={`fixed bottom-0 left-0 right-0 transition-all duration-500 ${
+            isFullscreenControlsHidden ? 'opacity-0 translate-y-10 pointer-events-none' : 'opacity-100 translate-y-0 pointer-events-auto'
+          }`}
+          onMouseMove={handleAnyInteraction}
+          onTouchStart={handleAnyInteraction}
+          style={{ zIndex: 50 }}
+        >
+          <div className="h-1 bg-black/30">
             <div 
               className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-700 ease-out"
               style={{ 
@@ -618,6 +612,26 @@ export const ReelsView: React.FC = () => {
           </div>
         </div>
         
+        {/* Image Navigation Dots */}
+        {currentReel?.images && currentReel.images.length > 1 && (
+          <div className="absolute top-2 left-0 right-0 z-30 px-2">
+            <div className="flex space-x-1">
+              {currentReel.images.map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
+                    index === currentImageIndex 
+                      ? 'bg-white' 
+                      : index < currentImageIndex 
+                        ? 'bg-white/60' 
+                        : 'bg-white/20'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
