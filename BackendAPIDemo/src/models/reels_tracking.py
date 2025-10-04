@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, HttpUrl
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, date
 from enum import Enum
-
+import uuid  # ← EKLE
 # ============ ENUMS ============
 
 class ViewStatus(str, Enum):
@@ -35,6 +35,21 @@ class ReelStatus(str, Enum):
     ARCHIVED = "archived"
     FAILED = "failed"
 
+
+# YENİ EKLE:
+class EmojiType(str, Enum):
+    """
+    Emoji türleri - TÜM EMOJİLER AYNI AĞIRLIKTA (+0.9)
+    Kullanıcı emoji attıysa → haberi beğendi demektir
+    """
+    HEART = "❤️"           # Kalp
+    LIKE = "👍"            # Beğen
+    FIRE = "🔥"            # Ateş
+    STAR = "⭐"            # Yıldız
+    CLAP = "👏"            # Alkış
+    LOVE = "😍"            # Aşık
+    THINKING = "🤔"        # Düşünüyor
+    WOW = "😮"             # Şaşırdı
 # ============ CORE TRACKING MODELS ============
 
 class ReelView(BaseModel):
@@ -58,9 +73,115 @@ class ReelView(BaseModel):
     session_id: Optional[str] = Field(None, description="Kullanıcı session ID'si")
     device_type: Optional[str] = Field(None, description="Cihaz türü (web/mobile)")
     
+    
+    # 🆕 NEW: Emoji reaction tracking
+    emoji_reaction: Optional[EmojiType] = Field(None, description="Emoji tepkisi")
+    emoji_timestamp: Optional[datetime] = Field(None, description="Emoji atılma zamanı")
+
+    # 🆕 NEW: Detail view tracking
+    detail_viewed: bool = Field(default=False, description="Detayları görüntüledi mi")
+    detail_duration_ms: int = Field(default=0, ge=0, description="Detayda geçirilen süre (ms)")
+    detail_scroll_depth: float = Field(default=0.0, ge=0.0, le=1.0, description="Detay scroll derinliği")
+    detail_opened_at: Optional[datetime] = Field(None, description="Detay açılma zamanı")
+    detail_closed_at: Optional[datetime] = Field(None, description="Detay kapanma zamanı")
+
+    # 🆕 NEW: Extended engagement signals
+    paused_count: int = Field(default=0, ge=0, description="Duraklama sayısı")
+    replayed: bool = Field(default=False, description="Tekrar oynat tıklandı mı")
+    shared: bool = Field(default=False, description="Paylaşıldı mı")
+    saved: bool = Field(default=False, description="Kaydedildi mi")
+
     def is_meaningful_view(self) -> bool:
-        """Anlamlı bir izleme mi (3sn+ için True)"""
-        return self.duration_ms >= 3000
+        """
+        Anlamlı izleme mi? (3+ saniye veya emoji/detail view var)
+        
+        Anlamlı izleme kriterleri:
+        - 3+ saniye izledi
+        - VEYA emoji attı (ilgi gösterdi)
+        - VEYA detay okudu (merak etti)
+        """
+        has_minimum_watch = self.duration_ms >= 3000
+        has_emoji = self.emoji_reaction is not None
+        has_detail_view = self.detail_viewed and self.detail_duration_ms >= 5000  # 5+ saniye detay
+        
+        return has_minimum_watch or has_emoji or has_detail_view
+
+    def get_engagement_score(self) -> float:
+        """
+        Engagement skoru hesapla (0.0 - 1.5 arası)
+        
+        Skorlama sistemi:
+        - Audio izleme: 0.0 - 0.7
+        - Emoji reaction: +0.9 (tüm emojiler aynı)
+        - Detail view: +0.0 - 0.6 (süreye göre)
+        - Extra signals: +0.1 - 0.3
+        
+        Maksimum skor: 1.5 (mükemmel engagement)
+        """
+        score = 0.0
+        
+        # 1. Audio izleme skoru (max 0.7)
+        if self.status == ViewStatus.COMPLETED:
+            audio_score = 0.7
+        elif self.duration_ms >= 30000:  # 30+ saniye
+            audio_score = 0.6
+        elif self.duration_ms >= 15000:  # 15+ saniye
+            audio_score = 0.4
+        elif self.duration_ms >= 5000:   # 5+ saniye
+            audio_score = 0.2
+        else:
+            audio_score = 0.1  # Hemen skip etti
+        
+        score += audio_score
+        
+        # 2. Emoji reaction bonus (TÜM EMOJİLER +0.9)
+        if self.emoji_reaction is not None:
+            score += 0.9
+        
+        # 3. Detail view bonus (max +0.6)
+        if self.detail_viewed:
+            # Detayda geçirilen süreye göre
+            if self.detail_duration_ms >= 60000:  # 60+ saniye
+                detail_score = 0.6
+            elif self.detail_duration_ms >= 30000:  # 30+ saniye
+                detail_score = 0.5
+            elif self.detail_duration_ms >= 15000:  # 15+ saniye
+                detail_score = 0.4
+            elif self.detail_duration_ms >= 5000:   # 5+ saniye
+                detail_score = 0.2
+            else:
+                detail_score = 0.1
+            
+            # Scroll depth bonusu
+            if self.detail_scroll_depth >= 0.8:  # %80+ scroll
+                detail_score += 0.1
+            elif self.detail_scroll_depth >= 0.5:  # %50+ scroll
+                detail_score += 0.05
+            
+            score += detail_score
+        
+        # 4. Extra engagement signals (max +0.3)
+        if self.replayed:
+            score += 0.1  # Tekrar izledi → önemli
+        if self.shared:
+            score += 0.15  # Paylaştı → çok önemli
+        if self.saved:
+            score += 0.1   # Kaydetti → ileride okumak istiyor
+        if self.paused_count > 0:
+            score += min(0.05 * self.paused_count, 0.1)  # Duraklattı → dikkatli dinliyor
+        
+        return min(score, 1.5)  # Max 1.5
+
+    def get_preference_weight(self) -> float:
+        """
+        Preference engine için ağırlık (0.0 - 1.0 normalleştirilmiş)
+        
+        Bu değer kullanıcı tercih skorlarını güncellerken kullanılır
+        """
+        engagement = self.get_engagement_score()
+        # 1.5 üzerinden normalize et
+        return min(engagement / 1.5, 1.0)    
+    
     
     def get_duration_seconds(self) -> float:
         """İzleme süresini saniye olarak döndür"""
@@ -71,10 +192,22 @@ class UserDailyStats(BaseModel):
     user_id: str
     stats_date: date = Field(default_factory=date.today)
     
+    # 🆕 NEW: Emoji & Detail stats
+    total_emoji_reactions: int = Field(default=0, description="Toplam emoji sayısı")
+    emoji_breakdown: Dict[str, int] = Field(default_factory=dict, description="Emoji dağılımı")
+    detail_views: int = Field(default=0, description="Detay görüntüleme sayısı")
+    meaningful_detail_reads: int = Field(default=0, description="Anlamlı detay okuma sayısı")
+    
     # View counts
     total_reels_watched: int = Field(default=0, description="Toplam izlenen reel sayısı")
     completed_reels: int = Field(default=0, description="Tamamen izlenen reel sayısı") 
     skipped_reels: int = Field(default=0, description="Atlanan reel sayısı")
+    
+    
+
+    
+    
+    
     
     # Time tracking
     total_screen_time_ms: int = Field(default=0, description="Toplam ekran süresi")
@@ -98,10 +231,18 @@ class UserReelStats(BaseModel):
     total_screen_time_ms: int = Field(default=0, description="Toplam ekran süresi")
     total_days_active: int = Field(default=0, description="Aktif gün sayısı")
     
+    # 🆕 NEW: Emoji & Detail stats
+    total_emoji_reactions: int = Field(default=0, description="Toplam emoji sayısı")
+    total_detail_views: int = Field(default=0, description="Toplam detay görüntüleme")
+    detail_view_rate: float = Field(default=0.0, ge=0.0, le=1.0, description="Detay okuma oranı")
+    
     # Averages
     avg_daily_reels: float = Field(default=0.0, description="Günlük ortalama reel")
     avg_daily_screen_time_ms: float = Field(default=0.0, description="Günlük ortalama ekran süresi")
     avg_reel_duration_ms: float = Field(default=0.0, description="Ortalama reel izleme süresi")
+    # Mevcut averages'a ekle:
+    avg_engagement_score: float = Field(default=0.0, description="Ortalama engagement skoru")
+    
     
     # Engagement
     completion_rate: float = Field(default=0.0, ge=0.0, le=1.0, description="Tamamlama oranı")
@@ -118,6 +259,24 @@ class UserReelStats(BaseModel):
     def get_total_screen_time_hours(self) -> float:
         """Toplam ekran süresini saat olarak döndür"""
         return self.total_screen_time_ms / (1000 * 60 * 60)
+    
+    
+
+    # YENİ METOD EKLE:
+    def get_personalization_level(self) -> str:
+        """
+        Kullanıcının personalization seviyesi
+        
+        - cold: 0-10 etkileşim (trending feed)
+        - warm: 10-50 etkileşim (rule-based)
+        - hot: 50+ etkileşim (NLP-powered)
+        """
+        if self.total_reels_watched < 10:
+            return "cold"
+        elif self.total_reels_watched < 50:
+            return "warm"
+        else:
+            return "hot"
 
 class ReelAnalytics(BaseModel):
     """Bir reel'in analitik verileri"""
@@ -138,6 +297,16 @@ class ReelAnalytics(BaseModel):
     hourly_views: int = Field(default=0, description="Son 1 saatteki görüntülenme")
     daily_views: int = Field(default=0, description="Son 24 saatteki görüntülenme")
     
+    # 🆕 NEW: Emoji & Detail metrics
+    total_emoji_reactions: int = Field(default=0, description="Toplam emoji sayısı")
+    emoji_breakdown: Dict[str, int] = Field(default_factory=dict, description="Emoji dağılımı")
+    emoji_rate: float = Field(default=0.0, ge=0.0, le=1.0, description="Emoji atma oranı")
+
+    detail_view_count: int = Field(default=0, description="Detay görüntüleme sayısı")
+    detail_view_rate: float = Field(default=0.0, ge=0.0, le=1.0, description="Detay okuma oranı")
+    avg_detail_duration_ms: float = Field(default=0.0, description="Ortalama detay okuma süresi")
+    
+    
     # Metadata
     published_at: datetime = Field(..., description="Yayınlanma zamanı")
     first_viewed_at: Optional[datetime] = Field(None, description="İlk izlenme zamanı")
@@ -148,16 +317,43 @@ class ReelAnalytics(BaseModel):
     tags: List[str] = Field(default_factory=list, description="Etiketler")
     
     def get_engagement_score(self) -> float:
-        """Engagement skoru hesapla (0-10)"""
+        """
+        Engagement skoru hesapla (0-10)
+        
+        Faktörler:
+        - Completion rate (30%)
+        - Average duration (20%)
+        - View count (20%)
+        - Emoji rate (15%)
+        - Detail view rate (15%)
+        """
         if self.total_views == 0:
             return 0.0
         
-        # Completion rate (40%) + Average duration (30%) + Views (30%)
-        completion_score = self.completion_rate * 4.0
-        duration_score = min(self.avg_view_duration_ms / 30000, 1.0) * 3.0  # 30sn max
-        view_score = min(self.total_views / 100, 1.0) * 3.0  # 100 view max
+        # Completion rate (30%) → 0-3 puan
+        completion_score = self.completion_rate * 3.0
         
-        return completion_score + duration_score + view_score
+        # Duration (20%) → 0-2 puan (30sn max)
+        duration_score = min(self.avg_view_duration_ms / 30000, 1.0) * 2.0
+        
+        # View count (20%) → 0-2 puan (100 view max)
+        view_score = min(self.total_views / 100, 1.0) * 2.0
+        
+        # Emoji rate (15%) → 0-1.5 puan
+        emoji_score = self.emoji_rate * 1.5
+        
+        # Detail view rate (15%) → 0-1.5 puan
+        detail_score = self.detail_view_rate * 1.5
+        
+        total_score = (
+            completion_score + 
+            duration_score + 
+            view_score + 
+            emoji_score + 
+            detail_score
+        )
+        
+        return round(total_score, 2)        
 
 class DailyProgress(BaseModel):
     """Kullanıcının günlük progress takibi"""
@@ -205,34 +401,37 @@ class NewsData(BaseModel):
     """Reel'deki haber verisi - mockup'taki ScrapedNewsItem'a benzer"""
     title: str
     summary: str
-    full_content: str
-    url: HttpUrl
+    full_content: List[str] = Field(default_factory=list, description="Paragraflar listesi")  # ✅
+    url: str
     
     # Metadata
     category: str
     author: Optional[str] = None
     location: Optional[str] = None
     published_date: str
-    scraped_date: str
+    # scraped_date: str
     
     # Media
     main_image: Optional[str] = None
-    images: List[str] = []
-    videos: List[str] = []
+    images: List[str] = Field(default_factory=list)
+    videos: List[str] = Field(default_factory=list)
     
     # SEO & Tags
-    tags: List[str] = []
-    keywords: List[str] = []
-    meta_description: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    keywords: List[str] = Field(default_factory=list, description="Haber anahtar kelimeleri - NLP için kritik")
+    
+    # meta_description: Optional[str] = None
+    
+       # Metrics
+    estimated_reading_time: int = Field(default=3, description="Tahmini okuma süresi (dakika)")
+    source: str = Field(default="aa", description="Kaynak")
     
     # Metrics
     word_count: int
     character_count: int
-    estimated_reading_time: int  # minutes
     
     # Technical
-    source: str = "aa"
-    scraping_quality: str = "high"  # high, medium, low
+    # scraping_quality: str = "high"  # high, medium, low
     content_language: str = "tr"
 
 # ============ FEED & REEL MODELS (Updated to match Mockup) ============
@@ -272,8 +471,12 @@ class ReelFeedItem(BaseModel):
     is_trending: bool = Field(default=False, description="Trend mi")
     is_fresh: bool = Field(default=False, description="Yeni mi (son 3 saat)")
     
-    # Recommendation & Feed info
-    recommendation_score: float = Field(default=0.0, description="Öneri puanı")
+    # 🆕 NEW: Personalization metadata
+    is_recommended: bool = Field(default=False, description="Kullanıcıya özel öneri mi")
+    recommendation_score: float = Field(default=0.0, ge=0.0, le=1.0, description="Öneri skoru")
+    recommendation_reason: Optional[str] = Field(None, description="Öneri nedeni")
+    
+
     feed_reason: str = Field(default="algorithmic", description="Feed'de olma sebebi")
     trend_rank: Optional[int] = Field(None, description="Trend sıralaması")
     
@@ -321,12 +524,35 @@ class TrackViewRequest(BaseModel):
     completed: bool = Field(default=False, description="Tamamen izlendi mi")
     category: Optional[str] = Field(None, description="Reel kategorisi")
     session_id: Optional[str] = Field(None, description="Session ID")
+    emoji_reaction: Optional[EmojiType] = Field(None, description="Emoji tepkisi")
+
+    # 🆕 NEW: Optional extra signals
+    paused_count: Optional[int] = Field(0, description="Duraklama sayısı")
+    replayed: Optional[bool] = Field(False, description="Tekrar oynat")
+    shared: Optional[bool] = Field(False, description="Paylaşıldı mı")
+    saved: Optional[bool] = Field(False, description="Kaydedildi mi")
+
+class TrackDetailViewRequest(BaseModel):
+    """Detay görüntüleme tracking request'i"""
+    reel_id: str = Field(..., description="Görüntülenen reel ID")
+    read_duration_ms: int = Field(..., ge=0, description="Okuma süresi")
+    scroll_depth: float = Field(default=0.0, ge=0.0, le=1.0, description="Scroll derinliği")
+    shared_from_detail: bool = Field(default=False, description="Detaydan paylaştı mı")
+    saved_from_detail: bool = Field(default=False, description="Detaydan kaydetti mi")
+    session_id: Optional[str] = None
 
 class TrackViewResponse(BaseModel):
     """Reel izleme kaydı response'u"""
     success: bool = Field(default=True)
     message: str = Field(default="View tracked successfully")
-    
+
+    engagement_score: float = Field(default=0.0, description="Engagement skoru")
+
+    # 🆕 NEW: Personalization level
+    personalization_level: str = Field(default="cold", description="cold/warm/hot")
+    total_interactions: int = Field(default=0, description="Toplam etkileşim sayısı")
+
+
     # View info
     view_id: Optional[str] = Field(None, description="View kaydının ID'si")
     meaningful_view: bool = Field(default=False, description="Anlamlı izleme mi")
@@ -371,6 +597,8 @@ class FeedMetadata(BaseModel):
     personalized_count: int = Field(default=0, description="Kişiselleştirilmiş reel sayısı")
     fresh_count: int = Field(default=0, description="Yeni reel sayısı")
     algorithm_version: str = Field(default="v1.0", description="Algoritma versiyonu")
+    exploration_count: int = Field(default=0, description="Keşfet reelleri")
+    personalization_level: str = Field(default="cold", description="Personalization seviyesi")
 
 class FeedResponse(BaseModel):
     """Instagram-style feed response"""
@@ -380,13 +608,89 @@ class FeedResponse(BaseModel):
     feed_metadata: FeedMetadata = Field(..., description="Feed metadata'sı")
     generated_at: datetime = Field(default_factory=datetime.now, description="Oluşturulma zamanı")
 
-# ============ EXPORTS ============
 
+
+
+
+# ==================== KULLANICIYA ÖZEL REELS VERİLERİ ÇEKMEK İÇİN ====================
+class DetailViewEvent(BaseModel):
+    """
+    Haber detayı görüntüleme event'i
+    
+    Kullanıcı "Detayları Oku" butonuna tıklayınca oluşturulur
+    """
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str = Field(..., description="Kullanıcı ID")
+    reel_id: str = Field(..., description="Reel ID")
+    
+    # Reading behavior
+    read_duration_ms: int = Field(..., ge=0, description="Okuma süresi (ms)")
+    scroll_depth: float = Field(default=0.0, ge=0.0, le=1.0, description="Scroll derinliği")
+    
+    # Actions
+    returned_to_feed: bool = Field(default=True, description="Feed'e geri döndü mü")
+    shared_from_detail: bool = Field(default=False, description="Detaydan paylaştı mı")
+    saved_from_detail: bool = Field(default=False, description="Detaydan kaydetti mi")
+    
+    # Timestamps
+    opened_at: datetime = Field(default_factory=datetime.now)
+    closed_at: Optional[datetime] = None
+    
+    # Session
+    session_id: Optional[str] = None
+    
+    def is_meaningful_read(self) -> bool:
+        """
+        Anlamlı okuma mı?
+        
+        Kriterler:
+        - 10+ saniye okudu
+        - VE %30+ scroll yaptı
+        """
+        return (
+            self.read_duration_ms >= 10000 and 
+            self.scroll_depth >= 0.3
+        )
+    
+    def get_detail_engagement_score(self) -> float:
+        """
+        Detay okuma engagement skoru (0.0 - 1.0)
+        
+        Bu skor kullanıcı profilini güncellerken EKSTRA boost için kullanılır
+        """
+        # Süre skoru (max 60sn = 1.0)
+        time_score = min(self.read_duration_ms / 60000, 1.0)
+        
+        # Scroll depth skoru
+        scroll_score = self.scroll_depth
+        
+        # Ağırlıklı ortalama (süre daha önemli)
+        base_score = 0.6 * time_score + 0.4 * scroll_score
+        
+        # Bonuslar
+        bonus = 0.0
+        if self.shared_from_detail:
+            bonus += 0.2  # Detaydan paylaştı → çok önemli!
+        if self.saved_from_detail:
+            bonus += 0.15  # Kaydetti → ileride tekrar okumak istiyor
+        
+        return min(base_score + bonus, 1.0)
+
+
+
+
+
+
+
+
+
+# ============ EXPORTS ============
 __all__ = [
     # Enums
     "ViewStatus",
     "TrendPeriod", 
     "ReelStatus",
+    "EmojiType",  # ← YENİ
     
     # Core models
     "ReelView", 
@@ -395,8 +699,9 @@ __all__ = [
     "ReelAnalytics",
     "DailyProgress",
     "NewsData",
+    "DetailViewEvent",  # ← YENİ
     
-    # Feed models (Updated)
+    # Feed models
     "ReelFeedItem",
     "TrendingReels",
     "FeedResponse",
@@ -406,13 +711,12 @@ __all__ = [
     # Request/Response
     "TrackViewRequest",
     "TrackViewResponse",
+    "TrackDetailViewRequest",  # ← YENİ
     
     # Utilities
     "TimeRange",
     "StatsFilter"
 ]
-
-
 """
     Core Tracking:
 

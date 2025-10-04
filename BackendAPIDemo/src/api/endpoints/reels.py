@@ -6,7 +6,14 @@
 Reels API endpoint'leri - Yeni ReelsAnalyticsService ve ReelFeedItem modelleriyle güncellenmiş
 Instagram-style pagination ve feed sistemi ile
 """
-
+from ...services.feed_generator import feed_generator
+from ...services.user_preference import preference_engine
+from ...services.incremental_nlp import incremental_nlp
+from ...models.reels_tracking import (
+    TrackDetailViewRequest,
+    DetailViewEvent,
+    EmojiType
+)
 from fastapi import APIRouter, Query, HTTPException, Depends, Header
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, HttpUrl, Field
@@ -74,6 +81,18 @@ class BulkReelCreationRequest(BaseModel):
     min_chars: int = Field(default=300, description="Minimum karakter sayısı")
     enable_scraping: bool = Field(default=True, description="Web scraping aktif et")
 
+# ayrıntılı tracking request
+
+class TrackDetailViewRequest(BaseModel):
+    """Detay görüntüleme tracking request'i"""
+    reel_id: str = Field(..., description="Görüntülenen reel ID")
+    read_duration_ms: int = Field(..., ge=0, description="Okuma süresi")
+    scroll_depth: float = Field(default=0.0, ge=0.0, le=1.0, description="Scroll derinliği")
+    shared_from_detail: bool = Field(default=False, description="Detaydan paylaştı mı")
+    session_id: Optional[str] = None
+
+
+
 # ============ UTILITY FUNCTIONS ============
 
 def get_user_id_from_header(user_id: Optional[str] = Header(None, alias="X-User-ID")) -> str:
@@ -81,44 +100,74 @@ def get_user_id_from_header(user_id: Optional[str] = Header(None, alias="X-User-
     return user_id or "anonymous_user"
 
 # ============ CORE TRACKING ENDPOINTS ============
-
-@router.post("/track-view", response_model=TrackViewResponse)
-async def track_reel_view(
-    request: ReelTrackingRequest,
-    user_id: str = Depends(get_user_id_from_header)
+@router.post("/track-view")
+async def track_view(
+    request: TrackViewRequest,
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     """
-    Reel izleme kaydı oluştur
+    Reel izleme kaydı oluştur (UPDATED: Emoji support)
     
-    **Frontend'den her reel izlendiğinde çağrılacak**
+    Frontend'den her reel izlendiğinde çağrılır.
     
-    - **reel_id**: İzlenen reel ID'si  
-    - **duration_ms**: Kaç milisaniye izlendi
-    - **completed**: 3 saniyeden fazla izlendiyse true
-    - **category**: Reel kategorisi
+    New features:
+    - Emoji reaction tracking
+    - Paused count, replayed, shared, saved signals
     """
     try:
-        # TrackViewRequest'e çevir
-        track_request = TrackViewRequest(
+        # Reel'in var olup olmadığını kontrol et
+        reel = await reels_analytics.get_reel_by_id(request.reel_id)
+        if not reel:
+            raise HTTPException(status_code=404, detail=f"Reel not found: {request.reel_id}")
+        
+        # ReelView oluştur (with new fields)
+        from ...models.reels_tracking import ReelView, ViewStatus
+        
+        view = ReelView(
+            user_id=user_id,
             reel_id=request.reel_id,
             duration_ms=request.duration_ms,
-            completed=request.completed,
-            category=request.category,
-            session_id=request.session_id
+            status=ViewStatus.COMPLETED if request.completed else ViewStatus.PARTIAL,
+            category=request.category or reel.news_data.category,
+            session_id=request.session_id,
+            
+            # NEW: Emoji reaction
+            emoji_reaction=request.emoji_reaction,
+            emoji_timestamp=datetime.now() if request.emoji_reaction else None,
+            
+            # NEW: Extra signals
+            paused_count=request.paused_count or 0,
+            replayed=request.replayed or False,
+            shared=request.shared or False,
+            saved=request.saved or False
         )
         
-        # Analytics servisine gönder
-        response = await reels_analytics.track_reel_view(user_id, track_request)
+        # Track view
+        response = await reels_analytics.track_reel_view(user_id, request)
         
-        if response.success:
-            return response
-        else:
-            raise HTTPException(status_code=400, detail=response.message)
-            
+        # NEW: Preference engine güncelle
+        await preference_engine.update_from_view(user_id, reel, view)
+        
+        # User stats al
+        user_stats = await reels_analytics.get_user_stats(user_id)
+        
+        # Response oluştur
+        return TrackViewResponse(
+            success=True,
+            message="View tracked successfully",
+            view_id=response.get("view_id"),
+            meaningful_view=view.is_meaningful_view(),
+            engagement_score=view.get_engagement_score(),
+            personalization_level=user_stats.get_personalization_level(),
+            total_interactions=user_stats.total_reels_watched,
+            daily_progress_updated=response.get("daily_progress_updated", False)
+        )
+        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Track view error: {str(e)}")
+        print(f"Track view error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/user/{user_id}/watched")
 async def get_user_watched_reels(
@@ -236,47 +285,99 @@ async def get_user_stats(user_id: str):
         raise HTTPException(status_code=500, detail=f"User stats error: {str(e)}")
 
 # ============ MAIN FEED ENDPOINTS (Instagram-style) ============
-
-@router.get("/feed", response_model=FeedResponse)
-async def get_user_feed(
-    limit: int = Query(20, ge=1, le=50, description="Feed'de kaç reel gösterilecek"),
-    cursor: Optional[str] = Query(None, description="Pagination cursor (reel_id)"),
-    user_id: str = Depends(get_user_id_from_header),
-    include_watched: bool = Query(True, description="İzlenmiş reels dahil edilsin mi")
+@router.get("/feed")
+async def get_feed(
+    limit: int = Query(20, ge=1, le=50, description="Kaç reel döndürsün"),
+    cursor: Optional[str] = Query(None, description="Pagination cursor"),
+    user_id: str = Header(..., alias="X-User-ID")
 ):
     """
-    **Ana Feed Endpoint - Instagram Style**
+    Kullanıcıya özel personalized feed (COMPLETELY REWRITTEN)
     
-    Kullanıcı için kişiselleştirilmiş reel feed'i
+    Instagram-style adaptive algorithm:
+    - Cold start (0-10 interactions): %70 trending + %30 fresh
+    - Warm (10-50 interactions): Rule-based preference
+    - Hot (50+ interactions): NLP-powered similarity
     
-    **Trending + Recent + Personalized karışımı, cursor-based pagination ile**
+    Query params:
+    - limit: Kaç reel (1-50)
+    - cursor: Pagination için
     
-    - **limit**: Feed boyutu (1-50)
-    - **cursor**: Pagination için son görülen reel_id
-    - **include_watched**: İzlenmiş reels dahil et (ama flag ile işaretle)
+    Headers:
+    - X-User-ID: Kullanıcı ID (required)
     """
     try:
-        # Feed'i oluştur
-        feed_response = await reels_analytics.generate_user_feed(
-            user_id=user_id, 
+        # Feed generator kullan
+        feed_response = await feed_generator.generate_feed(
+            user_id=user_id,
             limit=limit,
             cursor=cursor
         )
         
-        # İzlenmiş reels'i filtrele (eğer istenmiyorsa)
-        if not include_watched:
-            filtered_reels = [reel for reel in feed_response.reels if not reel.is_watched]
-            feed_response.reels = filtered_reels
-            
-            # Metadata güncelle
-            feed_response.feed_metadata.trending_count = sum(1 for r in filtered_reels if r.is_trending)
-            feed_response.feed_metadata.fresh_count = sum(1 for r in filtered_reels if r.is_fresh)
-            feed_response.feed_metadata.personalized_count = len(filtered_reels) - feed_response.feed_metadata.trending_count - feed_response.feed_metadata.fresh_count
-        
         return feed_response
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Feed generation error: {str(e)}")
+        print(f"Feed generation error: {e}")
+        
+        # Fallback: En yeni haberler
+        all_reels = await reels_analytics.get_all_published_reels()
+        sorted_reels = sorted(all_reels, key=lambda r: r.published_at, reverse=True)
+        
+        return FeedResponse(
+            success=False,
+            reels=sorted_reels[:limit],
+            pagination=FeedPagination(
+                current_page=1,
+                has_next=False,
+                total_available=len(sorted_reels)
+            ),
+            feed_metadata=FeedMetadata(
+                algorithm_version="fallback",
+                personalization_level="none"
+            )
+        )
+
+
+@router.get("/user/{user_id}/preference-stats")
+async def get_user_preference_stats(user_id: str):
+    """
+    Kullanıcının tercih istatistikleri (NEW ENDPOINT)
+    
+    Debug ve analytics için kullanılır.
+    
+    Returns:
+    - Personalization level (cold/warm/hot)
+    - Top categories
+    - Top keywords
+    - Total interactions
+    """
+    try:
+        stats = preference_engine.get_user_stats(user_id)
+        return {
+            "success": True,
+            "data": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.get("/system/nlp-stats")
+async def get_nlp_stats():
+    """
+    NLP engine istatistikleri (NEW ENDPOINT)
+    
+    Debug için: Model fitted mi, corpus boyutu vb.
+    """
+    try:
+        stats = incremental_nlp.get_stats()
+        return {
+            "success": True,
+            "data": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/trending")
 async def get_trending_reels(
@@ -367,18 +468,30 @@ async def get_reel_by_id(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Get reel error: {str(e)}")
-
 @router.post("/bulk-create")
 async def bulk_create_reels(request: BulkReelCreationRequest):
     """
-    Toplu reel oluşturma (RSS'den haberler alıp TTS yapıp reel oluştur)
+    Toplu reel oluşturma (RSS → TTS → Reel → NLP Corpus)
     
-    **RSS → TTS → Reel pipeline'ının manuel tetiklenmesi**
+    **UPDATED: NLP corpus integration**
     
+    Pipeline:
+    1. RSS'den haberler al
+    2. Filtreleme (min_chars)
+    3. TTS dönüşümü
+    4. Reel oluştur
+    5. NLP corpus'a ekle (NEW)
+    6. Keyword extraction (NEW)
+    
+    Args:
     - **category**: Haber kategorisi
     - **count**: Oluşturulacak reel sayısı
     - **voice**: TTS ses modeli
     - **min_chars**: Minimum karakter sayısı
+    - **enable_scraping**: Scraping aktif mi
+    
+    Returns:
+    - Summary with NLP stats
     """
     try:
         # 1. RSS'den haberler al
@@ -389,7 +502,10 @@ async def bulk_create_reels(request: BulkReelCreationRequest):
         )
         
         if not news_response.success:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch news: {news_response.message}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Failed to fetch news: {news_response.message}"
+            )
         
         # 2. Filtreleme
         filtered_articles = [
@@ -398,15 +514,20 @@ async def bulk_create_reels(request: BulkReelCreationRequest):
         ][:request.count]
         
         if not filtered_articles:
-            raise HTTPException(status_code=404, detail="No articles found matching criteria")
+            raise HTTPException(
+                status_code=404, 
+                detail="No articles found matching criteria"
+            )
         
-        # 3. TTS işlemi (simulated - gerçekte processing_service kullanacağız)
+        # 3. TTS işlemi + Reel oluştur
         processed_count = 0
         failed_count = 0
+        created_reels = []
+        nlp_added_count = 0
         
         for article in filtered_articles:
             try:
-                # TTS işlemi (simulated)
+                # TTS işlemi (simulated - production'da processing_service kullan)
                 tts_content = article.to_tts_content()
                 
                 # Simulated TTS response
@@ -427,32 +548,89 @@ async def bulk_create_reels(request: BulkReelCreationRequest):
                 )
                 
                 processed_count += 1
-                print(f"✅ Reel created: {reel.id}")
+                created_reels.append(reel)
+                print(f"✅ Reel created: {reel.id} - {reel.news_data.title[:50]}...")
+                
+                # 🆕 5. NLP corpus'a ekle
+                try:
+                    # Corpus text: title + summary
+                    corpus_text = f"{reel.news_data.title} {reel.news_data.summary}"
+                    
+                    # Metadata
+                    metadata = {
+                        "category": reel.news_data.category,
+                        "keywords": reel.news_data.keywords,
+                        "published_at": reel.published_at.isoformat()
+                    }
+                    
+                    # NLP'ye ekle
+                    await incremental_nlp.add_news_to_corpus(
+                        reel_id=reel.id,
+                        text=corpus_text,
+                        metadata=metadata
+                    )
+                    
+                    nlp_added_count += 1
+                    
+                    # 🆕 6. Keyword extraction (eğer haber keywords'ü yoksa)
+                    if not reel.news_data.keywords:
+                        extracted_keywords = incremental_nlp.extract_keywords(
+                            text=corpus_text,
+                            top_n=10
+                        )
+                        # Keywords'ü güncelle (optional - reel object'e ekleyebilirsin)
+                        print(f"   Extracted keywords: {extracted_keywords[:5]}")
+                    
+                except Exception as nlp_error:
+                    print(f"⚠️ NLP corpus add failed for {reel.id}: {nlp_error}")
+                    # NLP hatası reel oluşumunu engellemez, devam et
                 
             except Exception as e:
                 failed_count += 1
                 print(f"❌ Failed to create reel for {article.title}: {e}")
                 continue
         
+        # 🆕 NLP stats
+        nlp_stats = incremental_nlp.get_stats()
+        
         return {
             "success": True,
-            "message": f"Bulk reel creation completed",
+            "message": f"Bulk reel creation completed with NLP integration",
             "summary": {
                 "requested_count": request.count,
                 "articles_found": len(filtered_articles),
                 "reels_created": processed_count,
                 "failed": failed_count,
-                "success_rate": round((processed_count / len(filtered_articles)) * 100, 1),
+                "success_rate": round((processed_count / len(filtered_articles)) * 100, 1) if filtered_articles else 0,
                 "category": request.category,
                 "voice_used": request.voice
-            }
+            },
+            "nlp_integration": {
+                "corpus_added": nlp_added_count,
+                "nlp_fitted": nlp_stats["is_fitted"],
+                "corpus_size": nlp_stats["corpus_size"],
+                "vocab_size": nlp_stats["vocab_size"],
+                "next_refit_in": nlp_stats["next_refit_in"]
+            },
+            "created_reels": [
+                {
+                    "id": r.id,
+                    "title": r.news_data.title,
+                    "category": r.news_data.category,
+                    "duration_seconds": r.duration_seconds,
+                    "audio_url": r.audio_url
+                }
+                for r in created_reels[:5]  # İlk 5 reel'i göster
+            ] if created_reels else []
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Bulk creation error: {str(e)}")
-
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Bulk creation error: {str(e)}"
+        )
 # ============ ANALYTICS ENDPOINTS ============
 
 @router.get("/analytics/{reel_id}")
@@ -629,6 +807,60 @@ async def get_reel_system_status():
         raise HTTPException(status_code=500, detail=f"System status error: {str(e)}")
 
 # ============ API DOCUMENTATION HELPER ============
+@router.post("/track-detail-view")
+async def track_detail_view(
+    request: TrackDetailViewRequest,
+    user_id: str = Header(..., alias="X-User-ID")
+):
+    """
+    Haber detayı okuma tracking (NEW ENDPOINT)
+    
+    Kullanıcı "Detayları Oku" butonuna tıklayıp tam haberi okuduğunda çağrılır.
+    
+    Bu çok güçlü bir sinyal! Detay okuma = merak + ilgi
+    """
+    try:
+        # Reel kontrolü
+        reel = await reels_analytics.get_reel_by_id(request.reel_id)
+        if not reel:
+            raise HTTPException(status_code=404, detail=f"Reel not found: {request.reel_id}")
+        
+        # DetailViewEvent oluştur
+        detail_event = DetailViewEvent(
+            user_id=user_id,
+            reel_id=request.reel_id,
+            read_duration_ms=request.read_duration_ms,
+            scroll_depth=request.scroll_depth,
+            shared_from_detail=request.shared_from_detail,
+            saved_from_detail=request.saved_from_detail,
+            session_id=request.session_id
+        )
+        
+        # Analytics'e kaydet (detail view count güncelle)
+        await reels_analytics.track_detail_view(user_id, detail_event)
+        
+        # CRITICAL: Preference engine'e EKSTRA boost ver
+        engagement_score = detail_event.get_detail_engagement_score()
+        await preference_engine.boost_from_detail_view(
+            user_id=user_id,
+            reel=reel,
+            engagement_score=engagement_score
+        )
+        
+        return {
+            "success": True,
+            "message": "Detail view tracked successfully",
+            "meaningful_read": detail_event.is_meaningful_read(),
+            "engagement_score": engagement_score,
+            "boost_applied": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Track detail view error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/endpoints")
 async def list_reel_endpoints():
