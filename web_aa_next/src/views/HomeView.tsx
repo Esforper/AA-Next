@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useArticlesViewModel } from '../viewmodels';
 import { ArticleCard, LoadingSpinner, Button } from '../components';
+import { NewsSection } from './NewsSection';
 
 export const HomeView: React.FC = () => {
   const navigate = useNavigate();
@@ -90,6 +91,16 @@ export const HomeView: React.FC = () => {
             <p>Tüm haberler yüklendi</p>
           </div>
         )}
+
+        {/* Latest News Section - Modular integration without breaking layout */}
+        <div className="mt-12">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold" style={{ color: '#0C2340' }}>Latest News</h2>
+          </div>
+          <div className="rounded-xl overflow-hidden ring-1 ring-gray-200">
+            <NewsSection hideHeader />
+          </div>
+        </div>
       </div>
     </div>
   );

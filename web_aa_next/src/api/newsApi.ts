@@ -1,4 +1,4 @@
-import { API_CONFIG, createApiUrl } from './config';
+import { API_CONFIG } from './config';
 import { NewsListResponse, NewsQueryParams, NewsItem } from '../models/NewsModels';
 
 export class NewsApi {
@@ -18,11 +18,58 @@ export class NewsApi {
         signal: AbortSignal.timeout(API_CONFIG.DEFAULT_TIMEOUT)
       });
 
+      let data: any;
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+        // Try reels feed as fallback source (BackendAPIDemo Reels.py)
+        const reelsParams = new URLSearchParams({ limit: String(limit) });
+        const reelsUrl = `${API_CONFIG.BASE_URL}/api/reels/feed?${reelsParams.toString()}`;
+        const reelsRes = await fetch(reelsUrl, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-User-ID': 'web_user_' + Math.random().toString(36).substr(2, 9)
+          },
+          signal: AbortSignal.timeout(API_CONFIG.DEFAULT_TIMEOUT)
+        });
 
-      const data = await res.json();
+        if (reelsRes.ok) {
+          const reelsData = await reelsRes.json();
+          // Map reels to NewsItem list
+          const mapped: NewsListResponse = {
+            success: Boolean(reelsData.success ?? true),
+            message: reelsData.message,
+            data: (reelsData.reels || []).map((r: any): NewsItem => ({
+              id: String(r.id),
+              title: r.news_data?.title || 'Başlık',
+              description: r.news_data?.summary || '',
+              content: r.news_data?.full_content,
+              imageUrl: r.news_data?.main_image || (Array.isArray(r.news_data?.images) ? r.news_data.images[0] : undefined),
+              url: r.news_data?.url,
+              category: r.news_data?.category || 'General',
+              publishedAt: r.published_at,
+              author: r.news_data?.author,
+              source: 'AA'
+            })),
+            pagination: {
+              limit,
+              offset,
+              total: reelsData.pagination?.total_available,
+              hasMore: reelsData.pagination?.has_next
+            }
+          };
+          return mapped;
+        }
+
+        // Fallback to mock when both /api/news and reels feed are unavailable
+        const mockUrl = `${window.location.origin}/mocks/news.json`;
+        const mockRes = await fetch(mockUrl);
+        if (!mockRes.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        data = await mockRes.json();
+      } else {
+        data = await res.json();
+      }
 
       // Normalize response to NewsListResponse
       const normalized: NewsListResponse = {

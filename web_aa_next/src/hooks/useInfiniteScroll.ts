@@ -95,6 +95,17 @@ export const useInfiniteScroll = (
   
   // Prevent duplicate API calls
   const isLoadingRef = useRef(false);
+  const controllerRef = useRef<AbortController | null>(null);
+  const lastLoadAtRef = useRef<number>(0);
+
+  // Simple SWR-like cache for the first page
+  const cacheRef = useRef<{
+    ts: number;
+    data: FeedResponse | null;
+  }>({ ts: 0, data: null });
+
+  const STALE_MS = 60_000; // 60s stale-while-revalidate
+  const LOAD_THROTTLE_MS = 800; // min interval between loadMore calls
   
   const fetchReels = useCallback(async (isRefresh: boolean = false): Promise<void> => {
     // Prevent duplicate calls
@@ -110,6 +121,42 @@ export const useInfiniteScroll = (
         setIsLoadingMore(true);
       }
       
+      // Abort previous in-flight request
+      if (controllerRef.current) {
+        try { controllerRef.current.abort(); } catch {}
+      }
+      controllerRef.current = new AbortController();
+
+      // Serve from cache instantly if fresh and refresh requested
+      const now = Date.now();
+      if (isRefresh && cacheRef.current.data && now - cacheRef.current.ts < STALE_MS) {
+        const cached = cacheRef.current.data;
+        const convertedReels: ReelData[] = cached.reels.map(backendReel => ({
+          id: backendReel.id,
+          title: backendReel.news_data?.title || 'Untitled',
+          content: backendReel.news_data?.full_content || '',
+          summary: backendReel.news_data?.summary || '',
+          category: backendReel.news_data?.category || 'general',
+          images: backendReel.news_data?.images || [],
+          main_image: backendReel.news_data?.main_image || '',
+          audio_url: backendReel.audio_url,
+          subtitles: [],
+          estimated_duration: backendReel.duration_seconds,
+          tags: backendReel.news_data?.tags || [],
+          author: backendReel.news_data?.author || '',
+          location: backendReel.news_data?.location || '',
+          published_at: backendReel.published_at
+        }));
+        setReels(convertedReels);
+        setCurrentIndex(0);
+        setCursor(cached.pagination.next_cursor);
+        setHasMore(cached.pagination.has_next);
+        setTotalAvailable(cached.pagination.total_available);
+        setFeedMetadata(cached.feed_metadata);
+        setLoading(false);
+        // Continue to revalidate in background (do not return)
+      }
+
       // Build API URL
       const params = new URLSearchParams({
         limit: initialLimit.toString()
@@ -130,7 +177,7 @@ export const useInfiniteScroll = (
           'Content-Type': 'application/json',
           'X-User-ID': USER_ID // Backend requires this for user tracking
         },
-        signal: AbortSignal.timeout(30000)
+        signal: controllerRef.current?.signal ?? AbortSignal.timeout(30000)
       });
       
       if (!response.ok) {
@@ -172,6 +219,8 @@ export const useInfiniteScroll = (
         // Replace all reels
         setReels(convertedReels);
         setCurrentIndex(0);
+        // Cache first page
+        cacheRef.current = { ts: Date.now(), data };
       } else {
         // Append new reels
         setReels(prev => [...prev, ...convertedReels]);
@@ -242,7 +291,14 @@ export const useInfiniteScroll = (
       console.log(`⏭️ Skip loadMore: hasMore=${hasMore}, isLoading=${isLoadingRef.current}`);
       return;
     }
-    
+    // Throttle rapid loadMore calls
+    const now = Date.now();
+    if (now - lastLoadAtRef.current < LOAD_THROTTLE_MS) {
+      console.log('⏳ Throttled loadMore');
+      return;
+    }
+    lastLoadAtRef.current = now;
+
     console.log('📥 Loading more reels...');
     await fetchReels(false);
   }, [hasMore, fetchReels]);
