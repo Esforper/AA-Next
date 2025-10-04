@@ -74,6 +74,18 @@ class BulkReelCreationRequest(BaseModel):
     min_chars: int = Field(default=300, description="Minimum karakter sayısı")
     enable_scraping: bool = Field(default=True, description="Web scraping aktif et")
 
+# ayrıntılı tracking request
+
+class TrackDetailViewRequest(BaseModel):
+    """Detay görüntüleme tracking request'i"""
+    reel_id: str = Field(..., description="Görüntülenen reel ID")
+    read_duration_ms: int = Field(..., ge=0, description="Okuma süresi")
+    scroll_depth: float = Field(default=0.0, ge=0.0, le=1.0, description="Scroll derinliği")
+    shared_from_detail: bool = Field(default=False, description="Detaydan paylaştı mı")
+    session_id: Optional[str] = None
+
+
+
 # ============ UTILITY FUNCTIONS ============
 
 def get_user_id_from_header(user_id: Optional[str] = Header(None, alias="X-User-ID")) -> str:
@@ -629,6 +641,50 @@ async def get_reel_system_status():
         raise HTTPException(status_code=500, detail=f"System status error: {str(e)}")
 
 # ============ API DOCUMENTATION HELPER ============
+
+@router.post("/track-detail-view")
+async def track_detail_view(
+    request: TrackDetailViewRequest,
+    user_id: str = Header(..., alias="X-User-ID")
+):
+    """
+    Haber detayı okuma tracking
+    
+    Bu endpoint kullanıcı "Detayları Oku" butonuna tıklayıp 
+    tam haberi okuduğunda çağrılır.
+    """
+    try:
+        # Detail view event oluştur
+        detail_event = DetailViewEvent(
+            user_id=user_id,
+            reel_id=request.reel_id,
+            read_duration_ms=request.read_duration_ms,
+            scroll_depth=request.scroll_depth,
+            shared_from_detail=request.shared_from_detail,
+            session_id=request.session_id
+        )
+        
+        # Analytics servisine kaydet
+        result = await reels_analytics.track_detail_view(user_id, detail_event)
+        
+        # User preference güncelle (ÖNEMLİ!)
+        await preference_engine.boost_from_detail_view(
+            user_id=user_id,
+            reel=await reels_analytics.get_reel_by_id(request.reel_id),
+            engagement_score=detail_event.get_engagement_score()
+        )
+        
+        return {
+            "success": True,
+            "message": "Detail view tracked",
+            "meaningful_read": detail_event.is_meaningful_read(),
+            "engagement_score": detail_event.get_engagement_score()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @router.get("/endpoints")
 async def list_reel_endpoints():

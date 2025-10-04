@@ -541,27 +541,55 @@ class ReelsAnalyticsService:
             )
     
     # ============ HELPER METHODS ============
-    
-    async def _generate_algorithmic_feed(self, user_id: str) -> List[ReelFeedItem]:
+    # src/services/reels_analytics.py içindeki _generate_algorithmic_feed metodunu GÜNCELLE:
+
+    async def _generate_algorithmic_feed(
+        self, 
+        user_id: str,
+        limit: int = 20
+    ) -> List[ReelFeedItem]:
         """
-        Instagram-style algoritma ile feed oluştur
+        Personalized feed generation with preference engine
         """
-        # Tüm published reels al
+        from .preference_engine import preference_engine
+        
+        # Tüm published reels
         all_reels = await self.get_all_published_reels()
         
-        if not all_reels:
-            print("⚠️ No published reels found for feed generation")
-            return []
+        # Kullanıcının izlemediği reels
+        watched_ids = await self._get_user_watched_reel_ids(user_id)
+        unseen_reels = [r for r in all_reels if r.id not in watched_ids]
         
-        # Basit algoritma: son yayınlananlar önce
-        sorted_reels = sorted(all_reels, key=lambda r: r.published_at, reverse=True)
+        # Son 3 günlük haberler (fresh content)
+        three_days_ago = datetime.now() - timedelta(days=3)
+        fresh_reels = [r for r in unseen_reels if r.published_at >= three_days_ago]
         
-        # Fresh flag'lerini güncelle (son 3 saat)
-        for reel in sorted_reels:
-            reel.is_fresh = reel.is_recent(3)
+        # Preference engine ile skorla
+        scored_reels = []
+        for reel in fresh_reels:
+            score = await preference_engine.predict_reel_score(user_id, reel)
+            scored_reels.append((reel, score))
         
-        print(f"📱 Algorithmic feed: {len(sorted_reels)} reels sorted by date")
-        return sorted_reels
+        # Sırala
+        scored_reels.sort(key=lambda x: x[1], reverse=True)
+        
+        # %80 personalized + %20 exploration (random injection)
+        personalized_count = int(limit * 0.8)
+        exploration_count = limit - personalized_count
+        
+        # Top personalized
+        top_personalized = [r for r, s in scored_reels[:personalized_count]]
+        
+        # Random exploration (düşük skorlulardan)
+        low_score_reels = [r for r, s in scored_reels[personalized_count:]]
+        import random
+        exploration = random.sample(low_score_reels, min(exploration_count, len(low_score_reels)))
+        
+        # Karıştır
+        final_feed = top_personalized + exploration
+        random.shuffle(final_feed)
+        
+        return final_feed[:limit]
     
     async def _get_user_watched_reel_ids(self, user_id: str) -> Set[str]:
         """Kullanıcının izlediği reel ID'lerini al"""

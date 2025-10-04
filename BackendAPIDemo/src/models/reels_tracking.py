@@ -58,6 +58,27 @@ class ReelView(BaseModel):
     session_id: Optional[str] = Field(None, description="Kullanıcı session ID'si")
     device_type: Optional[str] = Field(None, description="Cihaz türü (web/mobile)")
     
+    
+    # YENİ EKLENDİ, kullanıcıya ait daha fazla veri çekerek 
+    detail_viewed: bool = Field(default=False, description="Detayı görüntüledi mi")
+    detail_view_duration_ms: int = Field(default=0, description="Detayda geçirilen süre")
+    detail_scroll_depth: float = Field(default=0.0, description="Detayda scroll derinliği")
+    
+    def get_total_engagement_score(self) -> float:
+        """Toplam engagement (audio + detail)"""
+        # Audio engagement
+        audio_score = 0.7 if self.is_meaningful_view() else 0.3
+        
+        # Detail engagement bonus
+        detail_bonus = 0.0
+        if self.detail_viewed:
+            if self.detail_view_duration_ms > 30000:  # 30+ saniye
+                detail_bonus = 0.5
+            elif self.detail_view_duration_ms > 10000:  # 10+ saniye
+                detail_bonus = 0.3
+        
+        return min(audio_score + detail_bonus, 1.2)  # Max 1.2!    
+    
     def is_meaningful_view(self) -> bool:
         """Anlamlı bir izleme mi (3sn+ için True)"""
         return self.duration_ms >= 3000
@@ -379,6 +400,61 @@ class FeedResponse(BaseModel):
     pagination: FeedPagination = Field(..., description="Sayfalama bilgisi")
     feed_metadata: FeedMetadata = Field(..., description="Feed metadata'sı")
     generated_at: datetime = Field(default_factory=datetime.now, description="Oluşturulma zamanı")
+
+
+
+
+
+# ==================== KULLANICIYA ÖZEL REELS VERİLERİ ÇEKMEK İÇİN ====================
+
+class DetailViewEvent(BaseModel):
+    """Haber detayını okuma event'i"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    reel_id: str
+    
+    # Detail view metadata
+    read_duration_ms: int = Field(..., description="Detayda geçirilen süre")
+    scroll_depth: float = Field(default=0.0, ge=0.0, le=1.0, description="Kaydırma derinliği (0-1)")
+    
+    # Reading behavior
+    returned_to_feed: bool = Field(default=True, description="Feed'e geri döndü mü")
+    shared_from_detail: bool = Field(default=False, description="Detaydan paylaştı mı")
+    
+    # Timestamps
+    viewed_at: datetime = Field(default_factory=datetime.now)
+    
+    # Session tracking
+    session_id: Optional[str] = None
+    
+    def is_meaningful_read(self) -> bool:
+        """Anlamlı okuma mı? (10sn+, %30+ scroll)"""
+        return (
+            self.read_duration_ms >= 10000 and 
+            self.scroll_depth >= 0.3
+        )
+    
+    def get_engagement_score(self) -> float:
+        """Engagement skoru (0-1)"""
+        # Süre skoru (max 60sn = 1.0)
+        time_score = min(self.read_duration_ms / 60000, 1.0)
+        
+        # Scroll depth skoru
+        scroll_score = self.scroll_depth
+        
+        # Ağırlıklı ortalama
+        return 0.6 * time_score + 0.4 * scroll_score
+
+
+
+
+
+
+
+
+
+
+
 
 # ============ EXPORTS ============
 
