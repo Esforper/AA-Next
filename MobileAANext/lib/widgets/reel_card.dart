@@ -28,7 +28,9 @@ class _ReelCardState extends State<ReelCard>
   Widget build(BuildContext context) {
     super.build(context);
     final p = context.watch<ReelsProvider>();
-    final speaking = p.speakingReelId == widget.reel.id;
+    // DEĞİŞİKLİK 1: 'speakingReelId' yerine 'playingReelId' kullanıldı.
+    // Değişken adı da daha anlamlı olması için 'isPlaying' olarak güncellendi.
+    final isPlaying = p.playingReelId == widget.reel.id;
 
     return Stack(
       fit: StackFit.expand,
@@ -40,8 +42,10 @@ class _ReelCardState extends State<ReelCard>
           bottom: 0,
           child: Center(
             child: VoiceButton(
-              speaking: speaking,
-              onToggle: () => p.speakSummary(widget.reel),
+              // DEĞİŞİKLİK 2: 'speaking' prop'una yeni 'isPlaying' değişkeni atandı.
+              speaking: isPlaying,
+              // DEĞİŞİKLİK 3: 'speakSummary' metodu yerine 'playAudio' metodu çağrıldı.
+              onToggle: () => p.playAudio(widget.reel),
             ),
           ),
         ),
