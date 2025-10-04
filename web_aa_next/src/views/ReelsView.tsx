@@ -345,15 +345,11 @@ export const ReelsView: React.FC = () => {
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 bg-black overflow-hidden select-none reels-container"
+      className="h-full w-full bg-black overflow-hidden select-none reels-container"
       style={{ 
         userSelect: 'none', 
         WebkitUserSelect: 'none',
-        WebkitTouchCallout: 'none',
-        width: '100vw',
-        height: '100vh',
-        top: 0,
-        left: 0
+        WebkitTouchCallout: 'none'
       } as React.CSSProperties}
       onTouchStart={(e) => { handleAnyInteraction(); handleTouchStart(e); }}
       onTouchMove={(e) => { handleAnyInteraction(); handleTouchMove(e); }}
@@ -366,18 +362,18 @@ export const ReelsView: React.FC = () => {
     >
       {/* UI toggle removed */}
 
-      {/* YouTube Shorts Style Container */}
-      <div className="relative h-full w-full">
+      {/* Responsive Reels Container */}
+      <div className="relative h-full w-full max-w-lg mx-auto flex items-center justify-center px-2">
         
         {/* Previous Reel (Behind) */}
         {prevReelData && (
           <div 
-            className="absolute inset-0 w-full h-full"
+            className="absolute inset-0 flex items-center justify-center"
             style={{
               transform: `translateY(${100 + slideOffset.y + (isMouseDown ? Math.max(0, mouseStartY - mouseStartY) : 0)}%)`,
               transition: isMouseDown ? 'none' : (isTransitioning ? 'transform 0.3s ease-out' : 'none'),
               zIndex: 1,
-              opacity: isMouseDown ? Math.min(1, Math.max(0, mouseStartY - mouseStartY)) : 1
+              opacity: isMouseDown ? Math.min(1, Math.max(0, mouseStartY - mouseStartY)) : 0.3
             }}
           >
             <ReelItem
@@ -388,7 +384,7 @@ export const ReelsView: React.FC = () => {
               isActive={false}
               onPlay={() => {}}
               onImageClick={() => {}}
-              className="absolute inset-0 w-full h-full opacity-50"
+              className="w-full max-w-lg mx-auto"
             />
           </div>
         )}
@@ -492,18 +488,16 @@ export const ReelsView: React.FC = () => {
 
         {/* Current Reel (Active) */}
         <div 
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 flex items-center justify-center"
           style={{
             transform: `translateY(${slideOffset.y}%)`,
             transition: isTransitioning ? 'transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1)' : 'none',
-            zIndex: 4,
-            perspective: '1200px',
-            transformStyle: 'preserve-3d'
+            zIndex: 4
           }}
         >
           {currentReel && (
             <>
-              {/* Foreground layer: circular slide out on horizontal change */}
+              {/* Foreground layer: clean, consistent sizing */}
               <ReelItem
                 reel={{
                   ...(currentReel || ({} as ReelData)),
@@ -512,15 +506,14 @@ export const ReelsView: React.FC = () => {
                 isActive={true}
                 onPlay={togglePlayPause}
                 onImageClick={togglePlayPause}
-                className="absolute inset-0 w-full h-full"
+                className="w-full max-w-lg mx-auto"
                 style={{
                   transform: incomingDirection
-                    ? `translateX(${incomingDirection === 'left' ? '-35%' : '35%'}) rotateY(${incomingDirection === 'left' ? 25 : -25}deg) scale(0.9)`
-                    : 'translateX(0%) rotateY(0deg) scale(1.2)',
-                  filter: incomingDirection ? 'blur(8px)' : 'none',
-                  opacity: incomingDirection ? 0.65 : 1,
-                  transition: 'transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), filter 0.45s, opacity 0.45s',
-                  boxShadow: '0 12px 36px rgba(0,0,0,0.4)'
+                    ? `translateX(${incomingDirection === 'left' ? '-10%' : '10%'})`
+                    : 'translateX(0%)',
+                  filter: incomingDirection ? 'blur(2px)' : 'none',
+                  opacity: incomingDirection ? 0.8 : 1,
+                  transition: 'transform 0.3s ease-out, filter 0.3s ease-out, opacity 0.3s ease-out'
                 }}
               />
               {/* Dots for current reel (original place) */}
@@ -549,12 +542,12 @@ export const ReelsView: React.FC = () => {
         {/* Next Reel (Front) */}
         {nextReelData && (
           <div 
-            className="absolute inset-0 w-full h-full"
+            className="absolute inset-0 flex items-center justify-center"
             style={{
               transform: `translateY(${-100 + slideOffset.y + (isMouseDown ? Math.min(0, mouseStartY - mouseStartY) : 0)}%)`,
               transition: isMouseDown ? 'none' : (isTransitioning ? 'transform 0.3s ease-out' : 'none'),
               zIndex: 1,
-              opacity: isMouseDown ? Math.min(1, Math.max(0, -mouseStartY + mouseStartY)) : 1
+              opacity: isMouseDown ? Math.min(1, Math.max(0, -mouseStartY + mouseStartY)) : 0.3
             }}
           >
             <ReelItem
@@ -565,7 +558,7 @@ export const ReelsView: React.FC = () => {
               isActive={false}
               onPlay={() => {}}
               onImageClick={() => {}}
-              className="absolute inset-0 w-full h-full opacity-50"
+              className="w-full max-w-lg mx-auto"
             />
             {/* Dots for next reel preview */}
             {currentReel?.images && currentReel.images.length > 1 && (

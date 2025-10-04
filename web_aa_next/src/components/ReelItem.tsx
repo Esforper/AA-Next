@@ -20,156 +20,137 @@ export const ReelItem: React.FC<ReelItemProps> = ({
   className,
   style
 }) => {
+  // Get first sentence from content
+  const getFirstSentence = (content: string) => {
+    const sentences = content.split(/[.!?]+/);
+    return sentences[0]?.trim() || content.substring(0, 100) + '...';
+  };
+
   return (
-    <Card
-      padding="none"
-      shadow="lg"
-      rounded="lg"
+    <div
       className={clsx(
-        'w-full max-w-sm mx-auto overflow-hidden select-none bg-black',
+        'relative w-full h-full flex flex-col bg-black overflow-hidden select-none',
         {
           'ring-2 ring-blue-500': isActive
         },
         className
       )}
-      style={style}
+      style={{
+        ...style,
+        // Responsive dimensions - no fixed heights
+        height: '100%',
+        width: '100%',
+        maxWidth: '100%',
+        maxHeight: '100%',
+        minHeight: '100vh', // Full viewport height
+        display: 'flex',
+        flexDirection: 'column'
+      }}
     >
-      {/* Image Section - Responsive Full Screen Style */}
+      {/* Image Section - Responsive Height */}
       <div 
-        className="relative h-full cursor-pointer overflow-hidden"
+        className="relative w-full cursor-pointer overflow-hidden flex-shrink-0"
         onClick={onImageClick}
         style={{ 
           userSelect: 'none', 
           WebkitUserSelect: 'none',
-          height: '100%'
+          height: '50vh', // Daha az yükseklik - dikdörtgen
+          minHeight: '40vh',
+          maxHeight: '60vh'
         }}
       >
-        {/* Main Image - Centered and Full Format with Enhanced Blur */}
-        <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+        {/* Main Image - Cinematic Bleed Effect */}
+        <div className="relative w-full h-full flex items-center justify-center">
           <img
             src={reel.main_image}
             alt={reel.title}
             className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
             style={{
-              minWidth: '100%',
-              minHeight: '100%',
+              minWidth: '130%', // Daha geniş bleed effect
+              minHeight: '130%',
               objectFit: 'cover',
               objectPosition: 'center',
-              width: '100%',
-              height: '100%'
+              transform: 'scale(1.15)' // Daha geniş cinematic overflow
             }}
             loading="lazy"
             draggable={false}
             onContextMenu={(e) => e.preventDefault()}
           />
           
-          {/* Subtle Edge Blur Effects - No Center Blur */}
-          <div className="absolute inset-0 pointer-events-none">
-            {/* Left Edge Blur - Subtle */}
-            <div 
-              className="absolute left-0 top-0 w-16 h-full"
-              style={{
-                background: 'linear-gradient(90deg, rgba(0,0,0,0.2) 0%, transparent 100%)',
-                filter: 'blur(2px)'
-              }}
-            />
-            
-            {/* Right Edge Blur - Subtle */}
-            <div 
-              className="absolute right-0 top-0 w-16 h-full"
-              style={{
-                background: 'linear-gradient(270deg, rgba(0,0,0,0.2) 0%, transparent 100%)',
-                filter: 'blur(2px)'
-              }}
-            />
-          </div>
+          {/* Cinematic Vignette for Bleed Effect */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/20" />
         </div>
         
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-        
-        {/* Category Badge - Instagram Stories Style */}
+        {/* Category Badge - Top Left */}
         <div className="absolute top-4 left-4">
-          <span className="px-3 py-1.5 text-sm font-bold bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full shadow-xl backdrop-blur-lg border border-white/30 hover:scale-105 transition-all duration-300">
+          <span className="px-3 py-1.5 text-sm font-bold bg-white/20 text-white rounded-full shadow-xl backdrop-blur-lg border border-white/30">
             {reel.category}
           </span>
         </div>
-        
       </div>
       
-      {/* Content Section - YouTube Shorts & Instagram Stories Style */}
+      {/* Content Section - Responsive Fill */}
       <div 
-        className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent text-white select-none"
+        className="flex-1 flex flex-col justify-between px-4 sm:px-6 py-4 bg-black text-white"
         style={{ 
           userSelect: 'none', 
           WebkitUserSelect: 'none',
-          paddingTop: 16,
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)'
+          minHeight: '30vh', // Daha fazla alan yazılar için
+          maxHeight: '40vh' // Daha fazla alan yazılar için
         }}
       >
-        {/* Title - YouTube Shorts Style */}
-        <h3 
-          className="font-extrabold mb-2 line-clamp-2 leading-tight text-white drop-shadow-2xl"
-          style={{ 
-            userSelect: 'none', 
-            WebkitUserSelect: 'none',
-            fontSize: 'clamp(18px, 2.6vw, 28px)'
-          }}
-        >
-          {reel.title}
-        </h3>
+        {/* Title and First Sentence */}
+        <div className="flex-1 flex flex-col justify-center">
+          <h3 
+            className="font-bold mb-2 line-clamp-2 leading-tight text-white"
+            style={{ 
+              userSelect: 'none', 
+              WebkitUserSelect: 'none',
+              fontSize: 'clamp(16px, 2.5vw, 24px)'
+            }}
+          >
+            {reel.title}
+          </h3>
+          
+          <p 
+            className="text-gray-200 line-clamp-2 leading-relaxed mb-3"
+            style={{ 
+              userSelect: 'none', 
+              WebkitUserSelect: 'none',
+              fontSize: 'clamp(14px, 1.8vw, 18px)'
+            }}
+          >
+            {getFirstSentence(reel.content)}
+          </p>
+        </div>
         
-        {/* Description - Instagram Stories Style */}
-        <p 
-          className="text-gray-100/95 mb-3 line-clamp-3 leading-relaxed drop-shadow-lg"
-          style={{ 
-            userSelect: 'none', 
-            WebkitUserSelect: 'none',
-            fontSize: 'clamp(13px, 1.8vw, 18px)'
-          }}
-        >
-          {reel.content}
-        </p>
-        
-        {/* Tags - Modern Instagram Style */}
-        {reel.tags && reel.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {reel.tags.slice(0, 3).map((tag, index) => (
-              <span
-                key={index}
-                className="px-3 py-1.5 text-xs font-semibold bg-white/20 text-white rounded-full backdrop-blur-lg border border-white/30 hover:bg-white/30 hover:scale-105 transition-all duration-300 shadow-lg"
-                style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-              >
-                #{tag}
-              </span>
-            ))}
-            {reel.tags.length > 3 && (
-              <span className="px-3 py-1.5 text-xs font-semibold bg-white/10 text-white/70 rounded-full backdrop-blur-lg border border-white/20">
-                +{reel.tags.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-        
-        {/* Author & Location - YouTube Shorts Style */}
-        {(reel.author || reel.location) && (
-          <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-sm text-gray-200" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
-            {reel.author && (
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full shadow-lg"></div>
-                <span className="font-semibold text-white">{reel.author}</span>
-              </div>
-            )}
-            {reel.author && reel.location && <span className="text-white/50 hidden sm:inline">•</span>}
-            {reel.location && (
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-gradient-to-r from-green-400 to-blue-400 rounded-full shadow-lg"></div>
-                <span className="font-semibold text-white">{reel.location}</span>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Floating Action Button - Bottom Center */}
+        <div className="flex justify-center">
+          <button
+            onClick={onPlay}
+            className="bg-white/20 hover:bg-white/30 backdrop-blur-lg border border-white/30 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-lg"
+            style={{ 
+              userSelect: 'none', 
+              WebkitUserSelect: 'none',
+              width: 'clamp(48px, 8vw, 64px)',
+              height: 'clamp(48px, 8vw, 64px)'
+            }}
+          >
+            <svg 
+              className="text-white" 
+              fill="currentColor" 
+              viewBox="0 0 24 24"
+              style={{
+                width: 'clamp(20px, 4vw, 28px)',
+                height: 'clamp(20px, 4vw, 28px)',
+                marginLeft: '2px'
+              }}
+            >
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </button>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 };
