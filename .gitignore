@@ -7,3 +7,5 @@ MobileAANext copy/node_modules/
 MobileAANext copy/android/.gradle/
 MobileAANext/windows/flutter/
 MobileAANext/macos/Flutter/
+MobileAANext/android/app/.cxx/Debug/
+MobileAANext/windows/flutter/generated_plugin_registrant.cc
