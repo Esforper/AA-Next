@@ -3,3 +3,4 @@ export * from './config';
 export * from './reelsApi';
 export * from './articlesApi';
 export * from './newsApi';
+export * from './authApi';

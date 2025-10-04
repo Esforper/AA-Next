@@ -26,7 +26,7 @@ export const ReelItem: React.FC<ReelItemProps> = ({
       shadow="lg"
       rounded="lg"
       className={clsx(
-        'w-full max-w-sm mx-auto overflow-hidden select-none',
+        'w-full max-w-sm mx-auto overflow-hidden select-none bg-black',
         {
           'ring-2 ring-blue-500': isActive
         },
@@ -36,12 +36,12 @@ export const ReelItem: React.FC<ReelItemProps> = ({
     >
       {/* Image Section - Responsive Full Screen Style */}
       <div 
-        className="relative h-screen bg-gray-200 cursor-pointer overflow-hidden"
+        className="relative h-full cursor-pointer overflow-hidden"
         onClick={onImageClick}
         style={{ 
           userSelect: 'none', 
           WebkitUserSelect: 'none',
-          minHeight: '100dvh' // Dynamic viewport height for mobile
+          height: '100%'
         }}
       >
         {/* Main Image - Centered and Full Format with Enhanced Blur */}
@@ -86,7 +86,7 @@ export const ReelItem: React.FC<ReelItemProps> = ({
         </div>
         
         {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         
         {/* Category Badge - Instagram Stories Style */}
         <div className="absolute top-4 left-4">
@@ -99,21 +99,34 @@ export const ReelItem: React.FC<ReelItemProps> = ({
       
       {/* Content Section - YouTube Shorts & Instagram Stories Style */}
       <div 
-        className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent text-white select-none"
-        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+        className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent text-white select-none"
+        style={{ 
+          userSelect: 'none', 
+          WebkitUserSelect: 'none',
+          paddingTop: 16,
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)'
+        }}
       >
         {/* Title - YouTube Shorts Style */}
         <h3 
-          className="text-xl sm:text-2xl font-bold mb-3 line-clamp-2 leading-tight text-white drop-shadow-2xl"
-          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+          className="font-extrabold mb-2 line-clamp-2 leading-tight text-white drop-shadow-2xl"
+          style={{ 
+            userSelect: 'none', 
+            WebkitUserSelect: 'none',
+            fontSize: 'clamp(18px, 2.6vw, 28px)'
+          }}
         >
           {reel.title}
         </h3>
         
         {/* Description - Instagram Stories Style */}
         <p 
-          className="text-sm sm:text-base text-gray-100 mb-4 line-clamp-3 leading-relaxed drop-shadow-lg"
-          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+          className="text-gray-100/95 mb-3 line-clamp-3 leading-relaxed drop-shadow-lg"
+          style={{ 
+            userSelect: 'none', 
+            WebkitUserSelect: 'none',
+            fontSize: 'clamp(13px, 1.8vw, 18px)'
+          }}
         >
           {reel.content}
         </p>

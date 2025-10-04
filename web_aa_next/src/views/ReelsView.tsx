@@ -45,28 +45,8 @@ export const ReelsView: React.FC = () => {
 
   // Fullscreen UI state and bottom bar visibility
   const [isFullscreenControlsHidden, setIsFullscreenControlsHidden] = useState(false);
-  const [autoAdvanceTimerId, setAutoAdvanceTimerId] = useState<number | null>(null);
-
-  const resetAutoAdvance = useCallback(() => {
-    if (autoAdvanceTimerId) {
-      window.clearTimeout(autoAdvanceTimerId);
-    }
-    const id = window.setTimeout(() => {
-      nextReel();
-    }, 10000);
-    setAutoAdvanceTimerId(id);
-  }, [autoAdvanceTimerId, nextReel]);
-
-  useEffect(() => {
-    resetAutoAdvance();
-    return () => {
-      if (autoAdvanceTimerId) window.clearTimeout(autoAdvanceTimerId);
-    };
-  }, [currentReelIndex, resetAutoAdvance]);
-
-  const handleAnyInteraction = () => {
-    resetAutoAdvance();
-  };
+  // Remove auto-advance to improve UX and efficiency
+  const handleAnyInteraction = () => {};
   
   // Progress tracking
   const [viewStartTime, setViewStartTime] = useState<number | null>(null);
@@ -254,11 +234,31 @@ export const ReelsView: React.FC = () => {
   };
 
   // Wheel handler: vertical only (like Shorts)
+  const wheelAccumRef = useRef(0);
+  const WHEEL_THRESHOLD = 80; // daha kullanıcı dostu eşik
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    if (Math.abs(e.deltaY) < 10) return;
-    if (e.deltaY > 0) animatedNextReel(); else animatedPrevReel();
+    wheelAccumRef.current += e.deltaY;
+    if (Math.abs(wheelAccumRef.current) < WHEEL_THRESHOLD) return;
+    if (wheelAccumRef.current > 0) {
+      animatedNextReel();
+    } else {
+      animatedPrevReel();
+    }
+    wheelAccumRef.current = 0; // sıfırla (throttle)
   };
+
+  // Prevent body scroll when Reels is mounted
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalHeight = document.body.style.height;
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100vh';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.height = originalHeight;
+    };
+  }, []);
 
   // Keyboard navigation
   useEffect(() => {
@@ -345,12 +345,15 @@ export const ReelsView: React.FC = () => {
   return (
     <div 
       ref={containerRef}
-      className="relative h-screen bg-black overflow-hidden select-none reels-container"
-      style={{
+      className="fixed inset-0 bg-black overflow-hidden select-none reels-container"
+      style={{ 
         userSelect: 'none', 
         WebkitUserSelect: 'none',
         WebkitTouchCallout: 'none',
-        minHeight: '100dvh'
+        width: '100vw',
+        height: '100vh',
+        top: 0,
+        left: 0
       } as React.CSSProperties}
       onTouchStart={(e) => { handleAnyInteraction(); handleTouchStart(e); }}
       onTouchMove={(e) => { handleAnyInteraction(); handleTouchMove(e); }}
@@ -361,15 +364,7 @@ export const ReelsView: React.FC = () => {
       onWheel={(e) => { handleAnyInteraction(); handleWheel(e); }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Top-left UI toggle button */}
-      <button
-        onClick={() => setIsFullscreenControlsHidden(prev => !prev)}
-        className="fixed top-3 left-3 z-[60] px-3 py-2 rounded-full bg-black/60 text-white text-sm hover:bg-black/80 backdrop-blur-md border border-white/20 shadow-md transition-colors"
-        style={{ WebkitTapHighlightColor: 'transparent' }}
-        aria-label={isFullscreenControlsHidden ? 'Arayüzü göster' : 'Arayüzü gizle'}
-      >
-        {isFullscreenControlsHidden ? '🔽 UI' : '🔼 UI'}
-      </button>
+      {/* UI toggle removed */}
 
       {/* YouTube Shorts Style Container */}
       <div className="relative h-full w-full">
@@ -472,6 +467,23 @@ export const ReelsView: React.FC = () => {
                     className="absolute inset-0 w-full h-full"
                     style={rightStyle}
                   />
+                  {/* Dots for current reel previews area (keeps old look) */}
+                  <div className="absolute top-2 left-0 right-0 z-30 px-2 pointer-events-none">
+                    <div className="flex space-x-1 max-w-sm mx-auto">
+                      {currentReel.images.map((_, index) => (
+                        <div
+                          key={index}
+                          className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
+                            index === currentImageIndex
+                              ? 'bg-white'
+                              : index < currentImageIndex
+                                ? 'bg-white/60'
+                                : 'bg-white/20'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </>
               );
             })()}
@@ -511,6 +523,25 @@ export const ReelsView: React.FC = () => {
                   boxShadow: '0 12px 36px rgba(0,0,0,0.4)'
                 }}
               />
+              {/* Dots for current reel (original place) */}
+              {currentReel.images && currentReel.images.length > 1 && (
+                <div className="absolute top-2 left-0 right-0 z-30 px-2 pointer-events-none">
+                  <div className="flex space-x-1 max-w-sm mx-auto">
+                    {currentReel.images.map((_, index) => (
+                      <div
+                        key={index}
+                        className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
+                          index === currentImageIndex 
+                            ? 'bg-white' 
+                            : index < currentImageIndex 
+                              ? 'bg-white/60' 
+                              : 'bg-white/20'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -536,40 +567,31 @@ export const ReelsView: React.FC = () => {
               onImageClick={() => {}}
               className="absolute inset-0 w-full h-full opacity-50"
             />
+            {/* Dots for next reel preview */}
+            {currentReel?.images && currentReel.images.length > 1 && (
+              <div className="absolute top-2 left-0 right-0 z-30 px-2 pointer-events-none">
+                <div className="flex space-x-1 max-w-sm mx-auto">
+                  {currentReel.images.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
+                        index === currentImageIndex 
+                          ? 'bg-white' 
+                          : index < currentImageIndex 
+                            ? 'bg-white/60' 
+                            : 'bg-white/20'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Bottom Progress Bar (Animated hide/show) */}
-        <div
-          className={`fixed bottom-0 left-0 right-0 transition-all duration-500 ${
-            isFullscreenControlsHidden ? 'opacity-0 translate-y-10 pointer-events-none' : 'opacity-100 translate-y-0 pointer-events-auto'
-          }`}
-          onMouseMove={handleAnyInteraction}
-          onTouchStart={handleAnyInteraction}
-          style={{ zIndex: 50 }}
-        >
-          <div className="h-1 bg-black/30">
-            <div 
-              className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-700 ease-out"
-              style={{ 
-                width: totalAvailable > 0 
-                  ? `${(loadedCount / totalAvailable) * 100}%` 
-                  : `${((currentReelIndex + 1) / Math.max(reels.length, 1)) * 100}%`
-              }}
-            />
-          </div>
-        </div>
+        {/* Bottom progress removed */}
 
-        {/* Stats Overlay (Debug) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="absolute top-4 right-4 text-xs text-white/60 bg-black/50 p-2 rounded">
-            <div>Reel: {currentReelIndex + 1}/{reels.length}</div>
-            <div>Loaded: {loadedCount}/{totalAvailable}</div>
-            <div>Has More: {hasMore ? 'Yes' : 'No'}</div>
-            <div>Loading: {isLoadingMore ? 'Yes' : 'No'}</div>
-            <div>View Time: {Math.floor(getTotalViewTime() / 1000)}s</div>
-          </div>
-        )}
+        {/* Stats Overlay removed per request */}
 
         {/* Loading More Indicator */}
         {isLoadingMore && (
@@ -612,25 +634,7 @@ export const ReelsView: React.FC = () => {
           </div>
         </div>
         
-        {/* Image Navigation Dots */}
-        {currentReel?.images && currentReel.images.length > 1 && (
-          <div className="absolute top-2 left-0 right-0 z-30 px-2">
-            <div className="flex space-x-1">
-              {currentReel.images.map((_, index) => (
-                <div
-                  key={index}
-                  className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
-                    index === currentImageIndex 
-                      ? 'bg-white' 
-                      : index < currentImageIndex 
-                        ? 'bg-white/60' 
-                        : 'bg-white/20'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Global fixed dots removed to keep original look but present on all layers */}
 
       </div>
     </div>

@@ -22,7 +22,7 @@ const AppContent: React.FC = () => {
   React.useEffect(() => {
     const currentPath = location.pathname;
     
-    if (currentPath === '/' || currentPath.startsWith('/news')) {
+    if (currentPath === '/' || currentPath === '/home' || currentPath.startsWith('/news')) {
       setActiveTab('home');
     } else if (currentPath === '/reels') {
       setActiveTab('reels');
@@ -57,14 +57,66 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Don't show tab bar on news detail pages or race view
+  const isReels = location.pathname === '/reels';
+  // Don't show tab bar on news detail pages or race view; show on mobile even in Reels
   const showTabBar = !location.pathname.startsWith('/news/') && 
-                     !location.pathname.startsWith('/race');  // ✅ Race'de tab bar gizle
+                     !location.pathname.startsWith('/race');
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
+      {/* Top Navigation - Desktop/Web Only */}
+      <div className="hidden sm:block shadow-lg sticky top-0 z-40" style={{ backgroundColor: '#005799' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 grid grid-cols-3 items-center">
+          <div className="flex items-center">
+            <span className="text-xl font-bold text-white">AA Haber</span>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <button 
+              onClick={() => handleTabChange('home')} 
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab==='home' 
+                  ? 'bg-white text-blue-600 shadow-md' 
+                  : 'text-white hover:bg-white/20 hover:text-white'
+              }`}
+            >
+              Haberler
+            </button>
+            <button 
+              onClick={() => handleTabChange('reels')} 
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab==='reels' 
+                  ? 'bg-white text-blue-600 shadow-md' 
+                  : 'text-white hover:bg-white/20 hover:text-white'
+              }`}
+            >
+              Reels
+            </button>
+            <button 
+              onClick={() => handleTabChange('games')} 
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab==='games' 
+                  ? 'bg-white text-blue-600 shadow-md' 
+                  : 'text-white hover:bg-white/20 hover:text-white'
+              }`}
+            >
+              Oyunlar
+            </button>
+            <button 
+              onClick={() => handleTabChange('profile')} 
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab==='profile' 
+                  ? 'bg-white text-blue-600 shadow-md' 
+                  : 'text-white hover:bg-white/20 hover:text-white'
+              }`}
+            >
+              Profil
+            </button>
+          </div>
+          <div />
+        </div>
+      </div>
       {/* Main Content Area */}
-      <div className="pb-16 sm:pb-20">
+      <div className={isReels ? 'pb-16 sm:pb-0 overflow-hidden' : 'pb-16 sm:pb-20'}>
         <Routes>
           <Route path="/" element={<TestView />} />
           <Route path="/home" element={<SimpleHomeView />} />
@@ -78,12 +130,13 @@ const AppContent: React.FC = () => {
         </Routes>
       </div>
       
-      {/* Tab Bar - Responsive */}
+      {/* Bottom Tab Bar - Mobile Only */}
       {showTabBar && (
         <TabBar
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={handleTabChange}
+          className="sm:hidden"
         />
       )}
     </div>
@@ -92,7 +145,7 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true } as any}>
       <AppContent />
     </Router>
   );
