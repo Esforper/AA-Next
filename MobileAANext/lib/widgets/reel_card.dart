@@ -1,3 +1,5 @@
+// lib/widgets/reel_card.dart - YENİ MODEL YAPISINA UYGUN SON HALİ
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -28,8 +30,6 @@ class _ReelCardState extends State<ReelCard>
   Widget build(BuildContext context) {
     super.build(context);
     final p = context.watch<ReelsProvider>();
-    // DEĞİŞİKLİK 1: 'speakingReelId' yerine 'playingReelId' kullanıldı.
-    // Değişken adı da daha anlamlı olması için 'isPlaying' olarak güncellendi.
     final isPlaying = p.playingReelId == widget.reel.id;
 
     return Stack(
@@ -42,9 +42,7 @@ class _ReelCardState extends State<ReelCard>
           bottom: 0,
           child: Center(
             child: VoiceButton(
-              // DEĞİŞİKLİK 2: 'speaking' prop'una yeni 'isPlaying' değişkeni atandı.
               speaking: isPlaying,
-              // DEĞİŞİKLİK 3: 'speakSummary' metodu yerine 'playAudio' metodu çağrıldı.
               onToggle: () => p.playAudio(widget.reel),
             ),
           ),
@@ -61,7 +59,9 @@ class _ReelCardState extends State<ReelCard>
         Positioned.fill(
           child: ArticleOverlay(
             open: p.overlayOpen,
-            content: widget.reel.fullContent,
+            // DÜZELTME 1: `fullContent` artık `newsData`'nın içinde.
+            // Ayrıca bu bir liste olduğu için paragrafları birleştiriyoruz.
+            content: widget.reel.newsData.fullContent.join('\n\n'),
             onClose: () => p.setOverlay(false),
           ),
         ),
@@ -79,9 +79,10 @@ class _ReelCardState extends State<ReelCard>
               bottomLeft: Radius.circular(12),
               bottomRight: Radius.circular(12),
             ),
+            // DÜZELTME 2: `images` ve `mainImage` artık `newsData`'nın içinde.
             child: ImageCarousel(
-              images: widget.reel.images,
-              mainImage: widget.reel.mainImage,
+              images: widget.reel.newsData.images,
+              mainImage: widget.reel.newsData.mainImage,
             ),
           ),
         ),
@@ -93,7 +94,8 @@ class _ReelCardState extends State<ReelCard>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.reel.title,
+                // DÜZELTME 3: `title` artık `newsData`'nın içinde.
+                widget.reel.newsData.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -104,9 +106,12 @@ class _ReelCardState extends State<ReelCard>
               ),
               const SizedBox(height: 6),
               Text(
-                widget.reel.summary,
+                // DÜZELTME 4: `summary` artık `newsData`'nın içinde.
+                widget.reel.newsData.summary,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
+                // `withOpacity` kullanımı güncel `Color.withAlpha` veya `Color.fromRGBO` ile değiştirilebilir.
+                // Şimdilik çalışması için dokunmuyoruz.
                 style: TextStyle(color: Colors.white.withOpacity(.9)),
               ),
               const SizedBox(height: 10),

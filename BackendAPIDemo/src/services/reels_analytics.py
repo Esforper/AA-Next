@@ -21,7 +21,8 @@ from ..models.reels_tracking import (
     ReelView, UserReelStats, UserDailyStats, DailyProgress,
     ReelAnalytics, ReelFeedItem, TrendingReels, TrendPeriod,
     TrackViewRequest, TrackViewResponse, ViewStatus, ReelStatus,
-    NewsData, FeedResponse, FeedPagination, FeedMetadata
+    NewsData, FeedResponse, FeedPagination, FeedMetadata, DetailViewEvent,
+    TrackDetailViewRequest, EmojiType
 )
 from ..models.news import Article
 from ..config import settings

@@ -71,6 +71,7 @@ try:
         
         # News data (yeni)
         NewsData,
+        DetailViewEvent,
         
         # Feed models (güncellenmiş)
         ReelFeedItem,
@@ -84,11 +85,13 @@ try:
         # Request/Response
         TrackViewRequest,
         TrackViewResponse,
+        TrackDetailViewRequest,
         
         # Enums (güncellenmiş)
         ViewStatus,
         TrendPeriod,
         ReelStatus,  # Yeni enum
+        EmojiType,
         
         # Utility
         TimeRange,
@@ -207,6 +210,7 @@ __all__ = [
     "ReelAnalytics",
     "DailyProgress",
     "NewsData",               # Yeni
+    "DetailViewEvent",
     "ReelFeedItem",           # Güncellenmiş
     "TrendingReels",
     "FeedResponse",           # Yeni
@@ -214,9 +218,11 @@ __all__ = [
     "FeedMetadata",           # Yeni
     "TrackViewRequest",
     "TrackViewResponse",
+     "TrackDetailViewRequest", # <-- YENİ EKLENDİ
     "ViewStatus",
     "TrendPeriod",
     "ReelStatus",             # Yeni
+    "EmojiType",
     "TimeRange",
     "StatsFilter",
     

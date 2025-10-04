@@ -1,3 +1,5 @@
+// lib/pages/reels_feed_page.dart - SON HALİ
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/reels_provider.dart';
@@ -11,28 +13,35 @@ class ReelsFeedPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) =>
-          ReelsProvider(ApiService('http://10.0.2.2:8000'))..loadMock(),
+      // 1. ApiService.auto() ile platforma özel doğru IP/host adresini otomatik bulmasını sağla.
+      // 2. Mock verileri yerine fetchInitialFeed() ile gerçek verilerin ilk sayfasını çek.
+      create: (_) => ReelsProvider(ApiService.auto())..fetchInitialFeed(),
+      
       child: Consumer<ReelsProvider>(
-        builder: (_, p, __) {
+        builder: (context, reelsProvider, child) {
           return Scaffold(
             backgroundColor: Colors.black,
             body: SafeArea(
               child: Stack(
                 children: [
-                  PageView.builder(
-                    scrollDirection: Axis.vertical,
-                    itemCount: p.reels.length,
-                    onPageChanged: p.onPageChanged,
-                    itemBuilder: (_, i) => p.reels.isEmpty
-                        ? const SizedBox.shrink()
-                        : ReelCard(reel: p.reels[i]),
-                  ),
-                  if (p.reels.isEmpty)
-                    const Center(child: CircularProgressIndicator()),
+                  // Reel listesi boşsa ve hala yükleniyorsa, bekleme indicator'ı göster.
+                  if (reelsProvider.reels.isEmpty)
+                    const Center(child: CircularProgressIndicator(color: Colors.white))
+                  else
+                    // PageView, provider'daki reel listesini kullanarak sayfaları oluşturur.
+                    PageView.builder(
+                      scrollDirection: Axis.vertical,
+                      itemCount: reelsProvider.reels.length,
+                      // Kullanıcı sayfa değiştirdiğinde provider'a haber ver.
+                      onPageChanged: reelsProvider.onPageChanged,
+                      itemBuilder: (context, index) {
+                        return ReelCard(reel: reelsProvider.reels[index]);
+                      },
+                    ),
+                  
+                  // PopupBar gibi diğer UI elemanları olduğu gibi kalabilir.
                   const PopupBar(
-                    message:
-                        'Premium emojiler kilitli. Kulübe geçince açılır ⭐',
+                    message: 'Premium emojiler kilitli. Kulübe geçince açılır ⭐',
                   ),
                 ],
               ),

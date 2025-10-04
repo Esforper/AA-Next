@@ -715,7 +715,11 @@ __all__ = [
     
     # Utilities
     "TimeRange",
-    "StatsFilter"
+    "StatsFilter",
+    
+    "DetailViewEvent",
+    "TrackDetailViewRequest",
+    "EmojiType",
 ]
 """
     Core Tracking:

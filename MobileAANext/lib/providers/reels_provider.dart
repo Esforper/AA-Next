@@ -1,107 +1,139 @@
-import 'package:flutter/material.dart';
-// import 'package:flutter_tts/flutter_tts.dart'; // flutter_tts import'u kaldırıldı.
-import '../models/reel_model.dart';
+// lib/providers/reels_provider.dart - MANTIK HATASI DÜZELTİLMİŞ HALİ
+
+import 'package:flutter/foundation.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../services/api_service.dart';
+import '../models/reel_model.dart';
 
 class ReelsProvider with ChangeNotifier {
-  final ApiService api;
-  // final FlutterTts _tts = FlutterTts(); // TTS nesnesi kaldırıldı.
+  final ApiService _apiService;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
-  List<Reel> reels = [];
-  int currentIndex = 0;
-  bool overlayOpen = false;
+  ReelsProvider(this._apiService) {
+    print("✅ [PROVIDER] ReelsProvider oluşturuldu.");
 
-  // TTS ile ilgili durumlar kaldırıldı.
-  // String? speakingReelId;
-  // bool get isSpeaking => speakingReelId != null;
-
-  // YERİNE BUNLARI KULLANABİLİRSİNİZ (Ses oynatıcı paketine göre değişir)
-  String? playingReelId; // Şu an sesi çalan reel'in ID'si
-  bool get isPlayingAudio =>
-      playingReelId != null; // Sesin çalınıp çalınmadığını kontrol eder
-
-  // ReelsProvider(this.api) {
-  //   _initTts(); // TTS başlatma fonksiyonu kaldırıldı.
-  // }
-  ReelsProvider(this.api); // Kurucu metod sadeleştirildi.
-
-  // _initTts metodu tamamen kaldırıldı.
-
-  Future<void> loadMock() async {
-    reels = await api.getMockupReels(count: 15);
-    notifyListeners();
+    _audioPlayer.onPlayerComplete.listen((_) {
+      _playingReelId = null;
+      notifyListeners();
+    });
   }
 
-  void onPageChanged(int i) {
-    currentIndex = i;
-    overlayOpen = false;
-    // Sayfa değiştiğinde önceki ses durdurulmalı.
-    if (isPlayingAudio) stopAudio();
-    notifyListeners();
-    _delayedTrack();
-  }
+  List<Reel> _reels = [];
+  List<Reel> get reels => _reels;
 
-  void setOverlay(bool v) {
-    overlayOpen = v;
-    // Overlay açıldığında ses durdurulmalı.
-    if (v && isPlayingAudio) stopAudio();
-    notifyListeners();
-  }
+  String? _nextCursor;
+  bool _hasNextPage = true;
+  bool _isLoading = false;
+  int _currentPageIndex = 0;
+  
+  String? _playingReelId;
+  String? get playingReelId => _playingReelId;
 
-  // Bu fonksiyon artık API'den gelen ses URL'sini oynatacak.
-  Future<void> playAudio(Reel reel) async {
-    // Eğer aynı reel'in sesi zaten çalıyorsa, durdur.
-    if (playingReelId == reel.id) {
-      await stopAudio();
+  bool _overlayOpen = false;
+  bool get overlayOpen => _overlayOpen;
+
+  Future<void> fetchInitialFeed() async {
+    print("🚀 [PROVIDER] fetchInitialFeed() çağrıldı.");
+    
+    if (_isLoading) {
+      print("⚠️ [PROVIDER] Zaten bir yükleme devam ediyor, fetchInitialFeed iptal edildi.");
       return;
     }
-    // Eğer başka bir ses çalıyorsa, önce onu durdur.
-    if (playingReelId != null) {
-      await stopAudio();
-    }
-
-    playingReelId = reel.id;
+    
+    _isLoading = true;
+    _reels = [];
+    _nextCursor = null;
+    _hasNextPage = true;
     notifyListeners();
 
-    // --- BURAYA SES OYNATICI KODU GELECEK ---
-    // Örnek: await audioPlayer.play(UrlSource(reel.audioUrl));
-    // Oynatma bittiğinde veya durdurulduğunda playingReelId'yi null yapmayı unutmayın.
-    // audioPlayer.onPlayerCompletion.listen((event) {
-    //   playingReelId = null;
-    //   notifyListeners();
-    // });
-    print("Playing audio for reel: ${reel.id}");
+    await _fetchMoreReels();
   }
+  
+  Future<void> _fetchMoreReels() async {
+    // ‼️ SORUNLU KISIM BURADAYDI. BU KONTROL KALDIRILDI. ‼️
+    // `isLoading` kontrolü zaten bu fonksiyonu çağıran yerlerde yapılıyor.
+    // if (_isLoading || !_hasNextPage) { ... } // <-- BU BLOK SİLİNDİ.
 
-  // Bu fonksiyon ses oynatmayı durduracak.
-  Future<void> stopAudio() async {
-    // --- BURAYA SESİ DURDURMA KODU GELECEK ---
-    // Örnek: await audioPlayer.stop();
+    // Sadece `hasNextPage` kontrolü kalabilir, bu mantıklı.
+    if (!_hasNextPage) {
+       print("⚠️ [PROVIDER] Yüklenecek başka sayfa yok, _fetchMoreReels iptal edildi.");
+       _isLoading = false; // Yüklemeyi bitir.
+       notifyListeners();
+       return;
+    }
+    
+    // Bu satır da gereksizdi, çünkü çağıran fonksiyon zaten _isLoading'ı yönetiyor.
+    // _isLoading = true; 
 
-    playingReelId = null;
-    notifyListeners();
-    print("Audio stopped.");
-  }
+    print("🔄 [PROVIDER] _fetchMoreReels() çalışıyor, API'den veri çekilecek...");
 
-  Future<void> _delayedTrack() async {
-    final captured = currentIndex;
-    await Future.delayed(const Duration(seconds: 3));
-    if (captured == currentIndex && reels.isNotEmpty) {
-      final reel = reels[currentIndex];
-      api.trackView(
-        reelId: reel.id,
-        durationMs: 3000,
-        completed: false,
-        category: reel.category,
-      );
+    try {
+      final response = await _apiService.getFeed(cursor: _nextCursor);
+      
+      print("✅ [PROVIDER] API'den yanıt alındı. ${response.reels.length} adet yeni reel geldi. hasNext: ${response.pagination.hasNext}");
+
+      _reels.addAll(response.reels);
+      _hasNextPage = response.pagination.hasNext;
+      _nextCursor = response.pagination.nextCursor;
+
+    } catch (e, stacktrace) {
+      print("❌❌❌ [PROVIDER] KRİTİK HATA: API'den veri çekilemedi! ❌❌❌");
+      print("Hata Mesajı: $e");
+      print("Hata Detayı (Stacktrace): $stacktrace");
+      _hasNextPage = false; 
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
+   void onPageChanged(int index) {
+    _currentPageIndex = index;
+    
+    if (_reels.isNotEmpty && index < _reels.length) {
+      playAudio(_reels[index]);
+    }
+    
+    // Buradaki `!_isLoading` kontrolü sayesinde `_fetchMoreReels` tekrar tekrar çağrılmaz.
+    if (index >= _reels.length - 2 && _hasNextPage && !_isLoading) {
+      print(" приближаемся к концу списка, загружаем еще...");
+      _fetchMoreReels();
+    }
+  }
+
+  Future<void> playAudio(Reel reel) async {
+    if (_playingReelId == reel.id) {
+      await _audioPlayer.stop();
+      _playingReelId = null;
+    } else {
+      if (_audioPlayer.state == PlayerState.playing) {
+        await _audioPlayer.stop();
+      }
+      await _audioPlayer.play(UrlSource(reel.audioUrl));
+      _playingReelId = reel.id;
+    }
+    notifyListeners();
+  }
+
+  void setOverlay(bool isOpen) {
+    if (_overlayOpen == isOpen) return;
+    _overlayOpen = isOpen;
+
+    if (_overlayOpen) {
+      if (_audioPlayer.state == PlayerState.playing) {
+        _audioPlayer.pause();
+      }
+    } else {
+       if (_audioPlayer.state == PlayerState.paused) {
+        _audioPlayer.resume();
+      }
+    }
+    notifyListeners();
+  }
+  
   @override
   void dispose() {
-    // _tts.stop(); // TTS durdurma kaldırıldı.
-    // Eğer ses oynatıcı kullanıyorsanız, burada temizlenmesi gerekir.
-    // Örnek: audioPlayer.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 }
