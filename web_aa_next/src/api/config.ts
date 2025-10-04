@@ -15,7 +15,13 @@ export const API_CONFIG = {
       DETAIL: '/api/articles'
     },
     AUTH: {
-      LOGIN: '/api/auth/login'
+      LOGIN: '/api/auth/login',
+      REGISTER: '/api/auth/register',
+      ME: '/api/auth/me',
+      LOGOUT: '/api/auth/logout',
+      CHANGE_PASSWORD: '/api/auth/change-password',
+      CHECK_EMAIL: '/api/auth/check-email',
+      CHECK_USERNAME: '/api/auth/check-username'
     }
   },
   DEFAULT_TIMEOUT: 10000
