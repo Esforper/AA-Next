@@ -1,3 +1,8 @@
+AUTH SİSTEMİ
+src/endpoints/auth.py -> apiler
+
+
+
 . Dependencies (Middleware) 🔐
 
 ✅ get_current_user() - Token validation
