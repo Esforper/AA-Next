@@ -1,99 +1,120 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../models/reel_model.dart';
-import '../pages/news_detail_page.dart';
+import 'package:provider/provider.dart';
 
-class ReelCard extends StatelessWidget {
-  const ReelCard({super.key, required this.reel});
+import '../models/reel_model.dart';
+import '../providers/reels_provider.dart';
+import 'image_carousel.dart';
+import 'read_button.dart';
+import 'emoji_panel.dart';
+import 'article_overlay.dart';
+import 'voice_button.dart';
+
+class ReelCard extends StatefulWidget {
   final Reel reel;
+  const ReelCard({super.key, required this.reel});
+
+  @override
+  State<ReelCard> createState() => _ReelCardState();
+}
+
+class _ReelCardState extends State<ReelCard>
+    with AutomaticKeepAliveClientMixin {
+  bool showEmojis = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 10,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Container(
-        color: Colors.black,
-        child: Column(
-          children: [
-            // Üst: popup bar için boşluk (ileride ikon koymak istersin)
-            const SizedBox(height: 44),
+    super.build(context);
+    final p = context.watch<ReelsProvider>();
+    final speaking = p.speakingReelId == widget.reel.id;
 
-            // Orta: Görsel (16:9)
-            if (reel.imageUrl.isNotEmpty)
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: CachedNetworkImage(
-                  imageUrl: reel.imageUrl,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      const Center(child: CircularProgressIndicator()),
-                  errorWidget: (_, __, ___) =>
-                      const Center(child: Icon(Icons.broken_image)),
-                ),
-              )
-            else
-              const SizedBox(height: 12),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _buildContent(context),
+        Positioned(
+          left: 12,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: VoiceButton(
+              speaking: speaking,
+              onToggle: () => p.speakSummary(widget.reel),
+            ),
+          ),
+        ),
+        EmojiPanel(
+          visible: showEmojis,
+          onPick: (emoji) {
+            setState(() => showEmojis = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Tepki gönderildi: $emoji')),
+            );
+          },
+        ),
+        Positioned.fill(
+          child: ArticleOverlay(
+            open: p.overlayOpen,
+            content: widget.reel.fullContent,
+            onClose: () => p.setOverlay(false),
+          ),
+        ),
+      ],
+    );
+  }
 
-            // Alt: Başlık + Özet + Devamını Oku
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      reel.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: Text(
-                          reel.summary,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => NewsDetailPage(reel: reel),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text('Devamını Oku'),
-                      ),
-                    ),
-                  ],
+  Widget _buildContent(BuildContext context) {
+    final p = context.read<ReelsProvider>();
+    return Column(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
+            child: ImageCarousel(
+              images: widget.reel.images,
+              mainImage: widget.reel.mainImage,
+            ),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          color: Colors.black,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.reel.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                widget.reel.summary,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white.withOpacity(.9)),
+              ),
+              const SizedBox(height: 10),
+              ReadButton(
+                onOpenOverlay: () => p.setOverlay(true),
+                onRevealEmojis: () => setState(() => showEmojis = true),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
