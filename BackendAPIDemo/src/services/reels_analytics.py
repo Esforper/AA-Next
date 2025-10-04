@@ -388,10 +388,9 @@ class ReelsAnalyticsService:
     
     async def track_reel_view(self, user_id: str, request: TrackViewRequest) -> TrackViewResponse:
         """
-        Reel izleme kaydı oluştur ve tüm istatistikleri güncelle
+        Reel izleme kaydı oluştur (UPDATED: emoji + detail support)
         """
         try:
-            # Reel'in var olup olmadığını kontrol et
             reel = await self.get_reel_by_id(request.reel_id)
             if not reel:
                 return TrackViewResponse(
@@ -399,7 +398,7 @@ class ReelsAnalyticsService:
                     message=f"Reel not found: {request.reel_id}"
                 )
             
-            # View kaydı oluştur
+            # View kaydı oluştur (UPDATED)
             view = ReelView(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
@@ -407,19 +406,50 @@ class ReelsAnalyticsService:
                 duration_ms=request.duration_ms,
                 status=ViewStatus.COMPLETED if request.completed else ViewStatus.PARTIAL,
                 category=request.category or reel.news_data.category,
-                session_id=request.session_id
+                session_id=request.session_id,
+                
+                # 🆕 NEW: Emoji reaction
+                emoji_reaction=request.emoji_reaction,
+                emoji_timestamp=datetime.now() if request.emoji_reaction else None,
+                
+                # 🆕 NEW: Extra signals
+                paused_count=request.paused_count or 0,
+                replayed=request.replayed or False,
+                shared=request.shared or False,
+                saved=request.saved or False
             )
             
             # Storage'a kaydet
             self.view_storage[user_id].append(view)
             
-            # Response oluştur
+            # 🆕 Reel analytics güncelle (emoji count)
+            if request.reel_id in self.reel_analytics:
+                analytics = self.reel_analytics[request.reel_id]
+                
+                # Total views
+                analytics.total_views += 1
+                
+                # Emoji tracking
+                if request.emoji_reaction:
+                    analytics.total_emoji_reactions += 1
+                    emoji_str = request.emoji_reaction.value
+                    if emoji_str not in analytics.emoji_breakdown:
+                        analytics.emoji_breakdown[emoji_str] = 0
+                    analytics.emoji_breakdown[emoji_str] += 1
+                    
+                    # Emoji rate
+                    analytics.emoji_rate = analytics.total_emoji_reactions / analytics.total_views
+            
+            # Response
             response = TrackViewResponse(
                 success=True,
                 message="View tracked successfully",
                 view_id=view.id,
                 meaningful_view=view.is_meaningful_view()
             )
+            
+            # Persist
+            self._save_persistent_data()
             
             return response
             
@@ -539,6 +569,159 @@ class ReelsAnalyticsService:
                 pagination=FeedPagination(),
                 feed_metadata=FeedMetadata()
             )
+    
+    
+    
+    async def get_user_watch_history(
+        self,
+        user_id: str,
+        limit: int = 50,
+        min_engagement: float = 0.0
+    ) -> List[Dict]:
+        """
+        Kullanıcının izleme geçmişini al (NLP için)
+        
+        Args:
+            user_id: Kullanıcı ID
+            limit: Maksimum kayıt sayısı
+            min_engagement: Minimum engagement skoru (0-1.5)
+        
+        Returns:
+            List of watch history with reel info
+            [{
+                "reel_id": "...",
+                "reel_title": "...",
+                "reel_summary": "...",
+                "category": "...",
+                "engagement_score": 0.8,
+                "watched_at": datetime,
+                "completed": bool
+            }, ...]
+        """
+        try:
+            if user_id not in self.view_storage:
+                return []
+            
+            # Kullanıcının tüm view'ları
+            all_views = self.view_storage[user_id]
+            
+            # Filtrele: min_engagement'tan yüksek olanlar
+            filtered_views = [
+                v for v in all_views
+                if v.get_engagement_score() >= min_engagement
+            ]
+            
+            # Tarihe göre sırala (yeniden eskiye)
+            filtered_views.sort(key=lambda v: v.viewed_at, reverse=True)
+            
+            # Limit uygula
+            filtered_views = filtered_views[:limit]
+            
+            # Reel bilgilerini ekle
+            history = []
+            for view in filtered_views:
+                reel = await self.get_reel_by_id(view.reel_id)
+                if reel:
+                    history.append({
+                        "reel_id": view.reel_id,
+                        "reel_title": reel.news_data.title,
+                        "reel_summary": reel.news_data.summary,
+                        "category": reel.news_data.category,
+                        "keywords": reel.news_data.keywords,
+                        "engagement_score": view.get_engagement_score(),
+                        "watched_at": view.viewed_at,
+                        "completed": view.status == ViewStatus.COMPLETED,
+                        "detail_viewed": view.detail_viewed
+                    })
+            
+            return history
+            
+        except Exception as e:
+            print(f"❌ Get watch history error: {e}")
+            return []    
+    
+    
+    async def track_detail_view(
+        self,
+        user_id: str,
+        detail_event: DetailViewEvent
+    ) -> Dict:
+        """
+        Detay okuma event'ini kaydet
+        
+        Args:
+            user_id: Kullanıcı ID
+            detail_event: DetailViewEvent instance
+        
+        Returns:
+            Success dict
+        """
+        try:
+            # Reel analytics'ini güncelle
+            reel_id = detail_event.reel_id
+            
+            if reel_id in self.reel_analytics:
+                analytics = self.reel_analytics[reel_id]
+                
+                # Detail view count artır
+                analytics.detail_view_count += 1
+                
+                # Average detail duration güncelle
+                if analytics.detail_view_count == 1:
+                    analytics.avg_detail_duration_ms = detail_event.read_duration_ms
+                else:
+                    # Running average
+                    total_duration = (analytics.avg_detail_duration_ms * 
+                                    (analytics.detail_view_count - 1) + 
+                                    detail_event.read_duration_ms)
+                    analytics.avg_detail_duration_ms = total_duration / analytics.detail_view_count
+                
+                # Detail view rate hesapla
+                if analytics.total_views > 0:
+                    analytics.detail_view_rate = analytics.detail_view_count / analytics.total_views
+            
+            # User daily stats güncelle
+            today = date.today()
+            date_str = today.isoformat()
+            
+            if user_id not in self.daily_progress:
+                self.daily_progress[user_id] = {}
+            
+            if date_str not in self.daily_progress[user_id]:
+                await self.get_user_daily_progress(user_id, today)
+            
+            progress = self.daily_progress[user_id][date_str]
+            
+            # User daily stats'a ekle (eğer varsa)
+            # UserDailyStats içinde detail_views field'i var
+            # Bu kısmı implement etmek için UserDailyStats tracking'e entegre etmen gerekir
+            
+            # Persist
+            self._save_persistent_data()
+            
+            return {
+                "success": True,
+                "detail_view_recorded": True,
+                "meaningful_read": detail_event.is_meaningful_read()
+            }
+            
+        except Exception as e:
+            print(f"❌ Track detail view error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     # ============ HELPER METHODS ============
     # src/services/reels_analytics.py içindeki _generate_algorithmic_feed metodunu GÜNCELLE:
