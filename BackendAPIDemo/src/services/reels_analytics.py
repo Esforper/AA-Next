@@ -284,36 +284,39 @@ class ReelsAnalyticsService:
     
     # ============ REEL MANAGEMENT METHODS (Enhanced with cache invalidation) ============
     
-    async def create_reel_from_article(self, article: Article, audio_url: str, 
-                                     duration_seconds: int, file_size_mb: float,
-                                     voice_used: str = "alloy", estimated_cost: float = 0.0) -> ReelFeedItem:
+    async def create_reel_from_article(
+        self,
+        article: Article,
+        audio_url: str,
+        duration_seconds: int,
+        file_size_mb: float,
+        voice_used: str = "alloy",
+        estimated_cost: float = 0.0
+    ) -> ReelFeedItem:
         """
-        Article'dan ReelFeedItem oluştur ve persist et
-        ENHANCED: Cache invalidation added
+        ✅ UPDATED: Article'dan ReelFeedItem oluştur
         """
         try:
-            # Unique reel ID oluştur
-            reel_id = f"aa_{hashlib.md5(f'{article.url}{voice_used}'.encode()).hexdigest()[:12]}"
+            reel_id = f"reel_{hashlib.md5(article.url.encode()).hexdigest()[:12]}"
             
-            # Article'dan NewsData oluştur
+            # ✅ UPDATED: NewsData oluştur - full_content List[str] olarak
             news_data = NewsData(
                 title=article.title,
-                summary=article.summary or article.content[:200] + "...",
-                full_content=article.content,
-                url=article.url,
+                summary=article.summary or "",
+                full_content=article.content_paragraphs,  # ✅ List[str] property kullan
+                url=str(article.url),
                 category=article.category,
                 author=article.author,
                 location=article.location,
                 published_date=article.published_at.isoformat() if article.published_at else datetime.now().isoformat(),
-                scraped_date=datetime.now().isoformat(),
                 main_image=article.main_image,
                 images=article.images,
+                videos=article.videos,
                 tags=article.tags,
-                keywords=article.tags,
-                meta_description=article.summary,
-                word_count=len(article.content.split()),
-                character_count=len(article.content),
-                estimated_reading_time=max(1, len(article.content.split()) // 200),
+                keywords=article.keywords,  # ✅ Yeni field
+                word_count=len(article.content_text.split()),  # ✅ content_text kullan
+                character_count=len(article.content_text),  # ✅ content_text kullan
+                estimated_reading_time=max(1, len(article.content_text.split()) // 200),
                 source=article.source or "aa"
             )
             
@@ -345,14 +348,14 @@ class ReelsAnalyticsService:
             # Analytics kaydı oluştur
             await self._initialize_reel_analytics(reel_id, reel)
             
-            # 🔥 NEW: Cache'leri invalidate et
+            # Cache'leri invalidate et
             self.invalidate_url_cache()
             self._invalidate_trending_cache()
             
             # Persist to file
             self._save_persistent_data()
             
-            print(f"✅ Reel created and saved: {reel_id} - {news_data.title[:50]}...")
+            print(f"✅ Reel created: {reel_id} - {news_data.title[:50]}...")
             return reel
             
         except Exception as e:

@@ -2,8 +2,8 @@
 # src/models/news.py
 # ================================
 
-from pydantic import BaseModel, Field, HttpUrl
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field, HttpUrl, computed_field
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 from .base import BaseResponse
@@ -20,13 +20,15 @@ class NewsCategory(str, Enum):
     TEKNOLOJI = "teknoloji"
     KULTUR = "kultur"
     DUNYA = "dunya"
-    # Yeni kategori eklemek için buraya ekle
 
 class Article(BaseModel):
     """Universal article model - tüm news provider'lar için"""
     id: str
     title: str
-    content: str
+    
+    # ✅ UPDATED: content artık str veya List[str] olabilir
+    content: Union[str, List[str]]  
+    
     summary: Optional[str] = None
     url: HttpUrl
     category: str
@@ -42,8 +44,12 @@ class Article(BaseModel):
     main_image: Optional[str] = None
     videos: List[str] = []
     
-    # Metadata
+    # ✅ UPDATED: aa_scraper'dan gelen yeni alanlar
     tags: List[str] = []
+    keywords: List[str] = Field(default_factory=list, description="Meta keywords + content'ten çıkarılan kelimeler")
+    hashtags: List[str] = Field(default_factory=list, description="Content'ten çıkarılan hashtag'ler")
+    meta_description: Optional[str] = Field(None, description="SEO meta açıklama")
+    
     source: Optional[str] = None
     language: str = "tr"
     status: ArticleStatus = ArticleStatus.PUBLISHED
@@ -51,10 +57,34 @@ class Article(BaseModel):
     # Processing info
     character_count: Optional[int] = None
     reading_time_minutes: Optional[int] = None
-    sentiment_score: Optional[float] = None  # -1 to 1
+    sentiment_score: Optional[float] = None
     
     # Extensible metadata
     metadata: Dict[str, Any] = {}
+    
+    # ✅ COMPUTED PROPERTY: Geriye dönük uyumluluk için
+    @computed_field
+    @property
+    def content_text(self) -> str:
+        """
+        Content'i her zaman str olarak döndür
+        Eski kodlarla uyumluluk için
+        """
+        if isinstance(self.content, list):
+            return '\n\n'.join(self.content)
+        return self.content
+    
+    # ✅ COMPUTED PROPERTY: Paragraf listesi
+    @computed_field
+    @property
+    def content_paragraphs(self) -> List[str]:
+        """
+        Content'i her zaman List[str] olarak döndür
+        """
+        if isinstance(self.content, list):
+            return self.content
+        # Eğer str ise, çift newline'a göre split et
+        return [p.strip() for p in self.content.split('\n\n') if p.strip()]
     
     def to_tts_content(self) -> str:
         """Convert article to TTS-optimized content"""
@@ -66,13 +96,13 @@ class Article(BaseModel):
         if self.summary:
             parts.append(f"Özet: {self.summary}")
         elif self.content:
-            # İlk 500 karakter
-            parts.append(self.content[:500])
+            # İlk 500 karakter (content_text kullan)
+            parts.append(self.content_text[:500])
         return "\n\n".join(parts)
     
     def calculate_reading_time(self) -> int:
         """Calculate reading time in minutes (avg 200 words/min)"""
-        word_count = len(self.content.split())
+        word_count = len(self.content_text.split())
         return max(1, round(word_count / 200))
 
 class NewsFilter(BaseModel):

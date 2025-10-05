@@ -182,7 +182,7 @@ class ProcessingService:
                     tts_text += f". {article.summary}"
                 else:
                     # Özet yoksa içerikten ilk 150 karakter al
-                    content_preview = article.content[:150].strip()
+                    content_preview = article.content_text[:150].strip()
                     if content_preview:
                         tts_text += f". {content_preview}..."
             else:
@@ -192,8 +192,8 @@ class ProcessingService:
             # TTS için ideal uzunluk kontrolü (15-45 saniye arası)
             if len(tts_text) < 30:
                 # Çok kısa, biraz daha içerik ekle
-                if article.content and len(article.content) > 100:
-                    additional_content = article.content[:100].strip()
+                if article.content_paragraphs and len(article.content_paragraphs) > 0:
+                    additional_content = article.content_paragraphs[0][:100].strip()
                     tts_text += f" {additional_content}..."
             
             # TTS request oluştur
@@ -384,7 +384,7 @@ class ProcessingService:
             # Filtreleme
             suitable_articles = []
             for article in news_response.articles:
-                content_length = len(article.title + (article.summary or "") + article.content)
+                content_length = len(article.title + (article.summary or "") + article.content_text)
                 if content_length >= min_chars:
                     suitable_articles.append(article)
                     if len(suitable_articles) >= count:
