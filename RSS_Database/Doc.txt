@@ -1,0 +1,70 @@
+AA HABER İŞLEME PİPELINE - KULLANIM KILAVUZU
+================================================
+
+SIRA 1: KATEGORİZE ETME
+-----------------------
+Script: categorize_news_by_url.py
+Input: aa_news_scraped_last.json
+Output: aa_news_categorized.json
+İşlev: Haberleri URL'den çıkardığı kategorilere göre gruplar
+Kullanım: python categorize_news_by_url.py
+
+SIRA 2: FİLTRELEME VE SEÇME
+---------------------------
+Script: filter_and_select_news.py
+Input: aa_news_categorized.json
+Output: aa_news_selected_with_keywords.json
+İşlev: 
+  - 100+ haber olan kategorilerden 20'şer seçer (son 3 gün)
+  - Tüm keywords toplar
+  - Her keyword için ilgili haberleri eşleştirir
+Kullanım: python filter_and_select_news.py
+
+SIRA 3: RESİM SCRAPING
+----------------------
+Script: scrape_missing_images.py
+Input: aa_news_selected_with_keywords.json (veya aa_news_final_data.json)
+Output: aa_news_final_data.json
+İşlev: Resmi olmayan haberlerin linklerine gidip resimleri scrape eder
+Kullanım: python scrape_missing_images.py
+Not: Kaldığı yerden devam eder, tekrar çalıştırılabilir
+
+SIRA 4: REELS FORMATINA ÇEVIRME
+-------------------------------
+Script: transform_to_reels_format.py
+Input: aa_news_final_data.json
+Output: reels_data_ready_for_tts.json
+İşlev: Haberleri BackendAPIDemo reels formatına dönüştürür (TTS null)
+Kullanım: python transform_to_reels_format.py
+
+SIRA 5: TTS OLUŞTURMA
+---------------------
+Script: generate_tts_for_reels.py
+Input: reels_data_ready_for_tts.json
+Output: 
+  - reels_data_ready_for_tts_with_tts.json
+  - audio_output/ klasöründe mp3 dosyaları
+İşlev: Başlık+özeti OpenAI TTS ile sese çevirir (200 reel)
+Kullanım: python generate_tts_for_reels.py reels_data_ready_for_tts.json 200 nova
+Gereksinim: 
+  - pip install python-dotenv
+  - BackendAPIDemo/.env dosyasında OPENAI_API_KEY
+Model: gpt-4o-mini-tts (en ucuz)
+Maliyet: ~$0.30 (200 reel)
+
+SIRA 6: BACKEND'E KOPYALAMA
+---------------------------
+Komut 1: cp reels_data_ready_for_tts_with_tts.json BackendAPIDemo/outputs/reels_data.json
+Komut 2: cp -r audio_output/* BackendAPIDemo/outputs/audio/
+
+YARDIMCI SCRIPTLER
+------------------
+news_data_analyzer.py - aa_news_scraped_last.json'u analiz eder (isteğe bağlı)
+description_parser_v2.py - Description field parsing test (kullanılmıyor)
+
+NOTLAR
+------
+- Her script kaldığı yerden devam edebilir (null kontrolleri var)
+- TTS script'i sadece audio_url null olanları işler
+- Resim scraping 0.5s rate limit ile çalışır
+- 200 reel = ~$0.30 maliyet
