@@ -20,11 +20,35 @@ export const ReelItem: React.FC<ReelItemProps> = ({
   className,
   style
 }) => {
-  // Get first sentence from content
-  const getFirstSentence = (content: string) => {
-    const sentences = content.split(/[.!?]+/);
-    return sentences[0]?.trim() || content.substring(0, 100) + '...';
+  // Get first sentence from content (guards against non-string inputs)
+  const getFirstSentence = (content: unknown) => {
+    if (content == null) return '';
+    let text: string;
+    if (typeof content === 'string') {
+      text = content;
+    } else if (Array.isArray(content)) {
+      // Join array items with space
+      text = content.map((item) => (typeof item === 'string' ? item : String(item))).join(' ');
+    } else if (typeof content === 'object') {
+      // Try common fields, fallback to stringified object
+      const anyContent: any = content as any;
+      text =
+        (typeof anyContent.text === 'string' && anyContent.text) ||
+        (typeof anyContent.content === 'string' && anyContent.content) ||
+        String(anyContent);
+    } else {
+      text = String(content);
+    }
+
+    const sentences = text.split(/[.!?]+/);
+    const first = sentences[0]?.trim();
+    return first && first.length > 0 ? first : (text.substring(0, 100) + '...');
   };
+
+  // Title overlay sizing for transparent-text white panel under image
+  const titleOverlayText = (reel.title || '').trim();
+  const overlayWidth = Math.min(Math.max(titleOverlayText.length * 13 + 32, 200), 820);
+  const overlayHeight = 52;
 
   return (
     <div
@@ -79,10 +103,30 @@ export const ReelItem: React.FC<ReelItemProps> = ({
           
           {/* Cinematic Vignette for Bleed Effect */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/20" />
+
+          {/* Transparent-text white panel under image edge */}
+          {titleOverlayText && (
+            <svg
+              className="absolute left-4 z-50"
+              style={{ bottom: '-10px' }}
+              width={overlayWidth}
+              height={overlayHeight}
+              viewBox={`0 0 ${overlayWidth} ${overlayHeight}`}
+              aria-hidden="true"
+            >
+              <defs>
+                <mask id={`title-overlay-mask-${reel.id}`}>
+                  <rect x="0" y="0" width={overlayWidth} height={overlayHeight} fill="white" rx="14" ry="14" />
+                  <text x="12" y={overlayHeight - 14} fontSize="22" fontWeight="800" fill="black">{titleOverlayText}</text>
+                </mask>
+              </defs>
+              <rect x="0" y="0" width={overlayWidth} height={overlayHeight} rx="14" ry="14" fill="rgba(255,255,255,0.95)" mask={`url(#title-overlay-mask-${reel.id})`} />
+            </svg>
+          )}
         </div>
         
         {/* Category Badge - Top Left */}
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4 z-10">
           <span className="px-3 py-1.5 text-sm font-bold bg-white/20 text-white rounded-full shadow-xl backdrop-blur-lg border border-white/30">
             {reel.category}
           </span>

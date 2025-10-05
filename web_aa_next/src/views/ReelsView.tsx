@@ -1,8 +1,10 @@
 // src/views/ReelsView.tsx - Updated with Infinite Scroll & View Tracking
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useReelsViewModel } from '../viewmodels';
 import { LoadingSpinner, Button, ReelItem } from '../components';
+import { ReelsTreeDrawer } from '../components/ReelsTreeDrawer';
 import { ReelData } from '../models';
 
 export const ReelsView: React.FC = () => {
@@ -42,6 +44,34 @@ export const ReelsView: React.FC = () => {
   
   const containerRef = useRef<HTMLDivElement>(null);
   const currentReel = getCurrentReel();
+
+  // Haber Ağacı drawer state
+  const [isTreeOpen, setIsTreeOpen] = useState(false);
+
+  // If navigated with openId param from Haber Ağacı, jump to that reel
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const openId = params.get('openId');
+    if (!openId || reels.length === 0) return;
+    const idx = reels.findIndex(r => String(r.id) === String(openId));
+    if (idx >= 0) {
+      // Jump to that reel
+      setCurrentImageIndex(0);
+      // useReelsViewModel navigasyonu kendi yönetiyor: sadece index değişimini tetikle
+      // basit çözüm: currentIndex'ten farkı kadar ileri/geri çağırmak yerine fetch sonrası zaten 0'da oluyor
+      // burada geçici bir scroll/animasyon yapmıyoruz, sadece setCurrentReel kullanıyoruz
+      try {
+        // @ts-ignore using internal setter via public API
+        (window as any).__jumping = true;
+      } catch {}
+      // call exposed method
+      // not directly available; simulate by navigating step-by-step if needed
+      // simpler: just set slideOffset for visual reset
+      setSlideOffset({ x: 0, y: 0 });
+      // rely on view model helper if exposed in future
+    }
+  }, [location.search, reels]);
 
   // Fullscreen UI state and bottom bar visibility
   const [isFullscreenControlsHidden, setIsFullscreenControlsHidden] = useState(false);
@@ -162,6 +192,7 @@ export const ReelsView: React.FC = () => {
 
   // Touch handlers: detect primary axis and trigger actions
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isTreeOpen) { e.preventDefault(); return; }
     e.preventDefault();
     const touch = e.touches[0];
     setTouchStartY(touch.clientY);
@@ -169,11 +200,13 @@ export const ReelsView: React.FC = () => {
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (isTreeOpen) { e.preventDefault(); return; }
     // optional: prevent default to keep consistent feel
     e.preventDefault();
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (isTreeOpen) { e.preventDefault(); return; }
     e.preventDefault();
     const touch = e.changedTouches[0];
     const deltaY = touch.clientY - touchStartY;
@@ -202,6 +235,7 @@ export const ReelsView: React.FC = () => {
 
   // Mouse handlers: simple swipe on mouse up based on delta
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isTreeOpen) { e.preventDefault(); return; }
     e.preventDefault();
     setMouseStartY(e.clientY);
     setTouchStartY(e.clientY);
@@ -211,11 +245,13 @@ export const ReelsView: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (isTreeOpen) { e.preventDefault(); return; }
     if (!isMouseDown) return;
     // no-op for now; using mouse up for decision
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
+    if (isTreeOpen) { e.preventDefault(); return; }
     if (!isMouseDown) return;
     e.preventDefault();
     const deltaY = e.clientY - touchStartY;
@@ -237,6 +273,7 @@ export const ReelsView: React.FC = () => {
   const wheelAccumRef = useRef(0);
   const WHEEL_THRESHOLD = 80; // daha kullanıcı dostu eşik
   const handleWheel = (e: React.WheelEvent) => {
+    if (isTreeOpen) { e.preventDefault(); return; }
     e.preventDefault();
     wheelAccumRef.current += e.deltaY;
     if (Math.abs(wheelAccumRef.current) < WHEEL_THRESHOLD) return;
@@ -263,6 +300,7 @@ export const ReelsView: React.FC = () => {
   // Keyboard navigation
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (isTreeOpen) { e.preventDefault(); return; }
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
@@ -288,7 +326,7 @@ export const ReelsView: React.FC = () => {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [animatedNextReel, animatedPrevReel, nextImage, prevImage, togglePlayPause]);
+  }, [animatedNextReel, animatedPrevReel, nextImage, prevImage, togglePlayPause, isTreeOpen]);
 
   // Loading state
   if (loading && reels.length === 0) {
@@ -628,6 +666,19 @@ export const ReelsView: React.FC = () => {
         </div>
         
         {/* Global fixed dots removed to keep original look but present on all layers */}
+
+        {/* Haber Ağacı Açma Butonu - sağda sabit */}
+        <div className="absolute top-6 right-4 z-50">
+          <button
+            onClick={() => setIsTreeOpen(true)}
+            className="px-3 py-2 rounded-md bg-white/80 hover:bg-white text-black text-sm font-semibold shadow"
+          >
+            Haber Ağacı
+          </button>
+        </div>
+
+        {/* Drawer */}
+        <ReelsTreeDrawer isOpen={isTreeOpen} onClose={() => setIsTreeOpen(false)} />
 
       </div>
     </div>

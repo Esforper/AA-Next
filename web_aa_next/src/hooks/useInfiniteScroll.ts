@@ -79,7 +79,7 @@ const USER_ID = 'web_user_' + Math.random().toString(36).substr(2, 9); // Genera
 
 export const useInfiniteScroll = (
   initialLimit: number = 20,
-  preloadThreshold: number = 3 // Load more when 3 reels left before end
+  preloadThreshold: number = 2 // Only prefetch up to 2 items ahead
 ): UseInfiniteScrollReturn => {
   
   // State
@@ -97,6 +97,8 @@ export const useInfiniteScroll = (
   const isLoadingRef = useRef(false);
   const controllerRef = useRef<AbortController | null>(null);
   const lastLoadAtRef = useRef<number>(0);
+  const consecutiveEmptyRef = useRef<number>(0);
+  const lastCursorRef = useRef<string | null>(null);
 
   // Simple SWR-like cache for the first page
   const cacheRef = useRef<{
@@ -106,6 +108,7 @@ export const useInfiniteScroll = (
 
   const STALE_MS = 60_000; // 60s stale-while-revalidate
   const LOAD_THROTTLE_MS = 800; // min interval between loadMore calls
+  const MAX_CONSECUTIVE_EMPTY = 3; // stop after 3 empty/no-progress fetches
   
   const fetchReels = useCallback(async (isRefresh: boolean = false): Promise<void> => {
     // Prevent duplicate calls
@@ -221,9 +224,15 @@ export const useInfiniteScroll = (
         setCurrentIndex(0);
         // Cache first page
         cacheRef.current = { ts: Date.now(), data };
+        consecutiveEmptyRef.current = 0;
       } else {
         // Append new reels
         setReels(prev => [...prev, ...convertedReels]);
+        if (convertedReels.length === 0) {
+          consecutiveEmptyRef.current += 1;
+        } else {
+          consecutiveEmptyRef.current = 0;
+        }
       }
       
       // Update pagination state
@@ -231,6 +240,19 @@ export const useInfiniteScroll = (
       setHasMore(data.pagination.has_next);
       setTotalAvailable(data.pagination.total_available);
       setFeedMetadata(data.feed_metadata);
+
+      // Stop further requests if no progress is possible
+      const cursorUnchanged = lastCursorRef.current === (data.pagination.next_cursor || null);
+      lastCursorRef.current = data.pagination.next_cursor || null;
+      if (!isRefresh) {
+        if (convertedReels.length === 0 && (!data.pagination.has_next || cursorUnchanged)) {
+          setHasMore(false);
+        }
+        if (consecutiveEmptyRef.current >= MAX_CONSECUTIVE_EMPTY) {
+          console.warn('🛑 Stopping further loads due to consecutive empty responses');
+          setHasMore(false);
+        }
+      }
       
     } catch (err) {
       console.error('Failed to fetch reels:', err);
@@ -291,6 +313,11 @@ export const useInfiniteScroll = (
       console.log(`⏭️ Skip loadMore: hasMore=${hasMore}, isLoading=${isLoadingRef.current}`);
       return;
     }
+    // Only prefetch when within preloadThreshold of the end
+    const distanceToEnd = reels.length - currentIndex - 1;
+    if (distanceToEnd > preloadThreshold) {
+      return;
+    }
     // Throttle rapid loadMore calls
     const now = Date.now();
     if (now - lastLoadAtRef.current < LOAD_THROTTLE_MS) {
@@ -301,7 +328,7 @@ export const useInfiniteScroll = (
 
     console.log('📥 Loading more reels...');
     await fetchReels(false);
-  }, [hasMore, fetchReels]);
+  }, [hasMore, fetchReels, reels.length, currentIndex, preloadThreshold]);
   
   const refreshFeed = useCallback(async (): Promise<void> => {
     console.log('🔄 Refreshing feed...');
