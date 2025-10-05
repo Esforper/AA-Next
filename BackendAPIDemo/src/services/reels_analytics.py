@@ -297,7 +297,7 @@ class ReelsAnalyticsService:
         ✅ UPDATED: Article'dan ReelFeedItem oluştur
         """
         try:
-            reel_id = f"reel_{hashlib.md5(article.url.encode()).hexdigest()[:12]}"
+            reel_id = f"reel_{hashlib.md5(str(article.url).encode()).hexdigest()[:12]}"
             
             # ✅ UPDATED: NewsData oluştur - full_content List[str] olarak
             news_data = NewsData(
