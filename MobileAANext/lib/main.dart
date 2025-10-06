@@ -1,23 +1,35 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:audio_session/audio_session.dart';
+import 'package:provider/provider.dart';
+
+import 'providers/reels_provider.dart';
 import 'pages/reels_feed_page.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final session = await AudioSession.instance;
-  await session.configure(const AudioSessionConfiguration.speech());
-  runApp(const MyApp());
+  runApp(const AanextApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class AanextApp extends StatelessWidget {
+  const AanextApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Reels',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
-      home: const ReelsFeedPage(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<ReelsProvider>(
+          create: (_) => ReelsProvider()..loadReels(),
+        ),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'AA-Next Reels',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+          useMaterial3: true,
+        ),
+        home: const ReelsFeedPage(),
+      ),
     );
   }
 }

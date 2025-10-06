@@ -1,68 +1,59 @@
 import 'package:flutter/material.dart';
 
+/// Yukarı çekince açılan okuma barı (sheet).
 class ArticleOverlay extends StatelessWidget {
-  final bool open;
-  final String content;
+  final String title;
+  final String body;
   final VoidCallback onClose;
+
   const ArticleOverlay({
     super.key,
-    required this.open,
-    required this.content,
+    required this.title,
+    required this.body,
     required this.onClose,
   });
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: !open,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 180),
-        opacity: open ? 1 : 0,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: ColoredBox(color: Colors.black.withOpacity(.45)),
-            ),
-            Positioned.fill(
-              child: DraggableScrollableSheet(
-                initialChildSize: .35,
-                minChildSize: .2,
-                maxChildSize: .95,
-                builder: (_, ctrl) => Material(
-                  color: Colors.white,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: Column(
-                    children: [
-                      Container(
-                        height: 5,
-                        width: 44,
-                        margin: const EdgeInsets.only(top: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      ),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          controller: ctrl,
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            content,
-                            style: const TextStyle(fontSize: 16, height: 1.45),
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                          onPressed: onClose, child: const Text('Kapat')),
-                    ],
+    return DraggableScrollableSheet(
+      initialChildSize: 0.22,
+      minChildSize: 0.15,
+      maxChildSize: 0.95,
+      snap: true,
+      builder: (context, scrollCtrl) {
+        return Material(
+          elevation: 12,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(12))),
+                ListTile(
+                  title: Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                  trailing: IconButton(
+                      icon: const Icon(Icons.close), onPressed: onClose),
+                ),
+                const Divider(height: 0),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    child: Text(body, style: const TextStyle(height: 1.35)),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
