@@ -49,8 +49,37 @@ export const useReelsViewModel = (): ReelsViewModel => {
     loadMore: loadMoreReels,
     refreshFeed: refreshInfiniteFeed,
     goToNext: goToNextReel,
-    goToPrev: goToPrevReel
+    goToPrev: goToPrevReel,
+    goToIndex
   } = useInfiniteScroll(20, 3); // Load 20, preload when 3 left
+
+  // Expose goToIndex to window for embed/openId jumps (scoped to this instance)
+  useEffect(() => {
+    (window as any).__goToIndex = (idx: number) => {
+      try {
+        // Clamp and update
+        const clamped = Math.max(0, Math.min(idx, reels.length - 1));
+        if (clamped !== currentIndex) {
+          // move index via internal helpers
+          if (clamped > currentIndex) {
+            // step forward
+            for (let i = currentIndex; i < clamped; i++) {
+              goToNextReel();
+            }
+          } else {
+            for (let i = currentIndex; i > clamped; i--) {
+              goToPrevReel();
+            }
+          }
+        }
+      } catch {}
+    };
+    return () => {
+      if ((window as any).__goToIndex) {
+        try { delete (window as any).__goToIndex; } catch {}
+      }
+    };
+  }, [currentIndex, reels.length, goToNextReel, goToPrevReel]);
   
   // View tracking hook
   const {

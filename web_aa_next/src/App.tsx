@@ -58,13 +58,16 @@ const AppContent: React.FC = () => {
   };
 
   const isReels = location.pathname === '/reels';
-  // Don't show tab bar on news detail pages or race view; show on mobile even in Reels
+  const isEmbed = new URLSearchParams(location.search).get('embed') === '1';
+  // Don't show tab bar on news detail pages or race view; hide in embed mode
   const showTabBar = !location.pathname.startsWith('/news/') && 
-                     !location.pathname.startsWith('/race');
+                     !location.pathname.startsWith('/race') &&
+                     !isEmbed;
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
       {/* Top Navigation - Desktop/Web Only */}
+      {!isEmbed && (
       <div className="hidden sm:block shadow-lg sticky top-0 z-40" style={{ backgroundColor: '#005799' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 grid grid-cols-3 items-center">
           <div className="flex items-center">
@@ -115,6 +118,7 @@ const AppContent: React.FC = () => {
           <div />
         </div>
       </div>
+      )}
       {/* Main Content Area */}
       <div className={isReels ? 'pb-16 sm:pb-0 overflow-hidden' : 'pb-16 sm:pb-20'}>
         <Routes>

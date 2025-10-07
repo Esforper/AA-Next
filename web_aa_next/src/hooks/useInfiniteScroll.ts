@@ -69,6 +69,7 @@ interface UseInfiniteScrollReturn {
   refreshFeed: () => Promise<void>;
   goToNext: () => void;
   goToPrev: () => void;
+  goToIndex: (index: number) => void;
   
   // Internal state
   isLoadingMore: boolean;
@@ -352,6 +353,11 @@ export const useInfiniteScroll = (
     const prevIndex = Math.max(currentIndex - 1, 0);
     setCurrentIndex(prevIndex);
   }, [currentIndex]);
+
+  const goToIndex = useCallback((index: number): void => {
+    const clamped = Math.max(0, Math.min(index, reels.length - 1));
+    setCurrentIndex(clamped);
+  }, [reels.length]);
   
   return {
     // Data
@@ -371,6 +377,7 @@ export const useInfiniteScroll = (
     refreshFeed,
     goToNext,
     goToPrev,
+    goToIndex,
     
     // Internal state
     isLoadingMore

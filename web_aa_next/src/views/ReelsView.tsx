@@ -55,23 +55,16 @@ export const ReelsView: React.FC = () => {
     const openId = params.get('openId');
     if (!openId || reels.length === 0) return;
     const idx = reels.findIndex(r => String(r.id) === String(openId));
-    if (idx >= 0) {
-      // Jump to that reel
-      setCurrentImageIndex(0);
-      // useReelsViewModel navigasyonu kendi yönetiyor: sadece index değişimini tetikle
-      // basit çözüm: currentIndex'ten farkı kadar ileri/geri çağırmak yerine fetch sonrası zaten 0'da oluyor
-      // burada geçici bir scroll/animasyon yapmıyoruz, sadece setCurrentReel kullanıyoruz
+    if (idx >= 0 && idx !== currentReelIndex) {
+      // Jump to that reel by moving index
       try {
-        // @ts-ignore using internal setter via public API
-        (window as any).__jumping = true;
+        // Expose simple global to allow jump from view if VM doesn't expose directly
+        (window as any).__goToIndex?.(idx);
       } catch {}
-      // call exposed method
-      // not directly available; simulate by navigating step-by-step if needed
-      // simpler: just set slideOffset for visual reset
+      setCurrentImageIndex(0);
       setSlideOffset({ x: 0, y: 0 });
-      // rely on view model helper if exposed in future
     }
-  }, [location.search, reels]);
+  }, [location.search, reels, currentReelIndex]);
 
   // Fullscreen UI state and bottom bar visibility
   const [isFullscreenControlsHidden, setIsFullscreenControlsHidden] = useState(false);
@@ -667,15 +660,17 @@ export const ReelsView: React.FC = () => {
         
         {/* Global fixed dots removed to keep original look but present on all layers */}
 
-        {/* Haber Ağacı Açma Butonu - sağda sabit */}
-        <div className="absolute top-6 right-4 z-50">
-          <button
-            onClick={() => setIsTreeOpen(true)}
-            className="px-3 py-2 rounded-md bg-white/80 hover:bg-white text-black text-sm font-semibold shadow"
-          >
-            Haber Ağacı
-          </button>
-        </div>
+        {/* Haber Ağacı Açma Butonu - embed modunda gizle */}
+        {new URLSearchParams(location.search).get('embed') !== '1' && (
+          <div className="absolute top-6 right-4 z-50">
+            <button
+              onClick={() => setIsTreeOpen(true)}
+              className="px-3 py-2 rounded-md bg-white/80 hover:bg-white text-black text-sm font-semibold shadow"
+            >
+              Haber Ağacı
+            </button>
+          </div>
+        )}
 
         {/* Drawer */}
         <ReelsTreeDrawer isOpen={isTreeOpen} onClose={() => setIsTreeOpen(false)} />
