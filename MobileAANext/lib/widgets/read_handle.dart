@@ -1,85 +1,158 @@
 import 'package:flutter/material.dart';
 
-enum HandleAction { none, up, right }
+/// Yukarı (up) = makale sheet, Sağa (right) = emoji panel.
+/// Küçük bir "ray" içinde gezinen kulp; eşik geçilirse aksiyon tetikler.
+enum HandleAction { up, right, none }
 
 class ReadHandle extends StatefulWidget {
-  final void Function(HandleAction action) onAction;
-  const ReadHandle({super.key, required this.onAction});
+  final ValueChanged<HandleAction> onAction;
+
+  /// İstersen ray ölçülerini özelleştirebilirsin.
+  final Size trackSize; // default: 120x56
+  final double knobSize; // default: 40
+  final double thresholdRight; // px
+  final double thresholdUp; // px
+
+  const ReadHandle({
+    super.key,
+    required this.onAction,
+    this.trackSize = const Size(120, 56),
+    this.knobSize = 40,
+    this.thresholdRight = 32,
+    this.thresholdUp = 28,
+  });
 
   @override
   State<ReadHandle> createState() => _ReadHandleState();
 }
 
-class _ReadHandleState extends State<ReadHandle> {
-  Offset _delta = Offset.zero;
+class _ReadHandleState extends State<ReadHandle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim;
+  late Animation<Offset> _spring;
+  Offset _offset = Offset.zero; // merkeze göre sapma (x:+ sağ, y:+ aşağı)
 
-  static const double _maxRight = 120;
-  static const double _maxLeft = -80;
-  static const double _maxUp = -150;
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 220));
+    _spring = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
+        .chain(CurveTween(curve: Curves.easeOutBack))
+        .animate(_anim)
+      ..addListener(() => setState(() {}))
+      ..addStatusListener((s) {
+        if (s == AnimationStatus.completed) {
+          _offset = Offset.zero; // animasyon bittiğinde merkezde kal
+        }
+      });
+  }
 
-  void _set(Offset next) {
-    setState(() {
-      _delta = Offset(
-        next.dx.clamp(_maxLeft, _maxRight),
-        next.dy.clamp(_maxUp, 0),
-      );
-    });
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  void _animateBack() {
+    _anim.reset();
+    // mevcut konumdan 0'a dön
+    _spring = Tween<Offset>(begin: _offset, end: Offset.zero)
+        .chain(CurveTween(curve: Curves.easeOutBack))
+        .animate(_anim);
+    _anim.forward();
+  }
+
+  // ray içinde maksimum sapma; kulp ray dışına taşmasın
+  Offset _clampToTrack(Offset raw) {
+    final w = widget.trackSize.width;
+    final h = widget.trackSize.height;
+    final r = widget.knobSize / 2;
+    final maxX = (w / 2) - r - 4; // içerden ufak tampon
+    final maxY = (h / 2) - r - 4;
+    return Offset(
+      raw.dx.clamp(-maxX, maxX),
+      raw.dy.clamp(-maxY, maxY),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    const double size = 68;
+    final trackW = widget.trackSize.width;
+    final trackH = widget.trackSize.height;
 
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque, // child öncelik kazanır
-        onHorizontalDragUpdate: (d) => _set(_delta + Offset(d.delta.dx, 0)),
-        onVerticalDragUpdate: (d) => _set(_delta + Offset(0, d.delta.dy)),
-        onHorizontalDragEnd: (_) => _finish(),
-        onVerticalDragEnd: (_) => _finish(),
-        child: SizedBox(
-          width: 120, height: 120, // daha kolay tutma alanı
-          child: Center(
-            child: Transform.translate(
-              offset: _delta,
+    // aktif pozisyon (animasyon varsa _spring.value, yoksa _offset)
+    final pos = _anim.isAnimating ? _spring.value : _offset;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque, // sadece bu küçük alan jesti alsın
+      onPanUpdate: (d) {
+        // küçük alan; PageView jestini bozmaz
+        final next = _clampToTrack(_offset + d.delta);
+        setState(() => _offset = next);
+      },
+      onPanEnd: (_) {
+        // karar ver: yukarı mı, sağ mı?
+        if (-_offset.dy >= widget.thresholdUp) {
+          widget.onAction(HandleAction.up);
+        } else if (_offset.dx >= widget.thresholdRight) {
+          widget.onAction(HandleAction.right);
+        } else {
+          widget.onAction(HandleAction.none);
+        }
+        _animateBack(); // her durumda ortalamaya dön
+      },
+      child: Container(
+        width: trackW,
+        height: trackH,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(trackH / 2),
+          boxShadow: const [
+            BoxShadow(
+                blurRadius: 8, color: Colors.black26, offset: Offset(0, 2)),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            // İpuçları (UP / EMOJI)
+            Positioned(
+              left: 12,
+              child: Row(
+                children: const [
+                  Icon(Icons.arrow_upward, color: Colors.white70, size: 18),
+                  SizedBox(width: 8),
+                  Icon(Icons.emoji_emotions_outlined,
+                      color: Colors.white70, size: 18),
+                ],
+              ),
+            ),
+            // KULP
+            Transform.translate(
+              offset: pos,
               child: Container(
-                width: size,
-                height: size,
-                decoration: const BoxDecoration(
+                width: widget.knobSize,
+                height: widget.knobSize,
+                decoration: BoxDecoration(
                   color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 12,
-                        offset: Offset(0, 6))
-                  ],
+                  borderRadius: BorderRadius.circular(widget.knobSize / 2),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Image.asset(
-                    'lib/assets/images/aa_logo.png', // AA logosu
-                    fit: BoxFit.contain,
+                alignment: Alignment.center,
+                child: const Text(
+                  'Read',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
-  }
-
-  void _finish() {
-    final a = _detectAction(_delta);
-    widget.onAction(a);
-    setState(() => _delta = Offset.zero);
-  }
-
-  HandleAction _detectAction(Offset d) {
-    if (d.dy < -60 && d.dy.abs() > d.dx.abs()) return HandleAction.up;
-    if (d.dx > 60 && d.dx.abs() > d.dy.abs()) return HandleAction.right;
-    return HandleAction.none;
   }
 }

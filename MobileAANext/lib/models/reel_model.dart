@@ -1,3 +1,4 @@
+// lib/models/reel_model.dart
 class Reel {
   final String id;
   final NewsData newsData;
@@ -22,6 +23,9 @@ class Reel {
   String get category => newsData.category;
   List<String> get imageUrls => newsData.images;
   List<String> get fullContent => newsData.fullContent;
+
+  /// @added: fullContent'i her zaman bir metin olarak birleştiren yardımcı.
+  /// Haber detayında paragraflar arasına boşluk koyarak gösterim için kullanılır.
   String get fullText =>
       fullContent.isEmpty ? summary : fullContent.join('\n\n');
 
@@ -34,12 +38,22 @@ class Reel {
         .where((s) => s.startsWith('http://') || s.startsWith('https://'))
         .toList();
 
-    final List fcRaw =
-        (m['full_content'] ?? m['fullContent'] ?? []) as List? ?? [];
-    final fullContent = fcRaw
-        .map((e) => (e ?? '').toString())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    // --- DEĞİŞİKLİK BAŞLANGICI ---
+    // @changed: full_content'in hem String hem de List<String> olabilme durumunu handle et.
+    // Gelen veri bir listeyse doğrudan kullanılır, string ise satır boşluklarına göre bölünür.
+    final dynamic fcRaw = m['full_content'] ?? m['fullContent'] ?? [];
+    final List<String> fullContent;
+    if (fcRaw is List) {
+      fullContent = fcRaw
+          .map((e) => (e ?? '').toString())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    } else if (fcRaw is String) {
+      fullContent = fcRaw.split('\n\n').where((s) => s.isNotEmpty).toList();
+    } else {
+      fullContent = [];
+    }
+    // --- DEĞİŞİKLİK SONU ---
 
     return Reel(
       id: (json['id'] ?? '').toString(),

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../widgets/popup_bar.dart';
-import '../widgets/image_carousel.dart';
 import '../providers/reels_provider.dart';
+import '../models/reel_model.dart';
+import '../widgets/image_carousel.dart';
 import '../widgets/article_overlay.dart';
 import '../widgets/emoji_panel.dart';
 import '../widgets/read_handle.dart';
+import '../widgets/popup_bar.dart';
 import '../services/api_service.dart';
 
 class ReelsFeedPage extends StatelessWidget {
@@ -14,131 +15,190 @@ class ReelsFeedPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.watch<ReelsProvider>();
+    final provider = context.watch<ReelsProvider>();
+
+    // İlk frame'den sonra tek seferlik yükleme tetikle
+    if (provider.status == FeedStatus.initial) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final p = context.read<ReelsProvider>();
+        if (p.status == FeedStatus.initial) {
+          p.loadReels();
+        }
+      });
+    }
 
     return Scaffold(
       appBar: const PopupBar(),
-      body: p.reels.isEmpty
-          ? const Center(child: Text('Gösterilecek haber bulunamadı.'))
-          : PageView.builder(
-              scrollDirection: Axis.vertical, // reels geçişi
-              itemCount: p.reels.length,
-              onPageChanged: p.setIndex,
-              itemBuilder: (context, index) {
-                final reel = p.reels[index];
+      body: Stack(
+        children: [
+          _buildBody(context, provider),
 
-                return Stack(
-                  children: [
-                    // sabit içerik
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 90),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 8),
-                          ImageCarousel(urls: reel.imageUrls),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              reel.title,
-                              style: const TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              reel.summary,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(height: 1.35),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+          // Sağ-alt: küçük alan -> jest çakışması yok
+          Positioned(
+            right: 16,
+            bottom: 24,
+            child: ReadHandle(
+              thresholdRight: 32, // 42 -> 32 (sağa daha kolay)
+              thresholdUp: 28, // 36 -> 28 (yukarı daha kolay)
+              onAction: (action) {
+                final reels = provider.reels;
+                if (reels.isEmpty) return;
+                final reel = reels[provider.currentIndex];
 
-                    // Handle (↑ detay sheet, → emoji fan)
-                    ReadHandle(
-                      onAction: (a) async {
-                        switch (a) {
-                          case HandleAction.up:
-                            // full content: paragraf dizisini birleştir
-                            final text = reel.fullText;
-                            await showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (_) => ArticleOverlay(
-                                title: reel.title,
-                                body: text,
-                                onClose: () => Navigator.pop(context),
-                              ),
-                            );
-                            break;
-
-                          case HandleAction.right:
-                            await showModalBottomSheet(
-                              context: context,
-                              backgroundColor: Colors.transparent,
-                              barrierColor: Colors.black45,
-                              builder: (_) => Container(
-                                color: Colors.transparent,
-                                child: SafeArea(
-                                  top: false,
-                                  child: EmojiPanel(
-                                    publicEmojis: const [
-                                      '👍',
-                                      '😂',
-                                      '🔥',
-                                      '😮'
-                                    ],
-                                    premiumEmojis: const [
-                                      '💎',
-                                      '🚀',
-                                      '😍',
-                                      '🤯'
-                                    ],
-                                    onPick: (e) async {
-                                      Navigator.pop(context);
-                                      await ApiService.trackView(
-                                        reelId: reel.id,
-                                        emojiReaction: e,
-                                        category: reel.category,
-                                      );
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                            content:
-                                                Text('Tepkin kaydedildi: $e')),
-                                      );
-                                    },
-                                    onTapPremium: () {
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text(
-                                                'Premium emojiler kilitli')),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            );
-                            break;
-
-                          case HandleAction.none:
-                            break;
-                        }
-                      },
-                    ),
-                  ],
-                );
+                switch (action) {
+                  case HandleAction.up:
+                    debugPrint('[Handle] UP detected');
+                    _openArticle(context, reel);
+                    break;
+                  case HandleAction.right:
+                    debugPrint('[Handle] RIGHT detected');
+                    _openEmojis(context, reel);
+                    break;
+                  case HandleAction.none:
+                    debugPrint('[Handle] NONE');
+                    break;
+                }
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openArticle(BuildContext context, Reel reel) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ArticleOverlay(
+        title: reel.title,
+        body: reel.fullText,
+        onClose: () => Navigator.pop(context),
+      ),
+    );
+  }
+
+  void _openEmojis(BuildContext context, Reel reel) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.2),
+      builder: (_) => EmojiPanel(
+        publicEmojis: const ['👍', '❤️', '🔥', '⭐', '👏'],
+        premiumEmojis: const ['😍', '🤔', '😮', '🎉', '💎'],
+        onPick: (emoji) async {
+          Navigator.pop(context);
+          await ApiService.trackView(
+            reelId: reel.id,
+            emojiReaction: emoji,
+            category: reel.category,
+          );
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(content: Text('Tepkiniz gönderildi: $emoji')),
+            );
+        },
+        onTapPremium: () {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                  content: Text('Premium emojiler şimdilik kilitli.')),
+            );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, ReelsProvider provider) {
+    switch (provider.status) {
+      case FeedStatus.initial:
+      case FeedStatus.loading:
+        return const Center(child: CircularProgressIndicator());
+
+      case FeedStatus.error:
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Haberler yüklenemedi.'),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () => context.read<ReelsProvider>().loadReels(),
+                child: const Text('Tekrar Dene'),
+              ),
+            ],
+          ),
+        );
+
+      case FeedStatus.loaded:
+        final reels = provider.reels;
+        if (reels.isEmpty) {
+          return const Center(child: Text('Gösterilecek içerik yok.'));
+        }
+        return PageView.builder(
+          scrollDirection: Axis.vertical,
+          physics: const PageScrollPhysics(),
+          allowImplicitScrolling: true,
+          itemCount: reels.length,
+          onPageChanged: (i) => context.read<ReelsProvider>().setIndex(i),
+          itemBuilder: (context, i) {
+            final reel = reels[i];
+            return KeyedSubtree(
+              key: ValueKey(reel.id),
+              child: _ReelView(reel: reel),
+            );
+          },
+        );
+    }
+  }
+}
+
+class _ReelView extends StatelessWidget {
+  final Reel reel;
+  const _ReelView({super.key, required this.reel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          bottom: 90, // handle için boşluk
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              Expanded(child: ImageCarousel(urls: reel.imageUrls)),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  reel.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  reel.summary,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(height: 1.4, color: Colors.black87),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
