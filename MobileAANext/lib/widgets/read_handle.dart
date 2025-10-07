@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
 
 /// Yukarı (up) = makale sheet, Sağa (right) = emoji panel.
-/// Küçük bir "ray" içinde gezinen kulp; eşik geçilirse aksiyon tetikler.
 enum HandleAction { up, right, none }
 
 class ReadHandle extends StatefulWidget {
   final ValueChanged<HandleAction> onAction;
 
-  /// İstersen ray ölçülerini özelleştirebilirsin.
-  final Size trackSize; // default: 120x56
-  final double knobSize; // default: 40
-  final double thresholdRight; // px
-  final double thresholdUp; // px
+  /// Ray ölçüleri ve eşikler
+  final Size trackSize; // daha yüksek yaptık: 140 x 110
+  final double knobSize; // 40
+  final double thresholdRight; // 28
+  final double thresholdUp; // 28
 
   const ReadHandle({
     super.key,
     required this.onAction,
-    this.trackSize = const Size(120, 56),
+    this.trackSize = const Size(140, 110),
     this.knobSize = 40,
-    this.thresholdRight = 32,
+    this.thresholdRight = 28,
     this.thresholdUp = 28,
   });
 
@@ -30,21 +29,21 @@ class _ReadHandleState extends State<ReadHandle>
     with SingleTickerProviderStateMixin {
   late final AnimationController _anim;
   late Animation<Offset> _spring;
-  Offset _offset = Offset.zero; // merkeze göre sapma (x:+ sağ, y:+ aşağı)
+  Offset _offset = Offset.zero; // merkezden sapma (+x sağ, +y aşağı)
 
   @override
   void initState() {
     super.initState();
     _anim = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 220));
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
     _spring = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
         .chain(CurveTween(curve: Curves.easeOutBack))
         .animate(_anim)
       ..addListener(() => setState(() {}))
       ..addStatusListener((s) {
-        if (s == AnimationStatus.completed) {
-          _offset = Offset.zero; // animasyon bittiğinde merkezde kal
-        }
+        if (s == AnimationStatus.completed) _offset = Offset.zero;
       });
   }
 
@@ -56,19 +55,18 @@ class _ReadHandleState extends State<ReadHandle>
 
   void _animateBack() {
     _anim.reset();
-    // mevcut konumdan 0'a dön
     _spring = Tween<Offset>(begin: _offset, end: Offset.zero)
         .chain(CurveTween(curve: Curves.easeOutBack))
         .animate(_anim);
     _anim.forward();
   }
 
-  // ray içinde maksimum sapma; kulp ray dışına taşmasın
+  // Kulpu ray içinde tut
   Offset _clampToTrack(Offset raw) {
     final w = widget.trackSize.width;
     final h = widget.trackSize.height;
     final r = widget.knobSize / 2;
-    final maxX = (w / 2) - r - 4; // içerden ufak tampon
+    final maxX = (w / 2) - r - 4;
     final maxY = (h / 2) - r - 4;
     return Offset(
       raw.dx.clamp(-maxX, maxX),
@@ -80,19 +78,16 @@ class _ReadHandleState extends State<ReadHandle>
   Widget build(BuildContext context) {
     final trackW = widget.trackSize.width;
     final trackH = widget.trackSize.height;
-
-    // aktif pozisyon (animasyon varsa _spring.value, yoksa _offset)
     final pos = _anim.isAnimating ? _spring.value : _offset;
 
     return GestureDetector(
-      behavior: HitTestBehavior.opaque, // sadece bu küçük alan jesti alsın
+      behavior: HitTestBehavior.opaque,
       onPanUpdate: (d) {
-        // küçük alan; PageView jestini bozmaz
         final next = _clampToTrack(_offset + d.delta);
         setState(() => _offset = next);
       },
       onPanEnd: (_) {
-        // karar ver: yukarı mı, sağ mı?
+        // karar ver
         if (-_offset.dy >= widget.thresholdUp) {
           widget.onAction(HandleAction.up);
         } else if (_offset.dx >= widget.thresholdRight) {
@@ -100,7 +95,7 @@ class _ReadHandleState extends State<ReadHandle>
         } else {
           widget.onAction(HandleAction.none);
         }
-        _animateBack(); // her durumda ortalamaya dön
+        _animateBack();
       },
       child: Container(
         width: trackW,
@@ -117,7 +112,6 @@ class _ReadHandleState extends State<ReadHandle>
         child: Stack(
           alignment: Alignment.centerLeft,
           children: [
-            // İpuçları (UP / EMOJI)
             Positioned(
               left: 12,
               child: Row(
@@ -129,7 +123,6 @@ class _ReadHandleState extends State<ReadHandle>
                 ],
               ),
             ),
-            // KULP
             Transform.translate(
               offset: pos,
               child: Container(
