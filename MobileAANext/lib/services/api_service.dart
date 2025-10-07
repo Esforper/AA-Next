@@ -87,4 +87,21 @@ class ApiService {
       return false;
     }
   }
+
+    static Future<void> trackEmoji({
+    required String reelId,
+    required String emoji,
+    required String category,
+  }) async {
+    // TODO: Implement API call to track emoji usage
+    // Example:
+    // await http.post(
+    //   Uri.parse('https://your.api/track-emoji'),
+    //   body: {
+    //     'reelId': reelId,
+    //     'emoji': emoji,
+    //     'category': category,
+    //   },
+    // );
+  }
 }

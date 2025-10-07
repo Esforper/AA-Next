@@ -1,85 +1,197 @@
+// lib/widgets/read_handle.dart
+// GÜNCELLEME: 4 yön (yukarı, sağ, aşağı, sol) + orta pozisyon
+
 import 'package:flutter/material.dart';
 
-enum HandleAction { none, up, right }
+/// 4 yönlü handle
+enum HandleAction { up, right, down, left, none }
 
 class ReadHandle extends StatefulWidget {
-  final void Function(HandleAction action) onAction;
-  const ReadHandle({super.key, required this.onAction});
+  final ValueChanged<HandleAction> onAction;
+
+  final Size trackSize;
+  final double knobSize;
+  final double threshold; // Tüm yönler için tek eşik
+
+  const ReadHandle({
+    super.key,
+    required this.onAction,
+    this.trackSize = const Size(160, 160), // Daha büyük (4 yön için)
+    this.knobSize = 50,
+    this.threshold = 35,
+  });
 
   @override
   State<ReadHandle> createState() => _ReadHandleState();
 }
 
-class _ReadHandleState extends State<ReadHandle> {
-  Offset _delta = Offset.zero;
+class _ReadHandleState extends State<ReadHandle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim;
+  late Animation<Offset> _spring;
+  Offset _offset = Offset.zero;
 
-  static const double _maxRight = 120;
-  static const double _maxLeft = -80;
-  static const double _maxUp = -150;
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _spring = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
+        .chain(CurveTween(curve: Curves.easeOutBack))
+        .animate(_anim)
+      ..addListener(() => setState(() {}))
+      ..addStatusListener((s) {
+        if (s == AnimationStatus.completed) _offset = Offset.zero;
+      });
+  }
 
-  void _set(Offset next) {
-    setState(() {
-      _delta = Offset(
-        next.dx.clamp(_maxLeft, _maxRight),
-        next.dy.clamp(_maxUp, 0),
-      );
-    });
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  void _animateBack() {
+    _anim.reset();
+    _spring = Tween<Offset>(begin: _offset, end: Offset.zero)
+        .chain(CurveTween(curve: Curves.easeOutBack))
+        .animate(_anim);
+    _anim.forward();
+  }
+
+  Offset _clampToTrack(Offset raw) {
+    final w = widget.trackSize.width;
+    final h = widget.trackSize.height;
+    final r = widget.knobSize / 2;
+    final maxX = (w / 2) - r - 8;
+    final maxY = (h / 2) - r - 8;
+    return Offset(
+      raw.dx.clamp(-maxX, maxX),
+      raw.dy.clamp(-maxY, maxY),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    const double size = 68;
+    final trackW = widget.trackSize.width;
+    final trackH = widget.trackSize.height;
+    final pos = _anim.isAnimating ? _spring.value : _offset;
 
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque, // child öncelik kazanır
-        onHorizontalDragUpdate: (d) => _set(_delta + Offset(d.delta.dx, 0)),
-        onVerticalDragUpdate: (d) => _set(_delta + Offset(0, d.delta.dy)),
-        onHorizontalDragEnd: (_) => _finish(),
-        onVerticalDragEnd: (_) => _finish(),
-        child: SizedBox(
-          width: 120, height: 120, // daha kolay tutma alanı
-          child: Center(
-            child: Transform.translate(
-              offset: _delta,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanUpdate: (d) {
+        final next = _clampToTrack(_offset + d.delta);
+        setState(() => _offset = next);
+      },
+      onPanEnd: (_) {
+        // 4 yön kontrolü
+        final absX = _offset.dx.abs();
+        final absY = _offset.dy.abs();
+
+        if (absX > absY) {
+          // Yatay hareket
+          if (_offset.dx > widget.threshold) {
+            widget.onAction(HandleAction.right); // Emoji
+          } else if (_offset.dx < -widget.threshold) {
+            widget.onAction(HandleAction.left); // Kaydet
+          } else {
+            widget.onAction(HandleAction.none);
+          }
+        } else {
+          // Dikey hareket
+          if (-_offset.dy > widget.threshold) {
+            widget.onAction(HandleAction.up); // Detail
+          } else if (_offset.dy > widget.threshold) {
+            widget.onAction(HandleAction.down); // Paylaş
+          } else {
+            widget.onAction(HandleAction.none);
+          }
+        }
+
+        _animateBack();
+      },
+      child: Container(
+        width: trackW,
+        height: trackH,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.3), // Dış çember (silik)
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+            width: 2,
+          ),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // 4 yön ikonları
+            Positioned(
+              top: 12,
+              child: Icon(
+                Icons.arrow_upward,
+                color: Colors.white.withOpacity(0.7),
+                size: 20,
+              ),
+            ),
+            Positioned(
+              right: 12,
+              child: Icon(
+                Icons.emoji_emotions_outlined,
+                color: Colors.white.withOpacity(0.7),
+                size: 20,
+              ),
+            ),
+            Positioned(
+              bottom: 12,
+              child: Icon(
+                Icons.share_outlined,
+                color: Colors.white.withOpacity(0.7),
+                size: 20,
+              ),
+            ),
+            Positioned(
+              left: 12,
+              child: Icon(
+                Icons.bookmark_outline,
+                color: Colors.white.withOpacity(0.7),
+                size: 20,
+              ),
+            ),
+
+            // Ortadaki kulp (beyaz yuvarlak)
+            Transform.translate(
+              offset: pos,
               child: Container(
-                width: size,
-                height: size,
-                decoration: const BoxDecoration(
+                width: widget.knobSize,
+                height: widget.knobSize,
+                decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 12,
-                        offset: Offset(0, 6))
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
                   ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Image.asset(
-                    'lib/assets/images/aa_logo.png', // AA logosu
-                    fit: BoxFit.contain,
+                alignment: Alignment.center,
+                child: const Text(
+                  'Sürükle',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
-  }
-
-  void _finish() {
-    final a = _detectAction(_delta);
-    widget.onAction(a);
-    setState(() => _delta = Offset.zero);
-  }
-
-  HandleAction _detectAction(Offset d) {
-    if (d.dy < -60 && d.dy.abs() > d.dx.abs()) return HandleAction.up;
-    if (d.dx > 60 && d.dx.abs() > d.dy.abs()) return HandleAction.right;
-    return HandleAction.none;
   }
 }

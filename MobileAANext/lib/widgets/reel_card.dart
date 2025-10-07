@@ -9,6 +9,8 @@ import 'read_handle.dart';
 import 'emoji_panel.dart';
 import 'article_overlay.dart';
 import 'voice_button.dart';
+import '../providers/chat_provider.dart';
+import '../services/api_service.dart';
 
 class ReelCard extends StatefulWidget {
   final Reel reel;
@@ -122,32 +124,67 @@ class _ReelCardState extends State<ReelCard>
               ),
               const SizedBox(height: 10),
 
-              // handle (yukarı=detay, sağa=emoji)
               ReadHandle(
                 onAction: (action) {
                   switch (action) {
                     case HandleAction.up:
-                      provider.openDetail(true);
+                      // Detay sheet
                       showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
-                        showDragHandle: true,
+                        backgroundColor: Colors.transparent,
                         builder: (_) => ArticleOverlay(
                           title: reel.title,
-                          body:
-                              '${reel.summary}\n\n(Haberin devamı burada gösterilecek)',
-                          onClose: () => provider.openDetail(false),
+                          body: reel.fullText,
+                          onClose: () => Navigator.pop(context),
                         ),
                       );
                       break;
-                    case HandleAction.right:
-                      setState(() => showEmojis = true);
+
+                      case HandleAction.right:
+                        // Emoji panel aç
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => EmojiPanel(
+                            publicEmojis: const ['❤️', '😮', '🔥', '👍', '😂'],
+                            premiumEmojis: const ['💎', '🏆', '⚡', '🌟'],
+                            onPick: (emoji) {
+                              debugPrint('[Emoji] picked: $emoji');
+                              Navigator.pop(context);
+                              ApiService.trackEmoji(
+                                reelId: reel.id,
+                                emoji: emoji,
+                                category: reel.category,
+                              );
+                            },
+                            onTapPremium: () {
+                              debugPrint('[Premium] tapped');
+                            },
+                          ),
+                        );
+                        break;
+
+                    case HandleAction.down:
+                      // TODO: Paylaş
+                      debugPrint('[Handle] DOWN - Share');
                       break;
+
+                    case HandleAction.left:
+                      // TODO: Kaydet
+                      debugPrint('[Handle] LEFT - Save');
+                      break;
+
                     case HandleAction.none:
+                      debugPrint('[Handle] NONE');
                       break;
                   }
                 },
               ),
+                            
+              
+              
+              
               const SizedBox(height: 12),
             ],
           ),
