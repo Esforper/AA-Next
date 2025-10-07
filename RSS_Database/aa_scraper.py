@@ -57,7 +57,7 @@ class AANewsScraper:
             content_div = soup.find('div', class_='detay-icerik') or soup.find('article')
             if content_div:
                 paragraphs = content_div.find_all('p')
-                article_data['content'] = ' '.join([p.get_text(strip=True) for p in paragraphs])
+                # article_data['content'] = ' '.join([p.get_text(strip=True) for p in paragraphs])
                 article_data['paragraphs'] = [p.get_text(strip=True) for p in paragraphs]
             else:
                 article_data['content'] = None
