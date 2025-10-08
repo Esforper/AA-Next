@@ -6,6 +6,7 @@ import '../models/reel_model.dart';
 enum FeedStatus { initial, loading, loaded, error }
 
 class ReelsProvider with ChangeNotifier {
+  final ApiService _apiService = ApiService();
   final List<Reel> _reels = [];
   int _current = 0;
   FeedStatus _status = FeedStatus.initial;
@@ -17,13 +18,15 @@ class ReelsProvider with ChangeNotifier {
 
   /// Reels'i yükle (re-entrancy koruması ile)
   Future<void> loadReels() async {
-    if (_status == FeedStatus.loading)
+    if (_status == FeedStatus.loading) {
       return; // aynı anda birden fazla çağrıyı engelle
+    }
+    
     _status = FeedStatus.loading;
     notifyListeners();
 
     try {
-      final List<Reel> data = await ApiService.fetchReels();
+      final List<Reel> data = await _apiService.fetchReels();
       _reels
         ..clear()
         ..addAll(data);
@@ -48,8 +51,11 @@ class ReelsProvider with ChangeNotifier {
     final reel = current;
     if (reel != null) {
       debugPrint('[Reels] visible -> ${reel.id}');
-      // Buraya istersen "mark seen / kısa izleme" tracking'ini koyabilirsin.
-      // ApiService.trackView(reelId: reel.id, category: reel.category);
+      // Kısa izleme tracking'i
+      _apiService.trackView(
+        reelId: reel.id,
+        category: reel.category,
+      );
     }
 
     notifyListeners();

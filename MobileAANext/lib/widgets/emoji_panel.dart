@@ -4,11 +4,11 @@ import 'package:flutter/services.dart';
 
 class EmojiPanel extends StatefulWidget {
   final List<String> publicEmojis; // alt yay
-  final List<String> premiumEmojis; // üst yay
+  final List<String> premiumEmojis; // ï¿½st yay
   final void Function(String emoji) onPick;
   final VoidCallback onTapPremium;
 
-  // ?? yeni: itemSize ile balon çapýný kontrol edebiliyorsun
+  // ?? yeni: itemSize ile balon ï¿½apï¿½nï¿½ kontrol edebiliyorsun
   final double itemSize;
 
   const EmojiPanel({
@@ -17,7 +17,7 @@ class EmojiPanel extends StatefulWidget {
     required this.premiumEmojis,
     required this.onPick,
     required this.onTapPremium,
-    this.itemSize = 40, // 56 › 44 (ekrandaki gibi daha kompakt)
+    this.itemSize = 40, // 56 ï¿½ 44 (ekrandaki gibi daha kompakt)
   });
 
   @override
@@ -52,10 +52,10 @@ class _EmojiPanelState extends State<EmojiPanel>
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
 
-    // ?? yay yarýçaplarý (daha sýký)
+    // ?? yay yarï¿½ï¿½aplarï¿½ (daha sï¿½kï¿½)
     final s = widget.itemSize;
     final double radiusPublic = math.min(width * 0.42, 110.0).toDouble(); // alt
-    final radiusPremium = radiusPublic + s * 0.85; // üst › altýn biraz dýþý
+    final radiusPremium = radiusPublic + s * 0.85; // ï¿½st ï¿½ altï¿½n biraz dï¿½ï¿½ï¿½
     final panelHeight = radiusPremium + s + 4;
 
     return SafeArea(
