@@ -1,24 +1,17 @@
+// lib/widgets/read_handle.dart
+// GÜNCELLEME: 4 yön (yukarı, sağ, aşağı, sol) + orta pozisyon
+
 import 'package:flutter/material.dart';
 
-/// Yukarı (up) = makale sheet, Sağa (right) = emoji panel.
-enum HandleAction { up, right, none }
+/// 4 yönlü handle
+enum HandleAction { up, right, down, left, none }
 
 class ReadHandle extends StatefulWidget {
   final ValueChanged<HandleAction> onAction;
 
-  /// Ray ölçüleri ve eşikler
-  final Size trackSize; // önceki: 140 x 110 -> daha kompakt
-  final double knobSize; // önceki: 40 -> 36
-  final double thresholdRight; // 28
-  final double thresholdUp; // 28
-
-  const ReadHandle({
-    super.key,
-    required this.onAction,
-    this.trackSize = const Size(110, 72),
-    this.knobSize = 36,
-    this.thresholdRight = 28,
-    this.thresholdUp = 28,
+    this.trackSize = const Size(160, 160), // Daha büyük (4 yön için)
+    this.knobSize = 50,
+    this.threshold = 35,
   });
 
   @override
@@ -29,18 +22,15 @@ class _ReadHandleState extends State<ReadHandle>
     with SingleTickerProviderStateMixin {
   late final AnimationController _anim;
   late Animation<Offset> _spring;
-  Offset _offset = Offset.zero; // merkezden sapma (+x sağ, +y aşağı)
+  Offset _offset = Offset.zero;
 
   @override
   void initState() {
     super.initState();
     _anim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
-    );
-    _spring = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
+      duration: const Duration(milliseconds: 250),
         .chain(CurveTween(curve: Curves.easeOutBack))
-        .animate(_anim)
       ..addListener(() => setState(() {}))
       ..addStatusListener((s) {
         if (s == AnimationStatus.completed) _offset = Offset.zero;
@@ -61,13 +51,12 @@ class _ReadHandleState extends State<ReadHandle>
     _anim.forward();
   }
 
-  // Kulpu ray içinde tut
   Offset _clampToTrack(Offset raw) {
     final w = widget.trackSize.width;
     final h = widget.trackSize.height;
     final r = widget.knobSize / 2;
-    final maxX = (w / 2) - r - 4;
-    final maxY = (h / 2) - r - 4;
+    final maxX = (w / 2) - r - 8;
+    final maxY = (h / 2) - r - 8;
     return Offset(
       raw.dx.clamp(-maxX, maxX),
       raw.dy.clamp(-maxY, maxY),
@@ -87,53 +76,81 @@ class _ReadHandleState extends State<ReadHandle>
         setState(() => _offset = next);
       },
       onPanEnd: (_) {
-        // Eşikleri mevcut ray boyutuna göre dinamikleştir
-        final r = widget.knobSize / 2;
-        final maxX = (widget.trackSize.width / 2) - r - 4;
-        final maxY = (widget.trackSize.height / 2) - r - 4;
-        final double effRight = widget.thresholdRight <= maxX * 0.9
-            ? widget.thresholdRight
-            : (maxX * 0.9);
-        final double effUp = widget.thresholdUp <= maxY * 0.9
-            ? widget.thresholdUp
-            : (maxY * 0.9);
+        // 4 yön kontrolü
+        final absX = _offset.dx.abs();
+        final absY = _offset.dy.abs();
 
-        // karar ver
-        if (-_offset.dy >= effUp) {
-          widget.onAction(HandleAction.up);
-        } else if (_offset.dx >= effRight) {
-          widget.onAction(HandleAction.right);
+        if (absX > absY) {
+          // Yatay hareket
+          if (_offset.dx > widget.threshold) {
+            widget.onAction(HandleAction.right); // Emoji
+          } else if (_offset.dx < -widget.threshold) {
+            widget.onAction(HandleAction.left); // Kaydet
+          } else {
+            widget.onAction(HandleAction.none);
+          }
         } else {
-          widget.onAction(HandleAction.none);
+          // Dikey hareket
+          if (-_offset.dy > widget.threshold) {
+            widget.onAction(HandleAction.up); // Detail
+          } else if (_offset.dy > widget.threshold) {
+            widget.onAction(HandleAction.down); // Paylaş
+          } else {
+            widget.onAction(HandleAction.none);
+          }
         }
+
         _animateBack();
       },
       child: Container(
         width: trackW,
         height: trackH,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.65),
-          borderRadius: BorderRadius.circular(trackH / 2),
-          boxShadow: const [
-            BoxShadow(
-                blurRadius: 6, color: Colors.black26, offset: Offset(0, 2)),
-          ],
+          color: Colors.black.withOpacity(0.3), // Dış çember (silik)
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+            width: 2,
+          ),
         ),
         child: Stack(
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.center,
           children: [
+            // 4 yön ikonları
             Positioned(
-              left: 10,
-              child: Row(
-                children: const [
-                  Icon(Icons.arrow_upward, color: Colors.white70, size: 16),
-                  SizedBox(width: 6),
-                  Icon(Icons.emoji_emotions_outlined,
-                      color: Colors.white70, size: 16),
-                ],
+              top: 12,
+              child: Icon(
+                Icons.arrow_upward,
+                color: Colors.white.withOpacity(0.7),
+                size: 20,
               ),
             ),
+            Positioned(
+              right: 12,
+              child: Icon(
+                Icons.emoji_emotions_outlined,
+                color: Colors.white.withOpacity(0.7),
+                size: 20,
+              ),
+            ),
+            Positioned(
+              bottom: 12,
+              child: Icon(
+                Icons.share_outlined,
+                color: Colors.white.withOpacity(0.7),
+                size: 20,
+              ),
+            ),
+            Positioned(
+              left: 12,
+              child: Icon(
+                Icons.bookmark_outline,
+                color: Colors.white.withOpacity(0.7),
+                size: 20,
+              ),
+            ),
+
+            // Ortadaki kulp (beyaz yuvarlak)
             Transform.translate(
               offset: pos,
               child: Container(
@@ -141,16 +158,24 @@ class _ReadHandleState extends State<ReadHandle>
                 height: widget.knobSize,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(widget.knobSize / 2),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
                 alignment: Alignment.center,
                 child: const Text(
-                  'Read',
+                  'Sürükle',
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: Colors.black87,
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ),
