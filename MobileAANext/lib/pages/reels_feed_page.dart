@@ -1,5 +1,5 @@
 // lib/pages/reels_feed_page.dart
-// GÜNCELLEME: Mevcut sistem + XP gamification entegrasyonu
+// GÜNCELLEME: Navigasyon ortada + Görsel kırpma düzenlemesi
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -26,7 +26,6 @@ class ReelsFeedPage extends StatefulWidget {
 }
 
 class _ReelsFeedPageState extends State<ReelsFeedPage> {
-  // XP tracking için state'ler
   DateTime? _reelStartTime;
   DateTime? _detailOpenTime;
   bool _hasEarnedWatchXP = false;
@@ -52,7 +51,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
   void _onPageChanged(int index) {
     final reelsProvider = context.read<ReelsProvider>();
     
-    // Önceki reel için XP ver (3+ saniye izlendiyse)
     if (!_hasEarnedWatchXP && _reelStartTime != null && _currentReelId != null) {
       final duration = DateTime.now().difference(_reelStartTime!);
       if (duration.inSeconds >= 3) {
@@ -63,7 +61,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
       }
     }
 
-    // Yeni reel için tracking
     reelsProvider.setIndex(index);
     if (reelsProvider.current != null) {
       _startReelTracking(reelsProvider.current!.id);
@@ -111,42 +108,44 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
             ),
           ),
 
-          // Read Handle (sağ-alt)
-          Positioned(
-            right: 16,
-            bottom: 24,
-            child: ReadHandle(
-              threshold: 35,
-              onAction: (action) {
-                final reels = provider.reels;
-                if (reels.isEmpty) return;
-                final reel = reels[provider.currentIndex];
+          // ✅ NAVİGASYON BARI ORTADA (Positioned yerine Align kullanıyoruz)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: ReadHandle(
+                threshold: 35,
+                onAction: (action) {
+                  final reels = provider.reels;
+                  if (reels.isEmpty) return;
+                  final reel = reels[provider.currentIndex];
 
-                switch (action) {
-                  case HandleAction.up:
-                    debugPrint('[Handle] UP - Article Detail');
-                    _openArticle(context, reel);
-                    break;
-                  
-                  case HandleAction.right:
-                    debugPrint('[Handle] RIGHT - Emoji Panel');
-                    _openEmojis(context, reel);
-                    break;
-                  
-                  case HandleAction.down:
-                    debugPrint('[Handle] DOWN - Share');
-                    _onShareTap(context, reel);
-                    break;
-                  
-                  case HandleAction.left:
-                    debugPrint('[Handle] LEFT - Save');
-                    _saveReel(context, reel);
-                    break;
-                  
-                  case HandleAction.none:
-                    break;
-                }
-              },
+                  switch (action) {
+                    case HandleAction.up:
+                      debugPrint('[Handle] UP - Article Detail');
+                      _openArticle(context, reel);
+                      break;
+                    
+                    case HandleAction.right:
+                      debugPrint('[Handle] RIGHT - Emoji Panel');
+                      _openEmojis(context, reel);
+                      break;
+                    
+                    case HandleAction.down:
+                      debugPrint('[Handle] DOWN - Share');
+                      _onShareTap(context, reel);
+                      break;
+                    
+                    case HandleAction.left:
+                      debugPrint('[Handle] LEFT - Save');
+                      _saveReel(context, reel);
+                      break;
+                    
+                    case HandleAction.none:
+                      break;
+                  }
+                },
+              ),
             ),
           ),
         ],
@@ -204,7 +203,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
     }
   }
 
-  // Article detail modal (10+ saniye okuma = 5 XP)
   void _openArticle(BuildContext context, Reel reel) {
     _detailOpenTime = DateTime.now();
     
@@ -227,12 +225,10 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
     if (_detailOpenTime != null) {
       final duration = DateTime.now().difference(_detailOpenTime!);
       
-      // 10+ saniye okuduysa XP ver
       if (duration.inSeconds >= 10) {
         final gamificationProvider = context.read<GamificationProvider>();
         gamificationProvider.onDetailRead(reel.id);
         
-        // Backend'e tracking gönder
         ApiService().trackDetailView(
           reelId: reel.id,
           durationMs: duration.inMilliseconds,
@@ -245,7 +241,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
     }
   }
 
-  // Emoji panel (her reels'e 1 emoji = 5 XP)
   void _openEmojis(BuildContext context, Reel reel) {
     showModalBottomSheet(
       context: context,
@@ -261,14 +256,12 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
           final success = gamificationProvider.onEmojiGiven(reel.id);
           
           if (success) {
-            // Backend'e tracking
             await ApiService().trackEmoji(
               reelId: reel.id,
               emoji: emoji,
               category: reel.category,
             );
             
-            // XP animasyonu
             _showFloatingXP(5, 'emoji_given');
             
             if (!context.mounted) return;
@@ -283,7 +276,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
                 ),
               );
           } else {
-            // Zaten emoji atılmış
             if (!context.mounted) return;
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
@@ -312,103 +304,67 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
     );
   }
 
-  // Paylaş (ilk paylaşma = 5 XP)
   void _onShareTap(BuildContext context, Reel reel) async {
-    final gamificationProvider = context.read<GamificationProvider>();
+    // Paylaşma işlemi
+    await Share.share(
+      '${reel.title}\n\n${reel.summary}',
+      subject: reel.title,
+    );
     
-    // Daha önce paylaşılmış mı?
-    if (gamificationProvider.hasShareGiven(reel.id)) {
+    // Şimdilik XP yok, ileride eklenebilir
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Paylaşıldı!'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+  }
+
+  void _saveReel(BuildContext context, Reel reel) async {
+    final savedProvider = context.read<SavedReelsProvider>();
+    
+    if (savedProvider.isSaved(reel.id)) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(
-            content: const Text('Bu haberi zaten paylaştın!'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.orange[700],
+          const SnackBar(
+            content: Text('Bu haber zaten kayıtlı!'),
+            duration: Duration(seconds: 2),
           ),
         );
       return;
     }
     
-    try {
-      final result = await Share.shareWithResult(
-        '${reel.title}\n\n${reel.summary}\n\nAA Haber uygulamasından paylaşıldı.',
-        subject: reel.title,
-      );
-      
-      if (result.status == ShareResultStatus.success) {
-        final success = gamificationProvider.onShareGiven(reel.id);
-        if (success) {
-          _showFloatingXP(5, 'share_given');
-        }
-      }
-    } catch (e) {
-      debugPrint('Paylaşım hatası: $e');
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Paylaşım özelliği yakında...'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-    }
-  }
-
-  // Save reel
-  void _saveReel(BuildContext context, Reel reel) {
-    final savedProv = context.read<SavedReelsProvider>();
+    savedProvider.saveReel(  // ✅ await kaldırıldı
+      reelId: reel.id,
+      title: reel.title,
+      content: reel.summary,
+      imageUrl: reel.imageUrls.isNotEmpty ? reel.imageUrls.first : '',
+    );
     
-    if (savedProv.isSaved(reel.id)) {
-      // Zaten kayıtlı, kaldır
-      savedProv.unsaveReel(reel.id);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.bookmark_remove, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Kayıt kaldırıldı'),
-              ],
-            ),
-            backgroundColor: Colors.orange[700],
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.bookmark_added, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Haber kaydedildi!'),
+            ],
           ),
-        );
-    } else {
-      // Kaydet
-      savedProv.saveReel(
-        reelId: reel.id,
-        title: reel.title,
-        imageUrl: reel.imageUrls.isNotEmpty ? reel.imageUrls.first : '',
+          backgroundColor: Colors.green[700],
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
       );
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.bookmark_added, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Haber kaydedildi!'),
-              ],
-            ),
-            backgroundColor: Colors.green[700],
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-    }
   }
 
   @override
@@ -418,7 +374,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
   }
 }
 
-// Reel görünümü widget'ı
+// ✅ REEL GÖRÜNÜMÜ - GÖRSEL KIRPMA DÜZENLENDİ
 class _ReelView extends StatelessWidget {
   final Reel reel;
   const _ReelView({required this.reel});
@@ -428,40 +384,83 @@ class _ReelView extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
+        // ✅ GÖRSEL - Daha kareye yakın, dikey biraz daha büyük
         Positioned.fill(
-          bottom: 90,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              Expanded(child: ImageCarousel(urls: reel.imageUrls)),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  reel.title,
+          top: 0,
+          bottom: 160,  // ✅ 120 → 80 (reels daha uzun olsun)
+          child: Center(
+            child: AspectRatio(
+              aspectRatio: 4 / 3,  // ✅ 16/9 → 4/3 (daha kare)
+              child: ClipRect(
+                child: SizedBox.expand(
+                  child: ImageCarousel(urls: reel.imageUrls),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ✅ Başlık ve özet - Navigasyon üstünde
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 10,  // ✅ Navigasyon için boşluk (24 bottom + 56 button + 20 padding = ~100)
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Colors.black.withOpacity(0.8),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ✅ BAŞLIK - Marker/Highlight efekti
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.9),  // Sarı marker
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    reel.title,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,  // Siyah yazı
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 120),
+                // Özet
+                Text(
+                  reel.summary,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  reel.summary,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     height: 1.4,
-                    color: Colors.black87,
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.95),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],

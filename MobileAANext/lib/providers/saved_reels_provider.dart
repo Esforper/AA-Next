@@ -24,6 +24,7 @@ class SavedReelsProvider extends ChangeNotifier {
     required String reelId,
     required String title,
     required String imageUrl,
+    required String content,
   }) {
     if (isSaved(reelId)) {
       debugPrint('Reel already saved: $reelId');
@@ -58,11 +59,12 @@ class SavedReelsProvider extends ChangeNotifier {
     required String reelId,
     required String title,
     required String imageUrl,
+    required String content,
   }) {
     if (isSaved(reelId)) {
       unsaveReel(reelId);
     } else {
-      saveReel(reelId: reelId, title: title, imageUrl: imageUrl);
+      saveReel(reelId: reelId, title: title, imageUrl: imageUrl, content: content);
     }
   }
 

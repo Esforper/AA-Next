@@ -7,14 +7,14 @@ class ReadHandle extends StatefulWidget {
   final ValueChanged<HandleAction> onAction;
   final Size trackSize;
   final double knobSize;
-  final double threshold; // Tek eşik değeri (4 yön için)
+  final double threshold;
 
   const ReadHandle({
     super.key,
     required this.onAction,
-    this.trackSize = const Size(140, 140), // Kare yapıldı (4 yön için)
-    this.knobSize = 40,
-    this.threshold = 35, // Daha yüksek eşik
+    this.trackSize = const Size(160, 160),
+    this.knobSize = 56,
+    this.threshold = 35,
   });
 
   @override
@@ -22,14 +22,20 @@ class ReadHandle extends StatefulWidget {
 }
 
 class _ReadHandleState extends State<ReadHandle>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _anim;
   late Animation<Offset> _spring;
   Offset _offset = Offset.zero;
+  bool _isPressed = false;
+  
+  late final AnimationController _expandAnim;
+  late final Animation<double> _expandScale;
 
   @override
   void initState() {
     super.initState();
+    
+    // Geri dönüş animasyonu
     _anim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
@@ -37,15 +43,34 @@ class _ReadHandleState extends State<ReadHandle>
     _spring = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
         .chain(CurveTween(curve: Curves.easeOutBack))
         .animate(_anim)
-      ..addListener(() => setState(() {}))
+      ..addListener(() {
+        if (mounted) setState(() {});
+      })
       ..addStatusListener((s) {
-        if (s == AnimationStatus.completed) _offset = Offset.zero;
+        if (s == AnimationStatus.completed) {
+          _offset = Offset.zero;
+        }
       });
+
+    // Dış daire açılma animasyonu
+    _expandAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    
+    _expandScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _expandAnim, curve: Curves.easeOutBack),
+    )..addListener(() {
+      if (mounted) setState(() {});
+    });
+    
+    debugPrint('[ReadHandle] Animasyonlar initialize edildi');
   }
 
   @override
   void dispose() {
     _anim.dispose();
+    _expandAnim.dispose();
     super.dispose();
   }
 
@@ -74,16 +99,13 @@ class _ReadHandleState extends State<ReadHandle>
     final dy = _offset.dy.abs();
     final threshold = widget.threshold;
 
-    // Hangi eksen daha baskın?
     if (dx > dy) {
-      // Yatay hareket
       if (_offset.dx > threshold) {
         return HandleAction.right;
       } else if (_offset.dx < -threshold) {
         return HandleAction.left;
       }
     } else {
-      // Dikey hareket
       if (_offset.dy > threshold) {
         return HandleAction.down;
       } else if (_offset.dy < -threshold) {
@@ -100,51 +122,111 @@ class _ReadHandleState extends State<ReadHandle>
     final trackH = widget.trackSize.height;
     final pos = _anim.isAnimating ? _spring.value : _offset;
 
+    debugPrint('[ReadHandle] Build - isPressed: $_isPressed, expandValue: ${_expandScale.value}');
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      onPanStart: (_) {
+        debugPrint('[ReadHandle] PAN START');
+        setState(() => _isPressed = true);
+        _expandAnim.forward();
+      },
       onPanUpdate: (d) {
         final next = _clampToTrack(_offset + d.delta);
         setState(() => _offset = next);
       },
       onPanEnd: (_) {
+        debugPrint('[ReadHandle] PAN END');
+        setState(() => _isPressed = false);
         final action = _detectDirection();
         widget.onAction(action);
         _animateBack();
+        _expandAnim.reverse();
       },
-      child: Container(
+      onPanCancel: () {
+        debugPrint('[ReadHandle] PAN CANCEL');
+        setState(() => _isPressed = false);
+        _animateBack();
+        _expandAnim.reverse();
+      },
+      child: SizedBox(
         width: trackW,
         height: trackH,
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
-          shape: BoxShape.circle, // Daire şekli (4 yön için)
-          boxShadow: const [
-            BoxShadow(
-                blurRadius: 8, color: Colors.black38, offset: Offset(0, 3)),
-          ],
-        ),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // 4 Yön İkonları
-            Positioned(
-              top: 12,
-              child: Icon(Icons.arrow_upward, color: Colors.white70, size: 18),
-            ),
-            Positioned(
-              right: 12,
-              child: Icon(Icons.emoji_emotions_outlined,
-                  color: Colors.white70, size: 18),
-            ),
-            Positioned(
-              bottom: 12,
-              child: Icon(Icons.share_outlined, color: Colors.white70, size: 18),
-            ),
-            Positioned(
-              left: 12,
-              child: Icon(Icons.bookmark_outline, color: Colors.white70, size: 18),
+            // DIŞ DAİRE (Animasyonlu açılır/kapanır)
+            AnimatedBuilder(
+              animation: _expandScale,
+              builder: (context, child) {
+                final scale = _expandScale.value;
+                debugPrint('[ReadHandle] AnimatedBuilder scale: $scale');
+                
+                if (scale == 0.0) return const SizedBox.shrink();
+                
+                return Transform.scale(
+                  scale: scale,
+                  child: Opacity(
+                    opacity: scale.clamp(0.0, 1.0),
+                    child: Container(
+                      width: trackW,
+                      height: trackH,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(
+                            blurRadius: 8,
+                            color: Colors.black38,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // 4 Yön İkonları
+                          Positioned(
+                            top: 16,
+                            child: Icon(
+                              Icons.arrow_upward,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                          ),
+                          Positioned(
+                            right: 16,
+                            child: Icon(
+                              Icons.emoji_emotions_outlined,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 16,
+                            child: Icon(
+                              Icons.share_outlined,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                          ),
+                          Positioned(
+                            left: 16,
+                            child: Icon(
+                              Icons.bookmark_outline,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
 
-            // Hareketli Kulp
+            // ÇEKIRDEK (Beyaz yuvarlak - her zaman görünür)
             Transform.translate(
               offset: pos,
               child: Container(
@@ -153,19 +235,19 @@ class _ReadHandleState extends State<ReadHandle>
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      blurRadius: 4,
+                      blurRadius: _isPressed ? 8 : 4,
                       color: Colors.black26,
-                      offset: Offset(0, 2),
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
                 alignment: Alignment.center,
-                child: const Icon(
+                child: Icon(
                   Icons.drag_indicator,
                   color: Colors.black87,
-                  size: 20,
+                  size: 24,
                 ),
               ),
             ),
