@@ -3,8 +3,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/user_model.dart';
-import 'api_service.dart';
 
 /// Authentication Service
 /// Backend auth API'leri ile iletişim + Token yönetimi
@@ -15,16 +15,13 @@ class AuthService {
 
   final _storage = const FlutterSecureStorage();
   
-  // Base URL'i direkt burada çöz (ApiService'den bağımsız)
+  // ✅ .env dosyasından al
   String get _baseUrl {
-    const baseFromDefine = String.fromEnvironment('BACKEND_BASE', defaultValue: '');
-    if (baseFromDefine.isNotEmpty) return baseFromDefine;
-    
-    const ipFromDefine = String.fromEnvironment('BACKEND_IP', defaultValue: '');
-    if (ipFromDefine.isNotEmpty) return 'http://$ipFromDefine:8000';
-    
-    return 'http://localhost:8000';
+    final backendIp = dotenv.env['API_URL'] ?? 'localhost';
+    final backendPort = dotenv.env['BACKEND_PORT'] ?? '8000';
+    return '$backendIp';
   }
+
 
   // Storage keys
   static const _tokenKey = 'auth_token';
@@ -38,6 +35,8 @@ class AuthService {
     String? fullName,
   }) async {
     try {
+      print('🔗 Register URL: $_baseUrl/api/auth/register'); // Debug
+      
       final response = await http.post(
         Uri.parse('$_baseUrl/api/auth/register'),
         headers: {'Content-Type': 'application/json'},
@@ -48,6 +47,8 @@ class AuthService {
           if (fullName != null) 'full_name': fullName,
         }),
       );
+
+      print('📡 Register Response: ${response.statusCode}'); // Debug
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
@@ -65,6 +66,7 @@ class AuthService {
         throw Exception(error['detail'] ?? 'Registration failed');
       }
     } catch (e) {
+      print('❌ Register error: $e'); // Debug
       throw Exception('Registration error: $e');
     }
   }
@@ -75,6 +77,8 @@ class AuthService {
     required String password,
   }) async {
     try {
+      print('🔗 Login URL: $_baseUrl/api/auth/login'); // Debug
+      
       final response = await http.post(
         Uri.parse('$_baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -83,6 +87,8 @@ class AuthService {
           'password': password,
         }),
       );
+
+      print('📡 Login Response: ${response.statusCode}'); // Debug
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -95,9 +101,11 @@ class AuthService {
         return loginResponse;
       } else {
         final error = jsonDecode(response.body);
+        print('❌ Login error response: ${error['detail']}'); // Debug
         throw Exception(error['detail'] ?? 'Login failed');
       }
     } catch (e) {
+      print('❌ Login error: $e'); // Debug
       throw Exception('Login error: $e');
     }
   }
