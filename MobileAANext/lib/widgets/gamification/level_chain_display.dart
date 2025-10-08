@@ -3,18 +3,21 @@
 import 'package:flutter/material.dart';
 
 /// Level Chain Display Widget
-/// Zincir şeklinde level gösterimi
+/// Düğüm şeklinde level gösterimi
+/// Her düğüm = 100 XP
 class LevelChainDisplay extends StatelessWidget {
   final int currentLevel;
-  final int currentChain;
-  final int totalChains;
+  final int currentNode;
+  final int totalNodes;
+  final int currentXP; // Mevcut düğümdeki XP (0-100)
   final bool compact;
 
   const LevelChainDisplay({
     Key? key,
     required this.currentLevel,
-    required this.currentChain,
-    required this.totalChains,
+    required this.currentNode,
+    required this.totalNodes,
+    this.currentXP = 0,
     this.compact = false,
   }) : super(key: key);
 
@@ -26,7 +29,9 @@ class LevelChainDisplay extends StatelessWidget {
     return _buildFull(context);
   }
 
-  // Compact version (Reels üstünde)
+  // ============ COMPACT VERSION ============
+  // Reels üstünde kullanılıyor (artık overlay var ama yedek)
+  
   Widget _buildCompact() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -37,9 +42,9 @@ class LevelChainDisplay extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
+          const Text(
             '⚡',
-            style: const TextStyle(fontSize: 14),
+            style: TextStyle(fontSize: 14),
           ),
           const SizedBox(width: 4),
           Text(
@@ -55,10 +60,15 @@ class LevelChainDisplay extends StatelessWidget {
     );
   }
 
-  // Full version (Profile ve Home sayfasında)
+  // ============ FULL VERSION ============
+  // Ana sayfa ve profil sayfasında kullanılıyor
+  
   Widget _buildFull(BuildContext context) {
+    final levelProgress = totalNodes > 0 ? currentNode / totalNodes : 0.0;
+    final nodeProgress = currentXP / 100;
+    
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -66,28 +76,36 @@ class LevelChainDisplay extends StatelessWidget {
             Colors.orange[50]!,
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.amber[200]!, width: 1.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.amber[200]!, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(0.2),
+            blurRadius: 12,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Level header
+          // Header: Level info
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [Colors.amber[400]!, Colors.orange[500]!],
                       ),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.amber.withOpacity(0.3),
+                          color: Colors.amber.withOpacity(0.4),
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),
@@ -95,26 +113,27 @@ class LevelChainDisplay extends StatelessWidget {
                     ),
                     child: const Text(
                       '⚡',
-                      style: TextStyle(fontSize: 20),
+                      style: TextStyle(fontSize: 24),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Level $currentLevel',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Colors.orange[800],
+                          color: Colors.orange[900],
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        '$currentChain / $totalChains zincir',
+                        '$currentNode / $totalNodes düğüm',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                           color: Colors.grey[600],
                         ),
                       ),
@@ -122,21 +141,22 @@ class LevelChainDisplay extends StatelessWidget {
                   ),
                 ],
               ),
+              
               // Progress percentage
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+                  horizontal: 14,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber[300]!),
+                  border: Border.all(color: Colors.amber[300]!, width: 2),
                 ),
                 child: Text(
-                  '${((currentChain / totalChains) * 100).toInt()}%',
+                  '${(levelProgress * 100).toInt()}%',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.orange[700],
                   ),
@@ -145,100 +165,224 @@ class LevelChainDisplay extends StatelessWidget {
             ],
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           
           // Chain visualization
-          _buildChainRow(),
+          _buildChainRow(nodeProgress),
           
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           
-          // Next level info
-          Text(
-            'Sonraki level: ${totalChains - currentChain} zincir kaldı',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600],
-            ),
-          ),
+          // Progress bar
+          _buildLevelProgressBar(levelProgress),
+          
+          const SizedBox(height: 12),
+          
+          // Info text
+          _buildInfoText(),
         ],
       ),
     );
   }
-
-  // Chain görselleştirmesi
-  Widget _buildChainRow() {
-    return Row(
+  
+  // ============ CHAIN GÖRSEL ============
+  
+  Widget _buildChainRow(double nodeProgress) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
-        for (int i = 0; i < totalChains; i++) ...[
-          // Chain node
-          _buildChainNode(i),
+        for (int i = 0; i < totalNodes; i++) ...[
+          _buildChainNode(i, nodeProgress),
           
           // Connector (son node'dan sonra gösterme)
-          if (i < totalChains - 1) _buildConnector(i),
+          if (i < totalNodes - 1) _buildConnector(i),
         ],
       ],
     );
   }
-
-  // Tek bir chain node
-  Widget _buildChainNode(int index) {
-    final isCompleted = index < currentChain;
-    final isCurrent = index == currentChain;
+  
+  // Tek bir düğüm
+  Widget _buildChainNode(int index, double nodeProgress) {
+    final isCompleted = index < currentNode;
+    final isCurrent = index == currentNode;
     
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: 28,
-      height: 28,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isCompleted ? Colors.amber[400] : Colors.grey[300],
+        gradient: isCompleted || isCurrent
+            ? LinearGradient(
+                colors: [Colors.amber[400]!, Colors.orange[500]!],
+              )
+            : null,
+        color: isCompleted || isCurrent ? null : Colors.grey[300],
         border: Border.all(
-          color: isCurrent ? Colors.orange[600]! : Colors.transparent,
+          color: isCurrent ? Colors.orange[700]! : Colors.transparent,
           width: 3,
         ),
         boxShadow: isCompleted || isCurrent
             ? [
                 BoxShadow(
-                  color: Colors.amber.withOpacity(0.4),
-                  blurRadius: 8,
-                  spreadRadius: 1,
+                  color: Colors.amber.withOpacity(0.5),
+                  blurRadius: 10,
+                  spreadRadius: 2,
                 ),
               ]
             : null,
       ),
-      child: Center(
-        child: isCompleted
-            ? Icon(
+      child: Stack(
+        children: [
+          // Completed check
+          if (isCompleted)
+            const Center(
+              child: Icon(
                 Icons.check,
-                size: 16,
+                size: 20,
                 color: Colors.white,
-              )
-            : Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isCurrent ? Colors.orange[600] : Colors.grey[400],
+              ),
+            ),
+          
+          // Current node progress
+          if (isCurrent)
+            Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  value: nodeProgress,
+                  strokeWidth: 3,
+                  backgroundColor: Colors.white.withOpacity(0.3),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               ),
+            ),
+          
+          // Empty node
+          if (!isCompleted && !isCurrent)
+            Center(
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[400],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
-
-  // Connector line
+  
+  // Bağlantı çizgisi
   Widget _buildConnector(int index) {
-    final isCompleted = index < currentChain;
+    final isCompleted = index < currentNode;
     
-    return Expanded(
-      child: Container(
-        height: 3,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: isCompleted ? Colors.amber[400] : Colors.grey[300],
-          borderRadius: BorderRadius.circular(2),
-        ),
+    return Container(
+      width: 16,
+      height: 4,
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        gradient: isCompleted
+            ? LinearGradient(
+                colors: [Colors.amber[400]!, Colors.orange[500]!],
+              )
+            : null,
+        color: isCompleted ? null : Colors.grey[300],
+        borderRadius: BorderRadius.circular(2),
       ),
+    );
+  }
+  
+  // ============ LEVEL PROGRESS BAR ============
+  
+  Widget _buildLevelProgressBar(double progress) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Level İlerlemesi',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 10,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: Stack(
+              children: [
+                // Progress fill
+                FractionallySizedBox(
+                  widthFactor: progress,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.amber[400]!, Colors.orange[500]!],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Shine effect
+                FractionallySizedBox(
+                  widthFactor: progress,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withOpacity(0.4),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // ============ INFO TEXT ============
+  
+  Widget _buildInfoText() {
+    final remainingNodes = totalNodes - currentNode;
+    final remainingXP = (remainingNodes * 100) - currentXP;
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Sonraki level: $remainingNodes düğüm',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[600],
+          ),
+        ),
+        Text(
+          '$remainingXP XP kaldı',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.orange[700],
+          ),
+        ),
+      ],
     );
   }
 }

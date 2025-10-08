@@ -136,17 +136,18 @@ class ProfileView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Level Chain Display
-                  Consumer<GamificationProvider>(
-                    builder: (context, provider, _) {
-                      return LevelChainDisplay(
-                        currentLevel: provider.currentLevel,
-                        currentChain: provider.state.currentChain,
-                        totalChains: provider.state.chainsInLevel,
-                      );
-                    },
-                  ),
-
+                  // DÜZELTİLMİŞ KOD (DOĞRU)
+                    // DÜZELTİLMİŞ KOD (DOĞRU)
+                    Consumer<GamificationProvider>(
+                      builder: (context, provider, _) {
+                        return LevelChainDisplay(
+                          currentLevel: provider.currentLevel,
+                          currentNode: provider.currentNode,          // DOĞRU: Doğrudan provider'dan
+                          totalNodes: provider.state.nodesInLevel,    // DOĞRU: State içindeki doğru isim
+                          currentXP: provider.currentXP,              // DOĞRU: Doğrudan provider'dan
+                        );
+                      },
+                    ),
                   const SizedBox(height: 24),
 
                   // Streak Display
