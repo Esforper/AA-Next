@@ -1,25 +1,27 @@
 // lib/main.dart
-// GÜNCELLEME: SavedReelsProvider + ChatProvider eklendi
+// Auth entegrasyonu + Splash ekranı eklendi
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/reels_provider.dart';
-import 'pages/splash_page.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'providers/gamification_provider.dart';
-import 'providers/saved_reels_provider.dart'; // 🆕
-import 'providers/chat_provider.dart'; // 🆕
+import 'providers/saved_reels_provider.dart';
+import 'providers/chat_provider.dart';
+
+import 'pages/splash_page.dart';
 import 'pages/reels_feed_page.dart';
 import 'views/home_view.dart';
 import 'views/profile_view.dart';
 
 void main() async {
-  await dotenv.load(fileName: ".env");
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   runApp(const AanextApp());
 }
+
 class AanextApp extends StatelessWidget {
   const AanextApp({super.key});
 
@@ -27,7 +29,7 @@ class AanextApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Auth Provider - İlk sırada (diğer provider'lar buna bağımlı olabilir)
+        // Auth Provider - İlk sırada
         ChangeNotifierProvider<AuthProvider>(
           create: (_) => AuthProvider(),
         ),
@@ -36,14 +38,18 @@ class AanextApp extends StatelessWidget {
         ChangeNotifierProvider<ReelsProvider>(
           create: (_) => ReelsProvider()..loadReels(),
         ),
+        
+        // Gamification Provider
         ChangeNotifierProvider<GamificationProvider>(
           create: (_) => GamificationProvider()..init(),
         ),
-        // 🆕 Saved Reels Provider
+        
+        // Saved Reels Provider
         ChangeNotifierProvider<SavedReelsProvider>(
           create: (_) => SavedReelsProvider()..init(),
         ),
-        // 🆕 Chat Provider
+        
+        // Chat Provider
         ChangeNotifierProvider<ChatProvider>(
           create: (_) => ChatProvider()..init(),
         ),
@@ -54,7 +60,6 @@ class AanextApp extends StatelessWidget {
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
           useMaterial3: true,
-          // Input decoration theme (tüm app için)
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
             fillColor: Colors.white,
@@ -64,13 +69,14 @@ class AanextApp extends StatelessWidget {
             ),
           ),
         ),
-        home: const MainNavigator(),
+        // ⚠️ ÖNEMLİ: SplashPage ile başla (auth kontrolü için)
+        home: const SplashPage(),
       ),
     );
   }
 }
 
-// Main Navigator
+// Main Navigator - Auth'dan sonra gelinen sayfa
 class MainNavigator extends StatefulWidget {
   const MainNavigator({super.key});
 

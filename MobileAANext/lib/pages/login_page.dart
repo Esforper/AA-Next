@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'register_page.dart';
-import 'reels_feed_page.dart';
+import '../main.dart'; // MainNavigator için
 
 /// Login Page - Modern ve profesyonel tasarım
 class LoginPage extends StatefulWidget {
@@ -40,8 +40,9 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
 
     if (success) {
+      // ✅ MainNavigator'a yönlendir
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ReelsFeedPage()),
+        MaterialPageRoute(builder: (_) => const MainNavigator()),
       );
     } else {
       // Error göster
@@ -119,14 +120,14 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 8),
 
                     Text(
-                      'Haber dünyasına giriş yapın',
+                      'Devam etmek için giriş yapın',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.white.withOpacity(0.8),
                       ),
                     ),
 
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 40),
 
                     // Email Field
                     Container(
@@ -150,9 +151,10 @@ class _LoginPageState extends State<LoginPage> {
                           hintText: 'ornek@email.com',
                           prefixIcon: Icon(Icons.email_outlined,
                               color: Colors.indigo.shade600),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
                           ),
                           filled: true,
                           fillColor: Colors.white,
@@ -207,9 +209,10 @@ class _LoginPageState extends State<LoginPage> {
                               });
                             },
                           ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
                           ),
                           filled: true,
                           fillColor: Colors.white,
@@ -217,9 +220,6 @@ class _LoginPageState extends State<LoginPage> {
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Şifre gerekli';
-                          }
-                          if (value.length < 8) {
-                            return 'Şifre en az 8 karakter olmalı';
                           }
                           return null;
                         },

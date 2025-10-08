@@ -27,6 +27,7 @@ class SavedReelsView extends StatelessWidget {
                   _showClearDialog(context, savedProv);
                 },
                 icon: const Icon(Icons.delete_outline),
+                tooltip: 'Tümünü Sil',
               );
             },
           ),
@@ -36,6 +37,7 @@ class SavedReelsView extends StatelessWidget {
         builder: (context, savedProv, _) {
           final savedReels = savedProv.savedReels;
 
+          // Boş durum
           if (savedReels.isEmpty) {
             return Center(
               child: Column(
@@ -67,6 +69,7 @@ class SavedReelsView extends StatelessWidget {
             );
           }
 
+          // Kayıtlı reels listesi
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: savedReels.length,
@@ -88,6 +91,7 @@ class SavedReelsView extends StatelessWidget {
                 ),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(12),
+                  // Thumbnail
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.network(
@@ -99,27 +103,31 @@ class SavedReelsView extends StatelessWidget {
                         width: 70,
                         height: 70,
                         color: Colors.grey[300],
-                        child: const Icon(Icons.image, size: 32),
+                        child: Icon(
+                          Icons.image_not_supported,
+                          color: Colors.grey[500],
+                        ),
                       ),
                     ),
                   ),
+                  // Başlık ve tarih
                   title: Text(
                     saved.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 6),
+                    padding: const EdgeInsets.only(top: 8),
                     child: Row(
                       children: [
                         Icon(
-                          Icons.bookmark,
+                          Icons.access_time,
                           size: 14,
-                          color: Colors.amber[700],
+                          color: Colors.grey[500],
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -132,21 +140,23 @@ class SavedReelsView extends StatelessWidget {
                       ],
                     ),
                   ),
+                  // Sil butonu
                   trailing: IconButton(
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: Colors.red[400],
+                    ),
                     onPressed: () {
                       savedProv.unsaveReel(saved.reelId);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Kayıt kaldırıldı'),
-                          duration: Duration(seconds: 1),
+                          duration: Duration(seconds: 2),
                         ),
                       );
                     },
-                    icon: Icon(
-                      Icons.delete_outline,
-                      color: Colors.red[400],
-                    ),
                   ),
+                  // Tıklanınca reels'e git
                   onTap: () {
                     _openInReels(context, saved.reelId);
                   },
@@ -159,6 +169,7 @@ class SavedReelsView extends StatelessWidget {
     );
   }
 
+  // Tarih formatı
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
@@ -174,44 +185,54 @@ class SavedReelsView extends StatelessWidget {
     }
   }
 
+  // Reels'te aç
   void _openInReels(BuildContext context, String reelId) {
     final reelsProv = context.read<ReelsProvider>();
     final index = reelsProv.reels.indexWhere((r) => r.id == reelId);
 
     if (index != -1) {
+      // Reel bulundu, index'e git
       reelsProv.setIndex(index);
-      Navigator.popUntil(context, (route) => route.isFirst);
+      
+      // Ana sayfaya dön (MainNavigator)
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      
+      // Reels tab'ına geç (index 1)
+      // Not: MainNavigator'da tabları kontrol etmek için bir mekanizma gerekebilir
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Reels\'e gidiliyor...'),
+          content: Text('Haber açılıyor...'),
           duration: Duration(seconds: 1),
         ),
       );
     } else {
+      // Reel listede yok
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Haber bulunamadı'),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
         ),
       );
     }
   }
 
+  // Tümünü sil dialog
   void _showClearDialog(BuildContext context, SavedReelsProvider savedProv) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Tümünü Sil'),
+        title: const Text('⚠️ Tümünü Sil'),
         content: const Text(
-          'Tüm kayıtlı haberleri silmek istediğine emin misin?',
+          'Tüm kayıtlı haberleri silmek istediğine emin misin?\n\nBu işlem geri alınamaz.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('İptal'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               savedProv.clearAll();
               Navigator.pop(context);
@@ -222,7 +243,9 @@ class SavedReelsView extends StatelessWidget {
                 ),
               );
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
             child: const Text('Sil'),
           ),
         ],

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'login_page.dart';
-import 'reels_feed_page.dart';
+import '../main.dart'; // MainNavigator için
 
 /// Splash Screen - Uygulama başlangıcı
 /// Token kontrolü yapar ve yönlendirir
@@ -68,10 +68,10 @@ class _SplashPageState extends State<SplashPage>
 
     if (!mounted) return;
 
-    // Yönlendirme
+    // ✅ Yönlendirme: Token varsa MainNavigator, yoksa LoginPage
     if (authProvider.isAuthenticated) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ReelsFeedPage()),
+        MaterialPageRoute(builder: (_) => const MainNavigator()),
       );
     } else {
       Navigator.of(context).pushReplacement(
@@ -127,43 +127,43 @@ class _SplashPageState extends State<SplashPage>
                           color: Colors.indigo.shade700,
                         ),
                       ),
-                      
-                      const SizedBox(height: 30),
-                      
-                      // App Name
+
+                      const SizedBox(height: 32),
+
+                      // App Title
                       const Text(
                         'AA-Next',
                         style: TextStyle(
-                          fontSize: 36,
+                          fontSize: 42,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 8),
-                      
-                      // Tagline
-                      Text(
-                        'Haber Reels',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withOpacity(0.8),
                           letterSpacing: 2,
                         ),
                       ),
-                      
-                      const SizedBox(height: 50),
-                      
-                      // Loading indicator
+
+                      const SizedBox(height: 16),
+
+                      // Subtitle
+                      Text(
+                        'Kısa Videolar, Uzun Eğlence',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white.withOpacity(0.8),
+                          letterSpacing: 1,
+                        ),
+                      ),
+
+                      const SizedBox(height: 48),
+
+                      // Loading Indicator
                       SizedBox(
                         width: 40,
                         height: 40,
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation(
                             Colors.white.withOpacity(0.8),
                           ),
-                          strokeWidth: 3,
                         ),
                       ),
                     ],

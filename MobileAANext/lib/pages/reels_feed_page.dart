@@ -1,7 +1,10 @@
+// lib/pages/reels_feed_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/reels_provider.dart';
+import '../providers/saved_reels_provider.dart';
 import '../models/reel_model.dart';
 import '../widgets/image_carousel.dart';
 import '../widgets/article_overlay.dart';
@@ -36,7 +39,7 @@ class ReelsFeedPage extends StatelessWidget {
             right: 16,
             bottom: 24,
             child: ReadHandle(
-              threshold: 35, // ✅ Tek parametre (4 yön için)
+              threshold: 35,
               onAction: (action) {
                 final reels = provider.reels;
                 if (reels.isEmpty) return;
@@ -60,15 +63,11 @@ class ReelsFeedPage extends StatelessWidget {
                       );
                     break;
                   case HandleAction.left:
+                    // ✅ SAVE İŞLEMİ AKTİF
                     debugPrint('[Handle] LEFT - Save');
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        const SnackBar(content: Text('İçerik kaydedildi! 📚')),
-                      );
+                    _saveReel(context, reel);
                     break;
                   case HandleAction.none:
-                    debugPrint('[Handle] NONE');
                     break;
                 }
               },
@@ -77,6 +76,107 @@ class ReelsFeedPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildBody(BuildContext context, ReelsProvider provider) {
+    switch (provider.status) {
+      case FeedStatus.initial:
+      case FeedStatus.loading:
+        return const Center(child: CircularProgressIndicator());
+
+      case FeedStatus.error:
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text('Yükleme hatası'),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () => context.read<ReelsProvider>().loadReels(),
+                child: const Text('Tekrar Dene'),
+              ),
+            ],
+          ),
+        );
+
+      case FeedStatus.loaded:
+        final reels = provider.reels;
+        if (reels.isEmpty) {
+          return const Center(child: Text('Gösterilecek içerik yok.'));
+        }
+        return PageView.builder(
+          scrollDirection: Axis.vertical,
+          physics: const PageScrollPhysics(),
+          allowImplicitScrolling: true,
+          itemCount: reels.length,
+          onPageChanged: (i) => context.read<ReelsProvider>().setIndex(i),
+          itemBuilder: (context, i) {
+            final reel = reels[i];
+            return KeyedSubtree(
+              key: ValueKey(reel.id),
+              child: _ReelView(reel: reel),
+            );
+          },
+        );
+    }
+  }
+
+  // ✅ SAVE REEl FONKSİYONU
+  void _saveReel(BuildContext context, Reel reel) {
+    final savedProv = context.read<SavedReelsProvider>();
+    
+    // Toggle save/unsave
+    if (savedProv.isSaved(reel.id)) {
+      // Zaten kayıtlı, kaldır
+      savedProv.unsaveReel(reel.id);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.bookmark_remove, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Kayıt kaldırıldı'),
+              ],
+            ),
+            backgroundColor: Colors.orange[700],
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+    } else {
+      // Kaydet
+      savedProv.saveReel(
+        reelId: reel.id,
+        title: reel.title,
+        imageUrl: reel.imageUrls.isNotEmpty ? reel.imageUrls.first : '',
+      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.bookmark_added, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Haber kaydedildi!'),
+              ],
+            ),
+            backgroundColor: Colors.green[700],
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+    }
   }
 
   void _openArticle(BuildContext context, Reel reel) {
@@ -120,54 +220,12 @@ class ReelsFeedPage extends StatelessWidget {
             ..hideCurrentSnackBar()
             ..showSnackBar(
               const SnackBar(
-                  content: Text('Premium emojiler şimdilik kilitli.')),
+                content: Text('Premium emojiler şimdilik kilitli.'),
+              ),
             );
         },
       ),
     );
-  }
-
-  Widget _buildBody(BuildContext context, ReelsProvider provider) {
-    switch (provider.status) {
-      case FeedStatus.initial:
-      case FeedStatus.loading:
-        return const Center(child: CircularProgressIndicator());
-
-      case FeedStatus.error:
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Haberler yüklenemedi.'),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () => context.read<ReelsProvider>().loadReels(),
-                child: const Text('Tekrar Dene'),
-              ),
-            ],
-          ),
-        );
-
-      case FeedStatus.loaded:
-        final reels = provider.reels;
-        if (reels.isEmpty) {
-          return const Center(child: Text('Gösterilecek içerik yok.'));
-        }
-        return PageView.builder(
-          scrollDirection: Axis.vertical,
-          physics: const PageScrollPhysics(),
-          allowImplicitScrolling: true,
-          itemCount: reels.length,
-          onPageChanged: (i) => context.read<ReelsProvider>().setIndex(i),
-          itemBuilder: (context, i) {
-            final reel = reels[i];
-            return KeyedSubtree(
-              key: ValueKey(reel.id),
-              child: _ReelView(reel: reel),
-            );
-          },
-        );
-    }
   }
 }
 

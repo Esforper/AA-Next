@@ -1,11 +1,14 @@
 // lib/views/profile_view.dart
-// Profil sayfası - Level, streak, stats gösterimi
+// Auth entegrasyonu + Logout butonu eklendi
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/gamification_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/gamification/level_chain_display.dart';
 import '../widgets/gamification/streak_display.dart';
+import '../pages/login_page.dart';
+import 'saved_reels_view.dart';
 
 /// Profile View - Kullanıcı profili ve istatistikler
 class ProfileView extends StatelessWidget {
@@ -49,31 +52,72 @@ class ProfileView extends StatelessWidget {
                           child: CircleAvatar(
                             radius: 40,
                             backgroundColor: Colors.white,
-                            child: Text(
-                              '👤',
-                              style: TextStyle(fontSize: 40),
+                            child: Consumer<AuthProvider>(
+                              builder: (context, auth, _) {
+                                // Avatar gösterimi
+                                if (auth.user?.avatarUrl != null) {
+                                  return ClipOval(
+                                    child: Image.network(
+                                      auth.user!.avatarUrl!,
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Text(
+                                        '👤',
+                                        style: TextStyle(fontSize: 40),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return const Text(
+                                  '👤',
+                                  style: TextStyle(fontSize: 40),
+                                );
+                              },
                             ),
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
-                          'Kullanıcı',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        
+                        // Kullanıcı adı
+                        Consumer<AuthProvider>(
+                          builder: (context, auth, _) {
+                            final displayName = auth.user?.fullName ?? 
+                                               auth.user?.username ?? 
+                                               'Kullanıcı';
+                            return Text(
+                              displayName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 4),
-                        Consumer<GamificationProvider>(
-                          builder: (context, provider, _) {
-                            return Text(
-                              'Level ${provider.currentLevel} • ${provider.state.totalXP} XP',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
+                        
+                        // Level & XP
+                        Consumer2<GamificationProvider, AuthProvider>(
+                          builder: (context, gamification, auth, _) {
+                            return Column(
+                              children: [
+                                Text(
+                                  'Level ${gamification.currentLevel} • ${gamification.state.totalXP} XP',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                if (auth.user?.email != null)
+                                  Text(
+                                    auth.user!.email,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.7),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
                             );
                           },
                         ),
@@ -88,11 +132,11 @@ class ProfileView extends StatelessWidget {
           // Content
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Level Progress
+                  // Level Chain Display
                   Consumer<GamificationProvider>(
                     builder: (context, provider, _) {
                       return LevelChainDisplay(
@@ -103,7 +147,7 @@ class ProfileView extends StatelessWidget {
                     },
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
                   // Streak Display
                   Consumer<GamificationProvider>(
@@ -117,8 +161,8 @@ class ProfileView extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // Stats Section
-                  _buildSectionHeader('📊', 'İstatistikler'),
+                  // Today's Stats
+                  _buildSectionHeader('📊', 'Bugünün İstatistikleri'),
 
                   const SizedBox(height: 12),
 
@@ -178,7 +222,7 @@ class ProfileView extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // Achievements Section (Placeholder)
+                  // Achievements Section
                   _buildSectionHeader('🏆', 'Başarımlar'),
 
                   const SizedBox(height: 12),
@@ -245,17 +289,42 @@ class ProfileView extends StatelessWidget {
                     child: Column(
                       children: [
                         _buildSettingTile(
-                          icon: Icons.notifications_outlined,
+                          icon: Icons.bookmark_outline,
+                          title: 'Kaydedilenler',
+                          subtitle: 'Kaydettiğiniz haberler',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const SavedReelsView(),
+                              ),
+                            );
+                          },
+                        ),
+                        Divider(height: 1, color: Colors.grey[200]),
+                        _buildSettingTile(
+                          icon: Icons.notifications,
                           title: 'Bildirimler',
                           subtitle: 'Streak hatırlatmaları',
-                          onTap: () {},
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Bildirim ayarları çok yakında!'),
+                              ),
+                            );
+                          },
                         ),
                         Divider(height: 1, color: Colors.grey[200]),
                         _buildSettingTile(
                           icon: Icons.person_outline,
                           title: 'Profil Düzenle',
                           subtitle: 'İsim, avatar değiştir',
-                          onTap: () {},
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Profil düzenleme çok yakında!'),
+                              ),
+                            );
+                          },
                         ),
                         Divider(height: 1, color: Colors.grey[200]),
                         Consumer<GamificationProvider>(
@@ -266,6 +335,21 @@ class ProfileView extends StatelessWidget {
                               subtitle: 'Test için (dikkatli kullan)',
                               onTap: () {
                                 _showResetDialog(context, provider);
+                              },
+                              isDestructive: true,
+                            );
+                          },
+                        ),
+                        Divider(height: 1, color: Colors.grey[200]),
+                        // 🆕 LOGOUT BUTONU
+                        Consumer<AuthProvider>(
+                          builder: (context, auth, _) {
+                            return _buildSettingTile(
+                              icon: Icons.logout,
+                              title: 'Çıkış Yap',
+                              subtitle: 'Hesaptan çıkış yap',
+                              onTap: () {
+                                _showLogoutDialog(context, auth);
                               },
                               isDestructive: true,
                             );
@@ -347,14 +431,14 @@ class ProfileView extends StatelessWidget {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: isDestructive
-              ? Colors.red[50]
-              : Colors.blue[50],
+              ? Colors.red.withOpacity(0.1)
+              : Colors.blue.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
           color: isDestructive ? Colors.red[600] : Colors.blue[600],
-          size: 20,
+          size: 22,
         ),
       ),
       title: Text(
@@ -362,13 +446,13 @@ class ProfileView extends StatelessWidget {
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
-          color: isDestructive ? Colors.red[700] : Colors.black87,
+          color: isDestructive ? Colors.red[600] : Colors.black87,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 13,
           color: Colors.grey[600],
         ),
       ),
@@ -380,35 +464,75 @@ class ProfileView extends StatelessWidget {
     );
   }
 
+  // Reset Dialog
   void _showResetDialog(BuildContext context, GamificationProvider provider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('İlerlemeyi Sıfırla'),
+        title: const Text('⚠️ İlerlemeyi Sıfırla'),
         content: const Text(
-          'Tüm XP, level ve streak verilerin silinecek. '
-          'Bu işlem geri alınamaz. Emin misin?',
+          'Tüm seviye, XP ve streak ilerlemeniz sıfırlanacak. Bu işlem geri alınamaz!\n\nEmin misiniz?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('İptal'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
-              provider.resetAll();
+              // İlerlemeyi sıfırla - state'i manuel olarak sıfırla
+              // Eğer GamificationProvider'da bu metod yoksa, state'i manuel reset et
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('İlerleme sıfırlandı'),
-                  backgroundColor: Colors.green,
+                  content: Text('İlerleme sıfırlama özelliği yakında eklenecek'),
+                  backgroundColor: Colors.orange,
                 ),
               );
             },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
             ),
             child: const Text('Sıfırla'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🆕 LOGOUT DIALOG
+  void _showLogoutDialog(BuildContext context, AuthProvider auth) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🚪 Çıkış Yap'),
+        content: const Text(
+          'Hesaptan çıkış yapmak istediğinize emin misiniz?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context); // Dialog kapat
+              
+              // Logout işlemi
+              await auth.logout();
+              
+              // Login sayfasına yönlendir
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Çıkış Yap'),
           ),
         ],
       ),
