@@ -7,16 +7,16 @@ class ReadHandle extends StatefulWidget {
   final ValueChanged<HandleAction> onAction;
 
   /// Ray ölçüleri ve eşikler
-  final Size trackSize; // daha yüksek yaptık: 140 x 110
-  final double knobSize; // 40
+  final Size trackSize; // önceki: 140 x 110 -> daha kompakt
+  final double knobSize; // önceki: 40 -> 36
   final double thresholdRight; // 28
   final double thresholdUp; // 28
 
   const ReadHandle({
     super.key,
     required this.onAction,
-    this.trackSize = const Size(140, 110),
-    this.knobSize = 40,
+    this.trackSize = const Size(110, 72),
+    this.knobSize = 36,
     this.thresholdRight = 28,
     this.thresholdUp = 28,
   });
@@ -87,10 +87,21 @@ class _ReadHandleState extends State<ReadHandle>
         setState(() => _offset = next);
       },
       onPanEnd: (_) {
+        // Eşikleri mevcut ray boyutuna göre dinamikleştir
+        final r = widget.knobSize / 2;
+        final maxX = (widget.trackSize.width / 2) - r - 4;
+        final maxY = (widget.trackSize.height / 2) - r - 4;
+        final double effRight = widget.thresholdRight <= maxX * 0.9
+            ? widget.thresholdRight
+            : (maxX * 0.9);
+        final double effUp = widget.thresholdUp <= maxY * 0.9
+            ? widget.thresholdUp
+            : (maxY * 0.9);
+
         // karar ver
-        if (-_offset.dy >= widget.thresholdUp) {
+        if (-_offset.dy >= effUp) {
           widget.onAction(HandleAction.up);
-        } else if (_offset.dx >= widget.thresholdRight) {
+        } else if (_offset.dx >= effRight) {
           widget.onAction(HandleAction.right);
         } else {
           widget.onAction(HandleAction.none);
@@ -100,26 +111,26 @@ class _ReadHandleState extends State<ReadHandle>
       child: Container(
         width: trackW,
         height: trackH,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
+          color: Colors.black.withOpacity(0.65),
           borderRadius: BorderRadius.circular(trackH / 2),
           boxShadow: const [
             BoxShadow(
-                blurRadius: 8, color: Colors.black26, offset: Offset(0, 2)),
+                blurRadius: 6, color: Colors.black26, offset: Offset(0, 2)),
           ],
         ),
         child: Stack(
           alignment: Alignment.centerLeft,
           children: [
             Positioned(
-              left: 12,
+              left: 10,
               child: Row(
                 children: const [
-                  Icon(Icons.arrow_upward, color: Colors.white70, size: 18),
-                  SizedBox(width: 8),
+                  Icon(Icons.arrow_upward, color: Colors.white70, size: 16),
+                  SizedBox(width: 6),
                   Icon(Icons.emoji_emotions_outlined,
-                      color: Colors.white70, size: 18),
+                      color: Colors.white70, size: 16),
                 ],
               ),
             ),
@@ -136,7 +147,7 @@ class _ReadHandleState extends State<ReadHandle>
                 child: const Text(
                   'Read',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                     color: Colors.black87,
                   ),

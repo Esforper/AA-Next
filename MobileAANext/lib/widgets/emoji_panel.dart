@@ -4,11 +4,11 @@ import 'package:flutter/services.dart';
 
 class EmojiPanel extends StatefulWidget {
   final List<String> publicEmojis; // alt yay
-  final List<String> premiumEmojis; // Ã¼st yay
+  final List<String> premiumEmojis; // üst yay
   final void Function(String emoji) onPick;
   final VoidCallback onTapPremium;
 
-  // âš™ï¸ yeni: itemSize ile balon Ã§apÄ±nÄ± kontrol edebiliyorsun
+  // ?? yeni: itemSize ile balon çapını kontrol edebiliyorsun
   final double itemSize;
 
   const EmojiPanel({
@@ -17,7 +17,7 @@ class EmojiPanel extends StatefulWidget {
     required this.premiumEmojis,
     required this.onPick,
     required this.onTapPremium,
-    this.itemSize = 44, // 56 â†’ 44 (ekrandaki gibi daha kompakt)
+    this.itemSize = 40, // 56 › 44 (ekrandaki gibi daha kompakt)
   });
 
   @override
@@ -52,13 +52,15 @@ class _EmojiPanelState extends State<EmojiPanel>
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
 
-    // ğŸ“ yay yarÄ±Ã§aplarÄ± (daha sÄ±kÄ±)
+    // ?? yay yarıçapları (daha sıkı)
     final s = widget.itemSize;
-    final double radiusPublic = math.min(width * 0.50, 120.0).toDouble(); // alt
-    final radiusPremium = radiusPublic + s * 0.95; // Ã¼st â†’ altÄ±n biraz dÄ±ÅŸÄ±
+    final double radiusPublic = math.min(width * 0.42, 110.0).toDouble(); // alt
+    final radiusPremium = radiusPublic + s * 0.85; // üst › altın biraz dışı
+    final panelHeight = radiusPremium + s + 4;
 
     return SafeArea(
       top: false,
+      bottom: false,
       child: AnimatedBuilder(
         animation: _ac,
         builder: (_, __) {
@@ -67,7 +69,7 @@ class _EmojiPanelState extends State<EmojiPanel>
             child: Transform.translate(
               offset: Offset(0, _slide.value),
               child: SizedBox(
-                height: 230, // 250 â†’ 230
+                height: panelHeight,
                 child: Stack(
                   alignment: Alignment.bottomCenter,
                   children: [
@@ -82,8 +84,8 @@ class _EmojiPanelState extends State<EmojiPanel>
                                 ))
                             .toList(),
                         radius: radiusPremium,
-                        angleStart: math.pi * 1.14,
-                        angleEnd: math.pi * 1.86,
+                        angleStart: math.pi * 1.20,
+                        angleEnd: math.pi * 1.80,
                         itemSize: s,
                       ),
                     if (widget.publicEmojis.isNotEmpty)
@@ -99,31 +101,10 @@ class _EmojiPanelState extends State<EmojiPanel>
                                 ))
                             .toList(),
                         radius: radiusPublic,
-                        angleStart: math.pi * 1.10, // biraz daha geniÅŸ
-                        angleEnd: math.pi * 1.90,
+                        angleStart: math.pi * 1.20,
+                        angleEnd: math.pi * 1.80,
                         itemSize: s,
-                      ),
-                    // alt etiket
-                    Positioned(
-                      bottom: 10,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.35),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Padding(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          child: Text(
-                            'Tepki ekle',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12),
-                          ),
-                        ),
-                      ),
-                    ),
+                      ),                    // alt etiket kald?r?ld?; emojiler direkt ba?l?yor
                   ],
                 ),
               ),
@@ -168,7 +149,7 @@ class _Fan extends StatelessWidget {
 
           return Positioned(
             left: (w / 2) + cx - (s / 2),
-            bottom: 16 - cy - (s / 2),
+            bottom: -cy - (s / 2),
             child: SizedBox(width: s, height: s, child: items[i]),
           );
         }),
@@ -224,7 +205,7 @@ class _EmojiItemState extends State<_EmojiItem> {
               children: [
                 SizedBox(width: s, height: s),
                 Text(widget.emoji,
-                    style: TextStyle(fontSize: s * 0.48)), // ~21px
+                    style: TextStyle(fontSize: s * 0.46)), // ~21px
                 if (widget.locked)
                   Positioned(
                     right: 6,
