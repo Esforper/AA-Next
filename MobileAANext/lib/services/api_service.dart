@@ -3,53 +3,36 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../models/reel_model.dart';
 import 'auth_service.dart';
 
 class ApiService {
   // =========================
-  // 💡 Esnek host çözümleme
+  // 💡 .env'den base URL al
   // =========================
-  static const int _port = 8000;
-
-  static final String _baseFromDefine =
-      const String.fromEnvironment('BACKEND_BASE', defaultValue: '');
-
-  static final String _ipFromDefine =
-      const String.fromEnvironment('BACKEND_IP', defaultValue: '');
-
-  static final bool _useEmulator =
-      const String.fromEnvironment('USE_EMULATOR', defaultValue: 'false')
-              .toLowerCase() ==
-          'true';
-
   static String _resolveHostBase() {
-    if (_baseFromDefine.isNotEmpty) {
-      return _baseFromDefine;
+    // .env'den oku
+    final envUrl = dotenv.env['API_URL'];
+    if (envUrl != null && envUrl.isNotEmpty) {
+      return envUrl;
     }
 
+    // Fallback: Platform'a göre
     if (kIsWeb) {
       return Uri.base.origin;
     }
 
-    if (!kIsWeb && _isIOS) {
-      return 'http://localhost:$_port';
-    }
-
     if (!kIsWeb && _isAndroid) {
-      if (_ipFromDefine.isNotEmpty) {
-        return 'http://$_ipFromDefine:$_port';
-      }
-
-      if (_useEmulator) {
-        return 'http://10.0.2.2:$_port';
-      }
-
-      return 'http://localhost:$_port';
+      return 'http://10.0.2.2:8000'; // Android emulator
     }
 
-    return 'http://localhost:$_port';
+    if (!kIsWeb && _isIOS) {
+      return 'http://localhost:8000'; // iOS simulator
+    }
+
+    return 'http://localhost:8000';
   }
 
   static bool get _isAndroid {
@@ -72,78 +55,74 @@ class ApiService {
   // 🔐 Auth Token Yönetimi
   // =========================
   final AuthService _authService = AuthService();
+Future<Map<String, String>> _getHeaders() async {
+  final headers = <String, String>{
+    'Content-Type': 'application/json',
+    'X-User-ID': 'demo_user_123', // 👈 Geçici user ID
+  };
 
-  /// Authorization header'ını al (token varsa)
-  Future<Map<String, String>> _getHeaders() async {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
-
-    // Token varsa ekle
-    final token = await _authService.getToken();
-    if (token != null && !token.isExpired) {
-      headers['Authorization'] = 'Bearer ${token.accessToken}';
-    }
-
-    return headers;
+  final token = await _authService.getToken();
+  if (token != null && !token.isExpired) {
+    headers['Authorization'] = 'Bearer ${token.accessToken}';
   }
 
+  return headers;
+}
   // =========================
   // 📡 API Endpoints
   // =========================
   final String _baseUrl = _resolveHostBase();
+Future<List<Reel>> fetchReels({
+  int limit = 20,
+  String? cursor,
+}) async {
+  try {
+    final headers = await _getHeaders();
+    final uri = Uri.parse('$_baseUrl/api/reels/feed').replace(
+      queryParameters: {
+        'limit': limit.toString(),
+        if (cursor != null) 'cursor': cursor,
+      },
+    );
 
-  /// Reels feed'ini çek
-  Future<List<Reel>> fetchReels({
-    int limit = 20,
-    String? cursor,
-  }) async {
-    try {
-      final headers = await _getHeaders();
-      final uri = Uri.parse('$_baseUrl/api/reels/feed').replace(
-        queryParameters: {
-          'limit': limit.toString(),
-          if (cursor != null) 'cursor': cursor,
-        },
-      );
+    print('🔍 Fetching reels from: $uri'); // Debug
+    final response = await http.get(uri, headers: headers);
+    print('📡 Response status: ${response.statusCode}'); // Debug
+    print('📦 Response body: ${response.body}'); // Debug
 
-      final response = await http.get(uri, headers: headers);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final reelsList = data['reels'] as List;
-        return reelsList.map((json) => Reel.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load reels: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Fetch reels error: $e');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final reelsList = data['reels'] as List;
+      return reelsList.map((json) => Reel.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load reels: ${response.statusCode}');
     }
+  } catch (e) {
+    throw Exception('Fetch reels error: $e');
   }
+}
 
-  /// Reel izleme tracking'i gönder (kısa versiyon)
   Future<void> trackView({
     required String reelId,
     String? category,
-    String? emojiReaction, // ✅ Emoji parametresi eklendi
+    String? emojiReaction,
   }) async {
     await trackReelView(
       reelId: reelId,
       durationMs: 0,
       completed: false,
       category: category,
-      emojiReaction: emojiReaction, // ✅ Emoji geçildi
+      emojiReaction: emojiReaction,
     );
   }
 
-  /// Reel izleme tracking'i gönder (detaylı) - ✅ GÜNCELLEME
   Future<void> trackReelView({
     required String reelId,
     required int durationMs,
     required bool completed,
     String? category,
     String? sessionId,
-    String? emojiReaction, // ✅ Yeni parametre
+    String? emojiReaction,
     int? pausedCount,
     bool? replayed,
     bool? shared,
@@ -160,7 +139,7 @@ class ApiService {
           'completed': completed,
           if (category != null) 'category': category,
           if (sessionId != null) 'session_id': sessionId,
-          if (emojiReaction != null) 'emoji_reaction': emojiReaction, // ✅ Emoji eklendi
+          if (emojiReaction != null) 'emoji_reaction': emojiReaction,
           if (pausedCount != null) 'paused_count': pausedCount,
           if (replayed != null) 'replayed': replayed,
           if (shared != null) 'shared': shared,
@@ -176,7 +155,6 @@ class ApiService {
     }
   }
 
-  /// Detail view tracking'i gönder
   Future<void> trackDetailView({
     required String reelId,
     required int durationMs,
@@ -202,7 +180,6 @@ class ApiService {
     }
   }
 
-  /// Günlük progress'i al
   Future<Map<String, dynamic>?> fetchDailyProgress(String userId) async {
     try {
       final headers = await _getHeaders();
@@ -221,7 +198,6 @@ class ApiService {
     }
   }
 
-  /// User istatistiklerini al
   Future<Map<String, dynamic>?> fetchUserStats(String userId) async {
     try {
       final headers = await _getHeaders();
@@ -240,7 +216,6 @@ class ApiService {
     }
   }
 
-  /// Emoji tracking'i gönder (özel metod)
   Future<void> trackEmoji({
     required String reelId,
     required String emoji,
@@ -252,7 +227,4 @@ class ApiService {
       emojiReaction: emoji,
     );
   }
-
-
-
 }
