@@ -125,22 +125,29 @@ class ApiService {
   Future<void> trackView({
     required String reelId,
     String? category,
+    String? emojiReaction, // ✅ Emoji parametresi eklendi
   }) async {
     await trackReelView(
       reelId: reelId,
       durationMs: 0,
       completed: false,
       category: category,
+      emojiReaction: emojiReaction, // ✅ Emoji geçildi
     );
   }
 
-  /// Reel izleme tracking'i gönder (detaylı)
+  /// Reel izleme tracking'i gönder (detaylı) - ✅ GÜNCELLEME
   Future<void> trackReelView({
     required String reelId,
     required int durationMs,
     required bool completed,
     String? category,
     String? sessionId,
+    String? emojiReaction, // ✅ Yeni parametre
+    int? pausedCount,
+    bool? replayed,
+    bool? shared,
+    bool? saved,
   }) async {
     try {
       final headers = await _getHeaders();
@@ -153,6 +160,11 @@ class ApiService {
           'completed': completed,
           if (category != null) 'category': category,
           if (sessionId != null) 'session_id': sessionId,
+          if (emojiReaction != null) 'emoji_reaction': emojiReaction, // ✅ Emoji eklendi
+          if (pausedCount != null) 'paused_count': pausedCount,
+          if (replayed != null) 'replayed': replayed,
+          if (shared != null) 'shared': shared,
+          if (saved != null) 'saved': saved,
         }),
       );
 
@@ -227,4 +239,20 @@ class ApiService {
       return null;
     }
   }
+
+  /// Emoji tracking'i gönder (özel metod)
+  Future<void> trackEmoji({
+    required String reelId,
+    required String emoji,
+    String? category,
+  }) async {
+    await trackView(
+      reelId: reelId,
+      category: category,
+      emojiReaction: emoji,
+    );
+  }
+
+
+
 }

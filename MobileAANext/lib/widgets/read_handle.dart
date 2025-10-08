@@ -1,17 +1,20 @@
-// lib/widgets/read_handle.dart
-// GÜNCELLEME: 4 yön (yukarı, sağ, aşağı, sol) + orta pozisyon
-
 import 'package:flutter/material.dart';
 
-/// 4 yönlü handle
+/// 4 yön: Yukarı, Sağ, Aşağı, Sol
 enum HandleAction { up, right, down, left, none }
 
 class ReadHandle extends StatefulWidget {
   final ValueChanged<HandleAction> onAction;
+  final Size trackSize;
+  final double knobSize;
+  final double threshold; // Tek eşik değeri (4 yön için)
 
-    this.trackSize = const Size(160, 160), // Daha büyük (4 yön için)
-    this.knobSize = 50,
-    this.threshold = 35,
+  const ReadHandle({
+    super.key,
+    required this.onAction,
+    this.trackSize = const Size(140, 140), // Kare yapıldı (4 yön için)
+    this.knobSize = 40,
+    this.threshold = 35, // Daha yüksek eşik
   });
 
   @override
@@ -29,8 +32,11 @@ class _ReadHandleState extends State<ReadHandle>
     super.initState();
     _anim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 220),
+    );
+    _spring = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
         .chain(CurveTween(curve: Curves.easeOutBack))
+        .animate(_anim)
       ..addListener(() => setState(() {}))
       ..addStatusListener((s) {
         if (s == AnimationStatus.completed) _offset = Offset.zero;
@@ -63,6 +69,31 @@ class _ReadHandleState extends State<ReadHandle>
     );
   }
 
+  HandleAction _detectDirection() {
+    final dx = _offset.dx.abs();
+    final dy = _offset.dy.abs();
+    final threshold = widget.threshold;
+
+    // Hangi eksen daha baskın?
+    if (dx > dy) {
+      // Yatay hareket
+      if (_offset.dx > threshold) {
+        return HandleAction.right;
+      } else if (_offset.dx < -threshold) {
+        return HandleAction.left;
+      }
+    } else {
+      // Dikey hareket
+      if (_offset.dy > threshold) {
+        return HandleAction.down;
+      } else if (_offset.dy < -threshold) {
+        return HandleAction.up;
+      }
+    }
+    
+    return HandleAction.none;
+  }
+
   @override
   Widget build(BuildContext context) {
     final trackW = widget.trackSize.width;
@@ -76,81 +107,44 @@ class _ReadHandleState extends State<ReadHandle>
         setState(() => _offset = next);
       },
       onPanEnd: (_) {
-        // 4 yön kontrolü
-        final absX = _offset.dx.abs();
-        final absY = _offset.dy.abs();
-
-        if (absX > absY) {
-          // Yatay hareket
-          if (_offset.dx > widget.threshold) {
-            widget.onAction(HandleAction.right); // Emoji
-          } else if (_offset.dx < -widget.threshold) {
-            widget.onAction(HandleAction.left); // Kaydet
-          } else {
-            widget.onAction(HandleAction.none);
-          }
-        } else {
-          // Dikey hareket
-          if (-_offset.dy > widget.threshold) {
-            widget.onAction(HandleAction.up); // Detail
-          } else if (_offset.dy > widget.threshold) {
-            widget.onAction(HandleAction.down); // Paylaş
-          } else {
-            widget.onAction(HandleAction.none);
-          }
-        }
-
+        final action = _detectDirection();
+        widget.onAction(action);
         _animateBack();
       },
       child: Container(
         width: trackW,
         height: trackH,
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.3), // Dış çember (silik)
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withOpacity(0.3),
-            width: 2,
-          ),
+          color: Colors.black.withOpacity(0.7),
+          shape: BoxShape.circle, // Daire şekli (4 yön için)
+          boxShadow: const [
+            BoxShadow(
+                blurRadius: 8, color: Colors.black38, offset: Offset(0, 3)),
+          ],
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // 4 yön ikonları
+            // 4 Yön İkonları
             Positioned(
               top: 12,
-              child: Icon(
-                Icons.arrow_upward,
-                color: Colors.white.withOpacity(0.7),
-                size: 20,
-              ),
+              child: Icon(Icons.arrow_upward, color: Colors.white70, size: 18),
             ),
             Positioned(
               right: 12,
-              child: Icon(
-                Icons.emoji_emotions_outlined,
-                color: Colors.white.withOpacity(0.7),
-                size: 20,
-              ),
+              child: Icon(Icons.emoji_emotions_outlined,
+                  color: Colors.white70, size: 18),
             ),
             Positioned(
               bottom: 12,
-              child: Icon(
-                Icons.share_outlined,
-                color: Colors.white.withOpacity(0.7),
-                size: 20,
-              ),
+              child: Icon(Icons.share_outlined, color: Colors.white70, size: 18),
             ),
             Positioned(
               left: 12,
-              child: Icon(
-                Icons.bookmark_outline,
-                color: Colors.white.withOpacity(0.7),
-                size: 20,
-              ),
+              child: Icon(Icons.bookmark_outline, color: Colors.white70, size: 18),
             ),
 
-            // Ortadaki kulp (beyaz yuvarlak)
+            // Hareketli Kulp
             Transform.translate(
               offset: pos,
               child: Container(
@@ -159,23 +153,19 @@ class _ReadHandleState extends State<ReadHandle>
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 12,
-                      spreadRadius: 2,
+                      blurRadius: 4,
+                      color: Colors.black26,
+                      offset: Offset(0, 2),
                     ),
                   ],
                 ),
                 alignment: Alignment.center,
-                child: const Text(
-                  'Sürükle',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
+                child: const Icon(
+                  Icons.drag_indicator,
+                  color: Colors.black87,
+                  size: 20,
                 ),
               ),
             ),
