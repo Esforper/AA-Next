@@ -142,7 +142,7 @@ class Settings(BaseSettings):
     
     jwt_secret_key: str = "your-secret-key-change-this-in-production"
     jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 24  # Token 24 saat geçerli
+    jwt_expire_hours: int = 720  # Token 24 saat geçerli
 
 
     class Config:

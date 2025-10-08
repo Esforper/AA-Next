@@ -59,9 +59,15 @@ async def register(user_data: UserCreate):
     try:
         user, token = await auth_service.register(user_data)
         return RegisterResponse(user=user_to_response(user), token=token)
-    except ValueError as e: raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e: raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Registration failed")
-
+    except ValueError as e: 
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e: 
+        print(f"❌❌❌ REGISTER ERROR: {e}")  # ← Bu satırı ekle
+        import traceback
+        traceback.print_exc()  # ← Ve bunu
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Registration failed: {str(e)}")
+    
+    
 @router.post("/auth/login", response_model=LoginResponse)
 async def login(login_data: UserLogin):
     try:
