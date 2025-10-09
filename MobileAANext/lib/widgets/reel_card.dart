@@ -3,7 +3,10 @@ import '../models/reel_model.dart';
 import 'image_carousel.dart';
 import 'read_handle.dart';
 import 'emoji_panel.dart';
-import 'article_overlay.dart';
+// DÜZELTME 1: Eski widget yerine yeni oluşturduğumuz ArticleReaderSheet'i import ediyoruz.
+import 'article_reader_sheet.dart'; 
+// DÜZELTME 2: Artık kullanılmayan eski import'u siliyoruz.
+// import 'article_overlay.dart'; 
 import '../services/api_service.dart';
 
 class ReelCard extends StatefulWidget {
@@ -67,7 +70,7 @@ class _ReelCardState extends State<ReelCard>
           right: 16,
           bottom: 24,
           child: ReadHandle(
-            onAction: (action) async {
+            onAction: (action) { // 'async' kaldırıldı
               switch (action) {
                 case HandleAction.up:
                   // ⬆️ YUKARΙ: Detay Makale Aç
@@ -76,28 +79,29 @@ class _ReelCardState extends State<ReelCard>
                     context: context,
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
-                    builder: (_) => ArticleOverlay(
+                    builder: (_) => ArticleReaderSheet(
+                      articleId: reel.id,
                       title: reel.title,
                       body: reel.fullText,
+                      // HATA BURADAYDI: Parametre 'imageUrl' -> 'imageUrls' olarak düzeltildi.
+                      imageUrls: reel.imageUrls,
                       onClose: () => Navigator.pop(context),
                     ),
                   );
                   break;
 
                 case HandleAction.right:
-                  // ➡️ SAĞA: Emoji Panel Aç
                   debugPrint('[Handle] RIGHT - Emoji Panel');
                   setState(() => _showEmojis = true);
                   break;
 
                 case HandleAction.down:
-                  // ⬇️ AŞAĞI: Paylaş
                   debugPrint('[Handle] DOWN - Share');
-                  if (!mounted) return;
                   ScaffoldMessenger.of(context)
                     ..hideCurrentSnackBar()
                     ..showSnackBar(
-                      SnackBar(
+                      // DÜZELTME 4: 'const' eklenerek performans artırıldı.
+                      const SnackBar(
                         content: Text('Paylaşım özelliği yakında...'),
                         duration: Duration(seconds: 2),
                       ),
@@ -105,13 +109,12 @@ class _ReelCardState extends State<ReelCard>
                   break;
 
                 case HandleAction.left:
-                  // ⬅️ SOLA: Kaydet
                   debugPrint('[Handle] LEFT - Save');
-                  if (!mounted) return;
                   ScaffoldMessenger.of(context)
                     ..hideCurrentSnackBar()
                     ..showSnackBar(
-                      SnackBar(
+                      // DÜZELTME 4: 'const' eklenerek performans artırıldı.
+                      const SnackBar(
                         content: Text('İçerik kaydedildi! 📚'),
                         duration: Duration(seconds: 2),
                       ),
@@ -138,13 +141,13 @@ class _ReelCardState extends State<ReelCard>
               onPick: (emoji) async {
                 setState(() => _showEmojis = false);
                 
-                // Emoji tracking gönder
                 await ApiService().trackEmoji(
                   reelId: reel.id,
                   emoji: emoji,
                   category: reel.category,
                 );
                 
+                // mounted kontrolü async işlemden sonra yapıldığı için doğrudur.
                 if (!mounted) return;
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
@@ -168,3 +171,5 @@ class _ReelCardState extends State<ReelCard>
     );
   }
 }
+
+

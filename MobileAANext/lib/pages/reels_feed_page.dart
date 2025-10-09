@@ -4,7 +4,7 @@ import '../services/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-
+import '../widgets/article_reader_sheet.dart'; 
 import '../providers/reels_provider.dart';
 import '../providers/saved_reels_provider.dart';
 import '../providers/gamification_provider.dart';
@@ -260,16 +260,31 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
   void _openArticle(BuildContext context, Reel reel) {
     _detailOpenTime = DateTime.now();
     
+    // İlk görseli al (varsa)
+    final imageUrl = reel.imageUrls.isNotEmpty ? reel.imageUrls.first : null;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ArticleOverlay(
+      builder: (_) => ArticleReaderSheet(
+        articleId: reel.id,
         title: reel.title,
         body: reel.fullText,
+        // ✅ GÜNCELLENDİ: Artık tek bir URL yerine tüm listeyi gönderiyoruz.
+        imageUrls: reel.imageUrls,
+        category: reel.category,
+        publishedDate: _formatPublishedDate(reel),
+        readingTimeMinutes: _calculateReadingTime(reel.fullText),
         onClose: () {
           Navigator.pop(context);
           _onDetailClose(reel);
+        },
+        onBookmark: () {
+          _saveReel(context, reel);
+        },
+        onShare: () {
+          _onShareTap(context, reel);
         },
       ),
     );
@@ -543,5 +558,39 @@ class _ReelView extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+
+String? _getCategoryFromReel(Reel reel) {
+  // Reel modelinde category zaten var
+  return reel.category;
+}
+
+
+
+/// Okuma süresini hesapla (kelime sayısından)
+int _calculateReadingTime(String text) {
+  // Ortalama okuma hızı: 200 kelime/dakika
+  final wordCount = text.split(' ').length;
+  final minutes = (wordCount / 200).ceil();
+  return minutes < 1 ? 1 : minutes;
+}
+
+
+/// Yayın tarihini formatla
+String? _formatPublishedDate(Reel reel) {
+  // Reel modelinde publishedAt var
+  final now = DateTime.now();
+  final diff = now.difference(reel.publishedAt);
+  
+  if (diff.inMinutes < 60) {
+    return '${diff.inMinutes} dakika önce';
+  } else if (diff.inHours < 24) {
+    return '${diff.inHours} saat önce';
+  } else if (diff.inDays < 7) {
+    return '${diff.inDays} gün önce';
+  } else {
+    return '${reel.publishedAt.day}.${reel.publishedAt.month}.${reel.publishedAt.year}';
   }
 }
