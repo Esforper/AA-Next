@@ -6,6 +6,7 @@ class Reel {
   final int durationSeconds;
   final DateTime publishedAt;
   final bool isWatched;
+  final List<SubtitleSegment>? subtitles;  // ✅ YENİ: Alt yazı desteği
 
   Reel({
     required this.id,
@@ -14,6 +15,7 @@ class Reel {
     this.durationSeconds = 0,
     DateTime? publishedAt,
     this.isWatched = false,
+    this.subtitles,  // ✅ YENİ
   }) : publishedAt = publishedAt ?? DateTime.now();
 
   // UI kolaylığı için kısayollar
@@ -24,23 +26,17 @@ class Reel {
   List<String> get imageUrls => newsData.images;
   List<String> get fullContent => newsData.fullContent;
 
-  /// @added: fullContent'i her zaman bir metin olarak birleştiren yardımcı.
-  /// Haber detayında paragraflar arasına boşluk koyarak gösterim için kullanılır.
   String get fullText =>
       fullContent.isEmpty ? summary : fullContent.join('\n\n');
 
   factory Reel.fromJson(Map<String, dynamic> json) {
-    final m =
-        (json['news_data'] ?? json['newsData'] ?? {}) as Map<String, dynamic>;
+    final m = (json['news_data'] ?? json['newsData'] ?? {}) as Map<String, dynamic>;
     final List imgsRaw = (m['images'] ?? []) as List? ?? [];
     final images = imgsRaw
         .map((e) => (e ?? '').toString())
         .where((s) => s.startsWith('http://') || s.startsWith('https://'))
         .toList();
 
-    // --- DEĞİŞİKLİK BAŞLANGICI ---
-    // @changed: full_content'in hem String hem de List<String> olabilme durumunu handle et.
-    // Gelen veri bir listeyse doğrudan kullanılır, string ise satır boşluklarına göre bölünür.
     final dynamic fcRaw = m['full_content'] ?? m['fullContent'] ?? [];
     final List<String> fullContent;
     if (fcRaw is List) {
@@ -53,7 +49,13 @@ class Reel {
     } else {
       fullContent = [];
     }
-    // --- DEĞİŞİKLİK SONU ---
+
+    // ✅ YENİ: Alt yazıları parse et
+    List<SubtitleSegment>? subtitles;
+    if (json['subtitles'] != null) {
+      final subsRaw = json['subtitles'] as List;
+      subtitles = subsRaw.map((s) => SubtitleSegment.fromJson(s)).toList();
+    }
 
     return Reel(
       id: (json['id'] ?? '').toString(),
@@ -63,17 +65,57 @@ class Reel {
         url: (m['url'] ?? '').toString(),
         images: images,
         category: (m['category'] ?? 'Genel').toString(),
-        keywords:
-            ((m['keywords'] as List?) ?? []).map((e) => e.toString()).toList(),
+        keywords: ((m['keywords'] as List?) ?? []).map((e) => e.toString()).toList(),
         fullContent: fullContent,
       ),
       audioUrl: (json['audio_url'] ?? json['audioUrl'] ?? '').toString(),
-      durationSeconds:
-          int.tryParse((json['duration_seconds'] ?? 0).toString()) ?? 0,
+      durationSeconds: int.tryParse((json['duration_seconds'] ?? 0).toString()) ?? 0,
       publishedAt: DateTime.tryParse(
-          (m['published_at'] ?? json['published_at'] ?? '').toString()),
-      isWatched: (json['is_watched'] == true) || (json['isWatched'] == true),
+          (m['published_at'] ?? json['published_at'] ?? '').toString()) ?? DateTime.now(),
+      isWatched: (json['is_watched'] ?? false) as bool,
+      subtitles: subtitles,  // ✅ YENİ
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'news_data': newsData.toJson(),
+      'audio_url': audioUrl,
+      'duration_seconds': durationSeconds,
+      'published_at': publishedAt.toIso8601String(),
+      'is_watched': isWatched,
+      'subtitles': subtitles?.map((s) => s.toJson()).toList(),  // ✅ YENİ
+    };
+  }
+}
+
+// ✅ YENİ: Alt yazı segment modeli
+class SubtitleSegment {
+  final double startTime;  // saniye cinsinden
+  final double endTime;
+  final String text;
+
+  SubtitleSegment({
+    required this.startTime,
+    required this.endTime,
+    required this.text,
+  });
+
+  factory SubtitleSegment.fromJson(Map<String, dynamic> json) {
+    return SubtitleSegment(
+      startTime: (json['start_time'] ?? 0).toDouble(),
+      endTime: (json['end_time'] ?? 0).toDouble(),
+      text: (json['text'] ?? '').toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'start_time': startTime,
+      'end_time': endTime,
+      'text': text,
+    };
   }
 }
 
@@ -95,4 +137,47 @@ class NewsData {
     required this.keywords,
     required this.fullContent,
   });
+
+  factory NewsData.fromJson(Map<String, dynamic> json) {
+    final List imgsRaw = (json['images'] ?? []) as List? ?? [];
+    final images = imgsRaw
+        .map((e) => (e ?? '').toString())
+        .where((s) => s.startsWith('http://') || s.startsWith('https://'))
+        .toList();
+
+    final dynamic fcRaw = json['full_content'] ?? json['fullContent'] ?? [];
+    final List<String> fullContent;
+    if (fcRaw is List) {
+      fullContent = fcRaw
+          .map((e) => (e ?? '').toString())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    } else if (fcRaw is String) {
+      fullContent = fcRaw.split('\n\n').where((s) => s.isNotEmpty).toList();
+    } else {
+      fullContent = [];
+    }
+
+    return NewsData(
+      title: (json['title'] ?? '').toString(),
+      summary: (json['summary'] ?? json['description'] ?? '').toString(),
+      url: (json['url'] ?? '').toString(),
+      images: images,
+      category: (json['category'] ?? 'Genel').toString(),
+      keywords: ((json['keywords'] as List?) ?? []).map((e) => e.toString()).toList(),
+      fullContent: fullContent,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'summary': summary,
+      'url': url,
+      'images': images,
+      'category': category,
+      'keywords': keywords,
+      'full_content': fullContent,
+    };
+  }
 }

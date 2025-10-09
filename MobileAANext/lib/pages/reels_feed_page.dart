@@ -17,6 +17,7 @@ import '../widgets/popup_bar.dart';
 import '../widgets/gamification/reels_xp_overlay.dart';
 import '../widgets/gamification/floating_xp.dart';
 import '../services/api_service.dart';
+import '../widgets/subtitle_widget.dart';
 
 class ReelsFeedPage extends StatefulWidget {
   const ReelsFeedPage({super.key});
@@ -25,21 +26,33 @@ class ReelsFeedPage extends StatefulWidget {
   State<ReelsFeedPage> createState() => _ReelsFeedPageState();
 }
 
-class _ReelsFeedPageState extends State<ReelsFeedPage> {
+class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserver {
   DateTime? _reelStartTime;
   DateTime? _detailOpenTime;
   bool _hasEarnedWatchXP = false;
   String? _currentReelId;
-
+  bool _subtitlesEnabled = true;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<ReelsProvider>();
       if (provider.reels.isNotEmpty) {
         _startReelTracking(provider.current!.id);
       }
     });
+  }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final reelsProvider = context.read<ReelsProvider>();
+    
+    if (state == AppLifecycleState.paused) {
+      // Arka plana geçince sesi devam ettir
+      if (!reelsProvider.audioService.isPlaying) {
+        reelsProvider.audioService.resume();
+      }
+    }
   }
 
   void _startReelTracking(String reelId) {
@@ -91,9 +104,23 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
         }
       });
     }
-
     return Scaffold(
-      appBar: const PopupBar(),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('Reels', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _subtitlesEnabled ? Icons.closed_caption : Icons.closed_caption_disabled,
+              color: Colors.white,
+            ),
+            onPressed: () => setState(() => _subtitlesEnabled = !_subtitlesEnabled),
+            tooltip: _subtitlesEnabled ? 'Alt yazıları gizle' : 'Alt yazıları göster',
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           _buildBody(context, provider),
@@ -196,9 +223,13 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
             final reel = reels[i];
             return KeyedSubtree(
               key: ValueKey(reel.id),
-              child: _ReelView(reel: reel),
+              child: _ReelView(
+                reel: reel,
+                subtitlesEnabled: _subtitlesEnabled,
+                audioService: provider.audioService,
+              ),
             );
-          },
+},
         );
     }
   }
@@ -367,30 +398,36 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
       );
   }
 
-  @override
-  void dispose() {
-    FloatingXPOverlay.remove();
-    super.dispose();
-  }
+@override
+void dispose() {
+  WidgetsBinding.instance.removeObserver(this);
+  FloatingXPOverlay.remove();
+  super.dispose();
 }
-
-// ✅ REEL GÖRÜNÜMÜ - GÖRSEL KIRPMA DÜZENLENDİ
+}
 class _ReelView extends StatelessWidget {
   final Reel reel;
-  const _ReelView({required this.reel});
+  final bool subtitlesEnabled;
+  final dynamic audioService;
+
+  const _ReelView({
+    required this.reel,
+    required this.subtitlesEnabled,
+    required this.audioService,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // ✅ GÖRSEL - Daha kareye yakın, dikey biraz daha büyük
+        // GÖRSEL
         Positioned.fill(
           top: 0,
-          bottom: 160,  // ✅ 120 → 80 (reels daha uzun olsun)
+          bottom: 160,
           child: Center(
             child: AspectRatio(
-              aspectRatio: 4 / 3,  // ✅ 16/9 → 4/3 (daha kare)
+              aspectRatio: 4 / 3,
               child: ClipRect(
                 child: SizedBox.expand(
                   child: ImageCarousel(urls: reel.imageUrls),
@@ -400,11 +437,29 @@ class _ReelView extends StatelessWidget {
           ),
         ),
 
-        // ✅ Başlık ve özet - Navigasyon üstünde
+        // ALT YAZI (Ses ile senkronize)
+        if (reel.subtitles != null && reel.subtitles!.isNotEmpty && subtitlesEnabled)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 240,
+            child: AnimatedBuilder(
+              animation: audioService,
+              builder: (context, _) {
+                return SubtitleWidget(
+                  subtitles: reel.subtitles!,
+                  currentPosition: audioService.position,
+                  isVisible: subtitlesEnabled,
+                );
+              },
+            ),
+          ),
+
+        // Başlık ve özet
         Positioned(
           left: 0,
           right: 0,
-          bottom: 10,  // ✅ Navigasyon için boşluk (24 bottom + 56 button + 20 padding = ~100)
+          bottom: 10,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -421,11 +476,10 @@ class _ReelView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ✅ BAŞLIK - Marker/Highlight efekti
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.9),  // Sarı marker
+                    color: Colors.amber.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(4),
                     boxShadow: [
                       BoxShadow(
@@ -442,13 +496,12 @@ class _ReelView extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,  // Siyah yazı
+                      color: Colors.black87,
                       height: 1.2,
                     ),
                   ),
                 ),
                 const SizedBox(height: 120),
-                // Özet
                 Text(
                   reel.summary,
                   maxLines: 2,
