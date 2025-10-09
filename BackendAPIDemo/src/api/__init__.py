@@ -132,38 +132,46 @@ def _register_core_routes(app: FastAPI):
                 "websocket": settings.websocket_enabled
             }
         }
+# src/api/__init__.py dosyasının _register_routers fonksiyonunu güncelle
 
 def _register_routers(app: FastAPI):
     """
     Router'ları dahil et
     Yeni sistem eklemek için buraya yeni import ekle
     """
-    # Diğer import'lardan sonra ekle:
-    # Diğer router'lardan sonra ekle:
+    
+    # 🆕 OYUN ROUTER'I EKLE (EN ÜSTTE)
     try:
-        from .endpoints.reels_mockup import router as reels_mockup_router
-        app.include_router(reels_mockup_router)
-        print("✅ Reels Mockup router registered")
+        from .endpoints.game import router as game_router
+        app.include_router(game_router)
+        print("✅ Game router registered")
     except ImportError as e:
-        print(f"⚠️  Reels Mockup router import failed: {e}")
-        
-        
+        print(f"⚠️  Game router import failed: {e}")
+    
+    # Auth router
     try:
         from .endpoints.auth import router as auth_router
         app.include_router(auth_router)
         print("✅ Auth router registered")
     except ImportError as e:
         print(f"⚠️  Auth router import failed: {e}")
-        
-        
-        
+    
+    # Reels router (asıl sistem)
     try:
         from .endpoints.reels import router as reels_router
         app.include_router(reels_router)
         print("✅ Reels router registered")
     except ImportError as e:
+        print(f"⚠️  Reels router import failed: {e}")
+    
+    # Reels mockup (test için)
+    try:
+        from .endpoints.reels_mockup import router as reels_mockup_router
+        app.include_router(reels_mockup_router)
+        print("✅ Reels Mockup router registered")
+    except ImportError as e:
         print(f"⚠️  Reels Mockup router import failed: {e}")
-        
+    
     # Core routers - her zaman dahil
     try:
         from .endpoints.news import router as news_router
@@ -186,7 +194,14 @@ def _register_routers(app: FastAPI):
     except ImportError as e:
         print(f"⚠️  System router import failed: {e}")
     
-    
+    # Optional routers - config'e göre dahil et
+    if settings.websocket_enabled:
+        try:
+            from .endpoints.websocket import router as websocket_router
+            app.include_router(websocket_router)
+            print("✅ WebSocket router registered")
+        except ImportError:
+            print("⚠️  WebSocket router not available")
 
     
     

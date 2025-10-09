@@ -1,6 +1,4 @@
-# ================================
-# src/api/endpoints/__init__.py - Router Export Management
-# ================================
+# src/api/endpoints/__init__.py - GÜNCELLENMIŞ VERSİYON
 
 """
 API endpoint router'larını toplar ve export eder
@@ -25,23 +23,37 @@ try:
 except ImportError:
     print("⚠️  System router import failed")
     system_router = None
+
+try:
+    from .auth import router as auth_router
+except ImportError:
+    print("⚠️  Auth router import failed")
+    auth_router = None
     
+try:
+    from .reels import router as reels_router
+except ImportError:
+    print("⚠️  Reels router import failed")
+    reels_router = None
+
 try:
     from .reels_mockup import router as reels_mockup_router
 except ImportError:
     reels_mockup_router = None
+
+# 🆕 GAME ROUTER (YENİ!)
+try:
+    from .game import router as game_router
+    print("✅ Game router imported successfully")
+except ImportError as e:
+    print(f"⚠️  Game router import failed: {e}")
+    game_router = None
 
 # Optional routers - config'e göre enable/disable edilebilir
 try:
     from .websocket import router as websocket_router
 except ImportError:
     websocket_router = None
-
-# Gelecekte eklenecek optional sistemler
-try:
-    from .game import router as game_router
-except ImportError:
-    game_router = None
 
 try:
     from .chat import router as chat_router
@@ -63,12 +75,14 @@ AVAILABLE_ROUTERS = {
     "news": news_router,
     "tts": tts_router,
     "system": system_router,
+    "auth": auth_router,
+    "reels": reels_router,
+    "reels_mockup": reels_mockup_router,
+    "game": game_router,  # 🆕 YENİ!
     "websocket": websocket_router,
-    "game": game_router,
     "chat": chat_router,
     "crypto": crypto_router,
     "video": video_router,
-    "reels_mockup": reels_mockup_router,
 }
 
 # Sadece mevcut olan router'ları export et
@@ -95,8 +109,11 @@ __all__ = [
     "news_router",
     "tts_router", 
     "system_router",
+    "auth_router",
+    "reels_router",
+    "reels_mockup_router",
+    "game_router",  # 🆕 YENİ!
     "websocket_router",
-    "game_router",
     "chat_router",
     "crypto_router",
     "video_router",
@@ -110,16 +127,3 @@ __all__ = [
     "AVAILABLE_ROUTERS",
     "ACTIVE_ROUTERS"
 ]
-
-# Yeni router eklemek için:
-# 1. Yukarıya import ekle:
-#    try:
-#        from .yeni_sistem import router as yeni_sistem_router
-#    except ImportError:
-#        yeni_sistem_router = None
-#
-# 2. AVAILABLE_ROUTERS'a ekle:
-#    "yeni_sistem": yeni_sistem_router,
-#
-# 3. __all__'a ekle:
-#    "yeni_sistem_router",
