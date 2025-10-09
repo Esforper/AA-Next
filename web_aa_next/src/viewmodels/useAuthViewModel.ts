@@ -96,7 +96,13 @@ export const useAuthViewModel = () => {
         throw new Error(response.message || 'Giriş başarısız');
       }
     } catch (error: any) {
-      const errorMessage = error?.message || 'Giriş sırasında bir hata oluştu';
+      let errorMessage = error?.message || 'Giriş sırasında bir hata oluştu';
+      // Detaylı hata eşlemeleri
+      if (/password/i.test(errorMessage) && /invalid|wrong/i.test(errorMessage)) {
+        errorMessage = 'E-posta veya şifre hatalı. Şifrenizde en az 8 karakter, bir harf ve bir rakam olmalı.';
+      } else if (/not found|kayıtlı kullanıcı bulunamadı/i.test(errorMessage)) {
+        errorMessage = 'Bu e-posta ile kullanıcı bulunamadı. Lütfen önce kayıt olun.';
+      }
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -133,7 +139,21 @@ export const useAuthViewModel = () => {
         throw new Error(response.message || 'Kayıt başarısız');
       }
     } catch (error: any) {
-      const errorMessage = error?.message || 'Kayıt sırasında bir hata oluştu';
+      let errorMessage = error?.message || 'Kayıt sırasında bir hata oluştu';
+      // Alan doğrulamaları
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const passRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/; // 8+ karakter, harf ve rakam
+      if (!emailRegex.test(userData.email)) {
+        errorMessage = 'Geçerli bir e-posta adresi giriniz.';
+      } else if (!passRegex.test(userData.password)) {
+        errorMessage = 'Şifreniz en az 8 karakter olmalı ve harf ile rakam içermelidir.';
+      } else if (!userData.username || userData.username.trim().length < 3) {
+        errorMessage = 'Kullanıcı adı en az 3 karakter olmalıdır.';
+      } else if (/email.*kayıtlı/i.test(errorMessage)) {
+        errorMessage = 'Bu e-posta adresi zaten kayıtlı. Farklı bir e-posta deneyin.';
+      } else if (/kullanıcı adı.*alınmış/i.test(errorMessage)) {
+        errorMessage = 'Bu kullanıcı adı zaten alınmış. Başka bir kullanıcı adı seçin.';
+      }
       setState(prev => ({
         ...prev,
         isLoading: false,

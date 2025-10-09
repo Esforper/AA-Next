@@ -61,6 +61,7 @@ export interface ReelData {
   author?: string;
   location?: string;
   summary?: string;
+  published_at?: string; // ekledik: sıralama için tarih
 }
 
 // Backend API Response models

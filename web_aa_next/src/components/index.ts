@@ -14,3 +14,12 @@ export { default as RaceTrack } from './race/RaceTrack';
 export { default as NewsNode, MiniNode } from './race/NewsNode';
 export { default as PlayerAvatar, MiniAvatar, AvatarTrail } from './race/PlayerAvatar';
 export { default as NodeDetailModal } from './race/NodeDetailModal';
+export { default as ReadHandleWeb } from './ReadHandleWeb';
+
+// Gamification components
+export { FloatingXP, FloatingXPOverlay } from './gamification/FloatingXP';
+export { default as XPProgressBar } from './gamification/XPProgressBar';
+export { default as LevelChainDisplay } from './gamification/LevelChainDisplay';
+export { default as StreakDisplay } from './gamification/StreakDisplay';
+export { default as ReelsXPOverlay } from './gamification/ReelsXPOverlay';
+export { default as DailyProgressCard } from './gamification/DailyProgressCard';

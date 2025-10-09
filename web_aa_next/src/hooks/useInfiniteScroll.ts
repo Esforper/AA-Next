@@ -1,6 +1,6 @@
 // src/hooks/useInfiniteScroll.ts
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { ReelData } from '../models';
 import { API_CONFIG } from '../api/config';
 
@@ -70,6 +70,8 @@ interface UseInfiniteScrollReturn {
   goToNext: () => void;
   goToPrev: () => void;
   goToIndex: (index: number) => void;
+  // Activity
+  markUserActive: () => void;
   
   // Internal state
   isLoadingMore: boolean;
@@ -99,7 +101,12 @@ export const useInfiniteScroll = (
   const controllerRef = useRef<AbortController | null>(null);
   const lastLoadAtRef = useRef<number>(0);
   const consecutiveEmptyRef = useRef<number>(0);
+  const consecutiveNoGrowthRef = useRef<number>(0);
   const lastCursorRef = useRef<string | null>(null);
+  const lastActivityAtRef = useRef<number>(Date.now());
+  const hasInteractedRef = useRef<boolean>(false);
+  const isPageHiddenRef = useRef<boolean>(false);
+  const sessionLoadCountRef = useRef<number>(0);
 
   // Simple SWR-like cache for the first page
   const cacheRef = useRef<{
@@ -110,10 +117,42 @@ export const useInfiniteScroll = (
   const STALE_MS = 60_000; // 60s stale-while-revalidate
   const LOAD_THROTTLE_MS = 800; // min interval between loadMore calls
   const MAX_CONSECUTIVE_EMPTY = 3; // stop after 3 empty/no-progress fetches
+  const INACTIVITY_MS = 30_000; // stop network after 30s inactivity
+  const MAX_SESSION_LOADS = 10; // hard cap per session to avoid runaway loops
   
+  // Visibility handling to pause network in background tabs
+  useEffect(() => {
+    const onVisibility = () => {
+      isPageHiddenRef.current = typeof document !== 'undefined' ? document.hidden : false;
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+      onVisibility();
+      return () => document.removeEventListener('visibilitychange', onVisibility);
+    }
+    return undefined as unknown as void;
+  }, []);
+
+  const isInactive = (): boolean => {
+    const now = Date.now();
+    if (isPageHiddenRef.current) return true;
+    return now - lastActivityAtRef.current > INACTIVITY_MS;
+  };
+
+  const markUserActive = useCallback(() => {
+    lastActivityAtRef.current = Date.now();
+    hasInteractedRef.current = true;
+  }, []);
+
   const fetchReels = useCallback(async (isRefresh: boolean = false): Promise<void> => {
     // Prevent duplicate calls
     if (isLoadingRef.current) return;
+    // Don't fetch if user is inactive (no interaction and page inactive)
+    if (isInactive()) return;
+    // If user hiç hareket etmediyse ve zaten ilk sayfadayız, agresif yeniden yüklemeyi engelle
+    if (!hasInteractedRef.current && !isRefresh && currentIndex === 0 && reels.length > 0) {
+      return;
+    }
     
     try {
       isLoadingRef.current = true;
@@ -151,7 +190,8 @@ export const useInfiniteScroll = (
           location: backendReel.news_data?.location || '',
           published_at: backendReel.published_at
         }));
-        setReels(convertedReels);
+        const sorted = [...convertedReels].sort((a, b) => new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime());
+        setReels(sorted);
         setCurrentIndex(0);
         setCursor(cached.pagination.next_cursor);
         setHasMore(cached.pagination.has_next);
@@ -221,14 +261,25 @@ export const useInfiniteScroll = (
       
       if (isRefresh) {
         // Replace all reels
-        setReels(convertedReels);
+        const sorted = [...convertedReels].sort((a, b) => new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime());
+        setReels(sorted);
         setCurrentIndex(0);
         // Cache first page
         cacheRef.current = { ts: Date.now(), data };
         consecutiveEmptyRef.current = 0;
+        consecutiveNoGrowthRef.current = 0;
       } else {
         // Append new reels
-        setReels(prev => [...prev, ...convertedReels]);
+        setReels(prev => {
+          const next = [...prev, ...convertedReels];
+          const sorted = next.sort((a, b) => new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime());
+          if (sorted.length === prev.length) {
+            consecutiveNoGrowthRef.current += 1;
+          } else {
+            consecutiveNoGrowthRef.current = 0;
+          }
+          return sorted;
+        });
         if (convertedReels.length === 0) {
           consecutiveEmptyRef.current += 1;
         } else {
@@ -251,6 +302,10 @@ export const useInfiniteScroll = (
         }
         if (consecutiveEmptyRef.current >= MAX_CONSECUTIVE_EMPTY) {
           console.warn('🛑 Stopping further loads due to consecutive empty responses');
+          setHasMore(false);
+        }
+        if (consecutiveNoGrowthRef.current >= 2) {
+          console.warn('🛑 Stopping further loads due to no growth in results');
           setHasMore(false);
         }
       }
@@ -310,8 +365,16 @@ export const useInfiniteScroll = (
   }, [cursor, initialLimit]);
   
   const loadMore = useCallback(async (): Promise<void> => {
+    // Skip if inactive
+    if (isInactive()) return;
     if (!hasMore || isLoadingRef.current) {
       console.log(`⏭️ Skip loadMore: hasMore=${hasMore}, isLoading=${isLoadingRef.current}`);
+      return;
+    }
+    // Hard session cap
+    if (sessionLoadCountRef.current >= MAX_SESSION_LOADS) {
+      console.warn('🛑 Session load cap reached');
+      setHasMore(false);
       return;
     }
     // Only prefetch when within preloadThreshold of the end
@@ -328,6 +391,7 @@ export const useInfiniteScroll = (
     lastLoadAtRef.current = now;
 
     console.log('📥 Loading more reels...');
+    sessionLoadCountRef.current += 1;
     await fetchReels(false);
   }, [hasMore, fetchReels, reels.length, currentIndex, preloadThreshold]);
   
@@ -378,6 +442,7 @@ export const useInfiniteScroll = (
     goToNext,
     goToPrev,
     goToIndex,
+    markUserActive,
     
     // Internal state
     isLoadingMore
