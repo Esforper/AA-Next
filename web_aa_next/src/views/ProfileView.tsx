@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Card, Button } from '../components';
-import { useAuthViewModel } from '../viewmodels';
+import { Card, Button, DailyProgressCard, LevelChainDisplay, StreakDisplay } from '../components';
+import { useAuthViewModel, useGamificationViewModel } from '../viewmodels';
 import clsx from 'clsx';
 
 type ViewMode = 'main' | 'login' | 'register';
@@ -17,6 +17,10 @@ export const ProfileView: React.FC = () => {
     clearError
   } = useAuthViewModel();
 
+  // Gamification ViewModel - her kullanıcı için ayrı
+  const effectiveUserId = user?.id || 'guest_user';
+  const gamification = useGamificationViewModel(effectiveUserId);
+
   const [viewMode, setViewMode] = useState<ViewMode>('main');
   const [formData, setFormData] = useState({
     email: '',
@@ -26,6 +30,13 @@ export const ProfileView: React.FC = () => {
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+
+  // Auth durumu değiştiğinde viewMode'u sıfırla
+  React.useEffect(() => {
+    if (isAuthenticated && viewMode !== 'main') {
+      setViewMode('main');
+    }
+  }, [isAuthenticated, viewMode]);
 
   // Form input change handler
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -237,6 +248,26 @@ export const ProfileView: React.FC = () => {
                 </button>
               </div>
           </div>
+
+            {/* Gamification Cards */}
+            <DailyProgressCard
+              currentXP={gamification.state.xpEarnedToday}
+              goalXP={gamification.state.dailyXPGoal}
+              streakDays={gamification.state.currentStreak}
+              percentile={gamification.state.streakPercentile}
+              goalCompleted={gamification.state.dailyGoalCompleted}
+              onStartReels={() => {
+                // Navigate to reels
+                window.location.href = '/reels';
+              }}
+            />
+            
+            <LevelChainDisplay
+              currentLevel={gamification.state.currentLevel}
+              currentNode={gamification.state.currentNode}
+              totalNodes={gamification.state.nodesInLevel}
+              currentXP={gamification.state.currentXP}
+            />
 
             {/* Features Coming Soon */}
             <div className="bg-white rounded-lg-lg shadow-sm border border-gray-200 p-6">

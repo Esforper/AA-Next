@@ -15,6 +15,7 @@ import { ApiResponse } from '../models/CommonModels';
  */
 class MockUsersStore {
   private static USERS_KEY = 'aa_mock_users';
+  private static PASSWORDS_KEY = 'aa_mock_passwords';
 
   static getAll(): User[] {
     try {
@@ -25,9 +26,34 @@ class MockUsersStore {
     }
   }
 
+  private static getPasswords(): Record<string, string> {
+    try {
+      const stored = localStorage.getItem(this.PASSWORDS_KEY);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  static setPassword(email: string, password: string): void {
+    const map = this.getPasswords();
+    map[email] = password;
+    localStorage.setItem(this.PASSWORDS_KEY, JSON.stringify(map));
+  }
+
+  static getPassword(email: string): string | null {
+    const map = this.getPasswords();
+    return map[email] ?? null;
+  }
+
   static findByEmail(email: string): User | null {
     const users = this.getAll();
     return users.find(u => u.email === email) || null;
+  }
+
+  static findByUsername(username: string): User | null {
+    const users = this.getAll();
+    return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
   }
 
   static add(user: User): void {
@@ -44,6 +70,7 @@ class MockUsersStore {
 
   static clear(): void {
     localStorage.removeItem(this.USERS_KEY);
+    localStorage.removeItem(this.PASSWORDS_KEY);
   }
 }
 
@@ -52,11 +79,36 @@ class MockUsersStore {
  * Backend API Auth endpoints integration
  */
 export class AuthApi {
+  /** Basit validasyonlar */
+  private static isValidEmail(email: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  private static isStrongPassword(password: string) {
+    return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password); // 8+, en az bir harf ve bir rakam
+  }
+
+  private static normalizeError(message: string): string {
+    const msg = (message || '').toLowerCase();
+    if (msg.includes('email') && msg.includes('already')) return 'Bu email adresi zaten kayıtlı';
+    if (msg.includes('username') && (msg.includes('exists') || msg.includes('taken'))) return 'Bu kullanıcı adı zaten alınmış';
+    if (msg.includes('password') && (msg.includes('weak') || msg.includes('invalid'))) return 'Şifreniz en az 8 karakter olmalı ve harf ile rakam içermelidir.';
+    if (msg.includes('not found')) return 'Bu e-posta ile kullanıcı bulunamadı. Lütfen önce kayıt olun.';
+    return message || 'İstek başarısız';
+  }
   /**
    * Login - Kullanıcı girişi
    */
   static async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
+      // Ön-validasyon (400 almamak için)
+      if (!this.isValidEmail(credentials.email)) {
+        throw new Error('Geçerli bir e-posta adresi giriniz.');
+      }
+      if (!credentials.password || credentials.password.length < 1) {
+        throw new Error('Şifre alanı boş olamaz.');
+      }
+
       const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.LOGIN}`;
       
       const response = await fetch(url, {
@@ -69,15 +121,19 @@ export class AuthApi {
         signal: AbortSignal.timeout(API_CONFIG.DEFAULT_TIMEOUT)
       });
 
-      // Backend auth henüz aktif değilse mock data kullan
-      if (!response.ok && response.status === 404) {
+      // Backend auth henüz aktif değilse veya 400/404 dönüyorsa mock data kullan
+      if (!response.ok && (response.status === 404 || response.status === 501)) {
         console.warn('Auth API not available, using mock data');
         
         // Mock users store'dan kayıtlı kullanıcıyı bul
         const registeredUser = MockUsersStore.findByEmail(credentials.email);
-        
+        const savedPassword = MockUsersStore.getPassword(credentials.email);
+
         if (!registeredUser) {
           throw new Error('Bu email ile kayıtlı kullanıcı bulunamadı. Lütfen önce kayıt olun.');
+        }
+        if (!savedPassword || savedPassword !== credentials.password) {
+          throw new Error('E-posta veya şifre hatalı.');
         }
         
         // Kayıtlı kullanıcı bulundu
@@ -98,7 +154,8 @@ export class AuthApi {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Giriş başarısız');
+        const serverMsg = typeof data === 'object' ? (data.message || data.error || '') : '';
+        throw new Error(this.normalizeError(serverMsg || 'Giriş başarısız'));
       }
 
       return data as LoginResponse;
@@ -109,9 +166,13 @@ export class AuthApi {
         
         // Mock users store'dan kayıtlı kullanıcıyı bul
         const registeredUser = MockUsersStore.findByEmail(credentials.email);
-        
+        const savedPassword = MockUsersStore.getPassword(credentials.email);
+
         if (!registeredUser) {
           throw new Error('Bu email ile kayıtlı kullanıcı bulunamadı. Lütfen önce kayıt olun.');
+        }
+        if (!savedPassword || savedPassword !== credentials.password) {
+          throw new Error('E-posta veya şifre hatalı.');
         }
         
         const mockUser: LoginResponse = {
@@ -128,7 +189,7 @@ export class AuthApi {
         return mockUser;
       }
       
-      throw new Error(error?.message || 'Giriş sırasında bir hata oluştu');
+      throw new Error(this.normalizeError(error?.message || 'Giriş sırasında bir hata oluştu'));
     }
   }
 
@@ -137,6 +198,17 @@ export class AuthApi {
    */
   static async register(userData: RegisterRequest): Promise<RegisterResponse> {
     try {
+      // Ön-validasyon (400 almamak için)
+      if (!this.isValidEmail(userData.email)) {
+        throw new Error('Geçerli bir e-posta adresi giriniz.');
+      }
+      if (!this.isStrongPassword(userData.password)) {
+        throw new Error('Şifreniz en az 8 karakter olmalı ve harf ile rakam içermelidir.');
+      }
+      if (!userData.username || userData.username.trim().length < 3) {
+        throw new Error('Kullanıcı adı en az 3 karakter olmalıdır.');
+      }
+
       const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.REGISTER}`;
       
       const response = await fetch(url, {
@@ -150,13 +222,17 @@ export class AuthApi {
       });
 
       // Backend auth henüz aktif değilse mock data kullan
-      if (!response.ok && response.status === 404) {
+      if (!response.ok && (response.status === 404 || response.status === 501)) {
         console.warn('Auth API not available, using mock data');
         
-        // Email zaten kayıtlı mı kontrol et
+        // Email/Username zaten kayıtlı mı kontrol et
         const existingUser = MockUsersStore.findByEmail(userData.email);
+        const existingUsername = MockUsersStore.findByUsername(userData.username);
         if (existingUser) {
           throw new Error('Bu email adresi zaten kayıtlı');
+        }
+        if (existingUsername) {
+          throw new Error('Bu kullanıcı adı zaten alınmış');
         }
         
         // Yeni kullanıcı oluştur
@@ -172,6 +248,8 @@ export class AuthApi {
         
         // Mock users store'a ekle
         MockUsersStore.add(newUser);
+        // Kullanıcı şifresini sakla (sadece mock senaryo için)
+        MockUsersStore.setPassword(userData.email, userData.password);
         
         // Response oluştur
         const mockResponse: RegisterResponse = {
@@ -191,7 +269,17 @@ export class AuthApi {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Kayıt başarısız');
+        // 400 doğrulama mesajlarını kullanıcı dostu hale getir
+        let serverMsg = '';
+        if (typeof data === 'object') {
+          serverMsg = data.message || data.error || '';
+          // Backend valida error formatları için alan bazlı kontrol
+          const errors = (data.errors || data.detail || {}) as Record<string, any>;
+          if (errors.email) serverMsg = 'Bu email adresi zaten kayıtlı';
+          if (errors.username) serverMsg = 'Bu kullanıcı adı zaten alınmış';
+          if (errors.password) serverMsg = 'Şifreniz en az 8 karakter olmalı ve harf ile rakam içermelidir.';
+        }
+        throw new Error(this.normalizeError(serverMsg || 'Kayıt başarısız'));
       }
 
       return data as RegisterResponse;
@@ -200,10 +288,14 @@ export class AuthApi {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         console.warn('Backend unreachable, using mock auth');
         
-        // Email zaten kayıtlı mı kontrol et
+        // Email/Username zaten kayıtlı mı kontrol et
         const existingUser = MockUsersStore.findByEmail(userData.email);
+        const existingUsername = MockUsersStore.findByUsername(userData.username);
         if (existingUser) {
           throw new Error('Bu email adresi zaten kayıtlı');
+        }
+        if (existingUsername) {
+          throw new Error('Bu kullanıcı adı zaten alınmış');
         }
         
         // Yeni kullanıcı oluştur
@@ -219,6 +311,7 @@ export class AuthApi {
         
         // Mock users store'a ekle
         MockUsersStore.add(newUser);
+        MockUsersStore.setPassword(userData.email, userData.password);
         
         const mockResponse: RegisterResponse = {
           success: true,
@@ -234,7 +327,7 @@ export class AuthApi {
         return mockResponse;
       }
       
-      throw new Error(error?.message || 'Kayıt sırasında bir hata oluştu');
+      throw new Error(this.normalizeError(error?.message || 'Kayıt sırasında bir hata oluştu'));
     }
   }
 
@@ -393,8 +486,8 @@ export class AuthApi {
       return data.available === true;
     } catch (error) {
       // Mock mode - check local storage
-      const users = MockUsersStore.getAll();
-      return !users.some(u => u.username === username); // Available if not found
+      const u = MockUsersStore.findByUsername(username);
+      return u == null; // Available if not found
     }
   }
 }

@@ -2,12 +2,16 @@ import React from 'react';
 import { ReelData } from '../models';
 import { Card } from './Card';
 import clsx from 'clsx';
+import ReadHandleWeb from './ReadHandleWeb';
 
 export interface ReelItemProps {
   reel: ReelData;
   isActive?: boolean;
   onPlay?: () => void;
   onImageClick?: () => void;
+  onEmojiClick?: () => void;
+  onSaveClick?: () => void;
+  onShareClick?: () => void;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -17,9 +21,30 @@ export const ReelItem: React.FC<ReelItemProps> = ({
   isActive = false,
   onPlay,
   onImageClick,
+  onEmojiClick,
+  onSaveClick,
+  onShareClick,
   className,
   style
 }) => {
+  const formatRelativeTime = (iso?: string): string => {
+    if (!iso) return '';
+    const published = new Date(iso).getTime();
+    if (Number.isNaN(published)) return '';
+    const now = Date.now();
+    const diffMs = Math.max(0, now - published);
+    const oneMinute = 60 * 1000;
+    const oneHour = 60 * oneMinute;
+    const oneDay = 24 * oneHour;
+
+    if (diffMs < oneHour) return 'Sıcak';
+    if (diffMs < oneDay) {
+      const hours = Math.floor(diffMs / oneHour);
+      return `${hours} saat önce`;
+    }
+    const days = Math.floor(diffMs / oneDay);
+    return `${days} gün önce`;
+  };
   // Get first sentence from content (guards against non-string inputs)
   const getFirstSentence = (content: unknown) => {
     if (content == null) return '';
@@ -50,6 +75,22 @@ export const ReelItem: React.FC<ReelItemProps> = ({
   const overlayWidth = Math.min(Math.max(titleOverlayText.length * 13 + 32, 200), 820);
   const overlayHeight = 52;
 
+  // Aksiyon handlers
+  const handleShare = () => {
+    const url = window.location.origin + '/news/' + reel.id;
+    if ((navigator as any).share) {
+      (navigator as any).share({ title: reel.title, url }).catch(() => {});
+    } else {
+      void navigator.clipboard.writeText(url);
+    }
+  };
+
+  const handleArticleOpen = () => {
+    // ReadHandle'ın yukarı hareketi makale detayını açacak
+    // Parent component'ten gelen callback varsa çağır
+    onImageClick?.();
+  };
+
   return (
     <div
       className={clsx(
@@ -61,25 +102,23 @@ export const ReelItem: React.FC<ReelItemProps> = ({
       )}
       style={{
         ...style,
-        // Responsive dimensions - no fixed heights
+        // Fill parent container, which is sized to viewport in ReelsView
         height: '100%',
         width: '100%',
         maxWidth: '100%',
         maxHeight: '100%',
-        minHeight: '100vh', // Full viewport height
         display: 'flex',
         flexDirection: 'column'
       }}
     >
       {/* Image Section - Responsive Height */}
       <div 
-        className="relative w-full cursor-pointer overflow-hidden flex-shrink-0"
-        onClick={onImageClick}
+        className="relative w-full overflow-hidden flex-shrink-0"
         style={{ 
           userSelect: 'none', 
           WebkitUserSelect: 'none',
-          height: '50vh', // Daha az yükseklik - dikdörtgen
-          minHeight: '40vh',
+          height: '55vh', // Resim boyutunu daha da büyült
+          minHeight: '50vh',
           maxHeight: '60vh'
         }}
       >
@@ -131,19 +170,27 @@ export const ReelItem: React.FC<ReelItemProps> = ({
             {reel.category}
           </span>
         </div>
+        {/* Relative Time - Top Right */}
+        {!!(reel as any).published_at && (
+          <div className="absolute top-4 right-4 z-10">
+            <span className="px-3 py-1.5 text-sm font-bold bg-black/40 text-white rounded-full shadow-xl backdrop-blur-lg border border-white/20">
+              {formatRelativeTime((reel as any).published_at)}
+            </span>
+          </div>
+        )}
       </div>
       
       {/* Content Section - Responsive Fill */}
       <div 
-        className="flex-1 flex flex-col justify-between px-4 sm:px-6 py-4 bg-black text-white"
+        className="flex-1 flex flex-col justify-between px-4 sm:px-6 py-4 bg-black text-white md:min-h-[25vh] md:max-h-[35vh]"
         style={{ 
           userSelect: 'none', 
           WebkitUserSelect: 'none',
-          minHeight: '30vh', // Daha fazla alan yazılar için
-          maxHeight: '40vh' // Daha fazla alan yazılar için
+          minHeight: '8vh', // Mobil için küçük
+          maxHeight: '15vh' // Mobil için küçük
         }}
       >
-        {/* Title and First Sentence */}
+        {/* Title, Meta and First Sentence */}
         <div className="flex-1 flex flex-col justify-center">
           <h3 
             className="font-bold mb-2 line-clamp-2 leading-tight text-white"
@@ -155,6 +202,11 @@ export const ReelItem: React.FC<ReelItemProps> = ({
           >
             {reel.title}
           </h3>
+          {!!(reel as any).published_at && (
+            <div className="text-xs text-gray-300 mb-2">
+              {formatRelativeTime((reel as any).published_at)}
+            </div>
+          )}
           
           <p 
             className="text-gray-200 line-clamp-2 leading-relaxed mb-3"
@@ -168,31 +220,15 @@ export const ReelItem: React.FC<ReelItemProps> = ({
           </p>
         </div>
         
-        {/* Floating Action Button - Bottom Center */}
-        <div className="flex justify-center">
-          <button
-            onClick={onPlay}
-            className="bg-white/20 hover:bg-white/30 backdrop-blur-lg border border-white/30 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-lg"
-            style={{ 
-              userSelect: 'none', 
-              WebkitUserSelect: 'none',
-              width: 'clamp(48px, 8vw, 64px)',
-              height: 'clamp(48px, 8vw, 64px)'
-            }}
-          >
-            <svg 
-              className="text-white" 
-              fill="currentColor" 
-              viewBox="0 0 24 24"
-              style={{
-                width: 'clamp(20px, 4vw, 28px)',
-                height: 'clamp(20px, 4vw, 28px)',
-                marginLeft: '2px'
-              }}
-            >
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          </button>
+        {/* Floating Action Button - Bottom Center with ReadHandle */}
+        <div className="relative flex justify-center">
+          <ReadHandleWeb
+            onArticle={handleArticleOpen}
+            onEmoji={onEmojiClick}
+            onShare={onShareClick || handleShare}
+            onSave={onSaveClick}
+            longPressMs={500}
+          />
         </div>
       </div>
     </div>

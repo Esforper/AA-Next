@@ -2,12 +2,16 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useReelsViewModel } from '../viewmodels';
-import { LoadingSpinner, Button, ReelItem } from '../components';
+import { useReelsViewModel, useGamificationViewModel, useAuthViewModel } from '../viewmodels';
+import { LoadingSpinner, Button, ReelItem, ReelsXPOverlay, FloatingXPOverlay } from '../components';
+import { openArticleModal } from '../services/modalService';
 import { ReelsTreeDrawer } from '../components/ReelsTreeDrawer';
 import { ReelData } from '../models';
 
 export const ReelsView: React.FC = () => {
+  // Auth ViewModel
+  const { user } = useAuthViewModel();
+  
   const {
     reels,
     currentReelIndex,
@@ -44,6 +48,42 @@ export const ReelsView: React.FC = () => {
   
   const containerRef = useRef<HTMLDivElement>(null);
   const currentReel = getCurrentReel();
+
+  // Gamification ViewModel - her kullanıcı için ayrı
+  const effectiveUserId = user?.id || `anonymous_${localStorage.getItem('anonymous_id') || (() => {
+    const id = 'anon_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('anonymous_id', id);
+    return id;
+  })()}`;
+  const gamification = useGamificationViewModel(effectiveUserId);
+  
+  // View tracking for XP
+  const viewStartTimeRef = useRef<number>(Date.now());
+  const hasEarnedWatchXPRef = useRef(false);
+  const isPageVisibleRef = useRef<boolean>(true);
+  const activeViewTimeRef = useRef<number>(0);
+  const lastVisibilityChangeRef = useRef<number>(Date.now());
+
+  // Sayfa görünürlük kontrolü
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const now = Date.now();
+      if (document.hidden) {
+        // Sayfa arka plana geçtiğinde aktif izleme süresini güncelle
+        if (isPageVisibleRef.current) {
+          activeViewTimeRef.current += now - lastVisibilityChangeRef.current;
+        }
+        isPageVisibleRef.current = false;
+      } else {
+        // Sayfa tekrar görünür olduğunda timestamp'i güncelle
+        lastVisibilityChangeRef.current = now;
+        isPageVisibleRef.current = true;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Haber Ağacı drawer state
   const [isTreeOpen, setIsTreeOpen] = useState(false);
@@ -134,6 +174,23 @@ export const ReelsView: React.FC = () => {
   const animatedNextReel = async () => {
     if (isTransitioning) return;
     
+    // XP kazanma kontrolü (3+ saniye aktif izleme)
+    if (!hasEarnedWatchXPRef.current && currentReel && isPageVisibleRef.current) {
+      const now = Date.now();
+      const currentActiveTime = activeViewTimeRef.current + (now - lastVisibilityChangeRef.current);
+      const activeSeconds = currentActiveTime / 1000;
+      
+      if (activeSeconds >= 3) {
+        hasEarnedWatchXPRef.current = true;
+        gamification.onReelWatched(currentReel.id);
+        FloatingXPOverlay.show({
+          xpAmount: 10,
+          source: 'reel_watched',
+          position: { x: window.innerWidth / 2 - 60, y: window.innerHeight / 2 - 100 },
+        });
+      }
+    }
+    
     // Check if we need to load more reels
     if (currentReelIndex >= reels.length - 3 && hasMore && !isLoadingMore) {
       console.log('🔄 Auto-loading more reels before navigation');
@@ -173,40 +230,88 @@ export const ReelsView: React.FC = () => {
     }, 300);
   };
 
-  // Reset image index when reel changes
+  // Reset image index when reel changes + XP tracking
   useEffect(() => {
     setCurrentImageIndex(0);
     setViewStartTime(Date.now());
+    viewStartTimeRef.current = Date.now();
+    hasEarnedWatchXPRef.current = false;
   }, [currentReelIndex]);
 
   // Gesture thresholds
   const H_SWIPE_THRESHOLD = 50; // px for horizontal image change
   const V_SWIPE_THRESHOLD = 50; // px for vertical reel change
 
-  // Touch handlers: detect primary axis and trigger actions
+  // Touch handlers with improved gesture detection
+  const touchStartTimeRef = useRef<number>(0);
+  const touchLastMoveRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const touchVelocityRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const MIN_VELOCITY = 0.5; // pixels/ms
+  const VELOCITY_SAMPLE_INTERVAL = 50; // ms
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (isTreeOpen) { e.preventDefault(); return; }
+    if (isTreeOpen || isTransitioning) { e.preventDefault(); return; }
     e.preventDefault();
     const touch = e.touches[0];
     setTouchStartY(touch.clientY);
     setTouchStartX(touch.clientX);
+    touchStartTimeRef.current = Date.now();
+    touchLastMoveRef.current = { x: touch.clientX, y: touch.clientY };
+    touchVelocityRef.current = { x: 0, y: 0 };
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (isTreeOpen) { e.preventDefault(); return; }
-    // optional: prevent default to keep consistent feel
+    if (isTreeOpen || isTransitioning) { e.preventDefault(); return; }
     e.preventDefault();
+    
+    const touch = e.touches[0];
+    const now = Date.now();
+    const timeDelta = now - touchStartTimeRef.current;
+    
+    if (timeDelta >= VELOCITY_SAMPLE_INTERVAL) {
+      const velocityX = (touch.clientX - touchLastMoveRef.current.x) / timeDelta;
+      const velocityY = (touch.clientY - touchLastMoveRef.current.y) / timeDelta;
+      touchVelocityRef.current = { x: velocityX, y: velocityY };
+      touchLastMoveRef.current = { x: touch.clientX, y: touch.clientY };
+      touchStartTimeRef.current = now;
+    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (isTreeOpen) { e.preventDefault(); return; }
+    if (isTreeOpen || isTransitioning) { e.preventDefault(); return; }
     e.preventDefault();
+    
     const touch = e.changedTouches[0];
     const deltaY = touch.clientY - touchStartY;
     const deltaX = touch.clientX - touchStartX;
     const absDeltaY = Math.abs(deltaY);
     const absDeltaX = Math.abs(deltaX);
+    const velocity = touchVelocityRef.current;
+    const absVelocityX = Math.abs(velocity.x);
+    const absVelocityY = Math.abs(velocity.y);
 
+    // Hızlı swipe kontrolü
+    if (absVelocityY > MIN_VELOCITY || absVelocityX > MIN_VELOCITY) {
+      if (absVelocityY > absVelocityX) {
+        // Vertical hızlı swipe
+        if (velocity.y > 0) {
+          animatedPrevReel();
+        } else {
+          animatedNextReel();
+        }
+        return;
+      } else {
+        // Horizontal hızlı swipe
+        if (velocity.x > 0) {
+          prevImage();
+        } else {
+          nextImage();
+        }
+        return;
+      }
+    }
+
+    // Normal swipe kontrolü
     if (absDeltaY < V_SWIPE_THRESHOLD && absDeltaX < H_SWIPE_THRESHOLD) return;
 
     if (absDeltaY > absDeltaX) {
@@ -278,16 +383,9 @@ export const ReelsView: React.FC = () => {
     wheelAccumRef.current = 0; // sıfırla (throttle)
   };
 
-  // Prevent body scroll when Reels is mounted
+  // Avoid changing body; keep scroll isolation within container
   useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    const originalHeight = document.body.style.height;
-    document.body.style.overflow = 'hidden';
-    document.body.style.height = '100vh';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.height = originalHeight;
-    };
+    // no-op: body styles untouched to keep global header/panel visible
   }, []);
 
   // Keyboard navigation
@@ -376,11 +474,14 @@ export const ReelsView: React.FC = () => {
   return (
     <div 
       ref={containerRef}
-      className="h-full w-full bg-black overflow-hidden select-none reels-container"
+      className="w-full bg-black overflow-hidden select-none reels-container"
       style={{ 
         userSelect: 'none', 
         WebkitUserSelect: 'none',
-        WebkitTouchCallout: 'none'
+        WebkitTouchCallout: 'none',
+        height: 'calc(100dvh - 60px)', // Daha az kırpma - beyaz boşluğu kapat
+        overflow: 'hidden',
+        position: 'relative'
       } as React.CSSProperties}
       onTouchStart={(e) => { handleAnyInteraction(); handleTouchStart(e); }}
       onTouchMove={(e) => { handleAnyInteraction(); handleTouchMove(e); }}
@@ -420,8 +521,8 @@ export const ReelsView: React.FC = () => {
           </div>
         )}
 
-        {/* Side blurred previews (conditional) */}
-        {currentReel?.images && currentReel.images.length > 0 && (
+        {/* Side blurred previews (conditional) - only show if 2+ images */}
+        {currentReel?.images && currentReel.images.length > 1 && (
           <>
             {(() => {
               const imgCount = currentReel.images.length;
@@ -482,18 +583,20 @@ export const ReelsView: React.FC = () => {
                     />
                   )}
 
-                  {/* Right preview: always (if 1 image, shows same but blurred) */}
-                  <ReelItem
-                    reel={{
-                      ...(currentReel || ({} as ReelData)),
-                      main_image: getReelImage(currentReel as ReelData, nextIdx)
-                    }}
-                    isActive={false}
-                    onPlay={() => {}}
-                    onImageClick={() => {}}
-                    className="absolute inset-0 w-full h-full"
-                    style={rightStyle}
-                  />
+                  {/* Right preview: only if 2+ images */}
+                  {imgCount > 1 && (
+                    <ReelItem
+                      reel={{
+                        ...(currentReel || ({} as ReelData)),
+                        main_image: getReelImage(currentReel as ReelData, nextIdx)
+                      }}
+                      isActive={false}
+                      onPlay={() => {}}
+                      onImageClick={() => {}}
+                      className="absolute inset-0 w-full h-full"
+                      style={rightStyle}
+                    />
+                  )}
                   {/* Dots for current reel previews area (keeps old look) */}
                   <div className="absolute top-2 left-0 right-0 z-30 px-2 pointer-events-none">
                     <div className="flex space-x-1 max-w-sm mx-auto">
@@ -536,7 +639,50 @@ export const ReelsView: React.FC = () => {
                 }}
                 isActive={true}
                 onPlay={togglePlayPause}
-                onImageClick={togglePlayPause}
+                onImageClick={async () => {
+                  try {
+                    // Önce modal'ı aç
+                    const modalResult = await openArticleModal(currentReel);
+                    
+                    // Modal başarıyla açıldıysa XP ver
+                    if (modalResult.success) {
+                      gamification.onDetailRead(currentReel.id);
+                      FloatingXPOverlay.show({
+                        xpAmount: 5,
+                        source: 'detail_read',
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Modal açma hatası:', error);
+                  }
+                }}
+                onEmojiClick={() => {
+                  const success = gamification.onEmojiGiven(currentReel.id);
+                  if (success) {
+                    FloatingXPOverlay.show({
+                      xpAmount: 5,
+                      source: 'emoji_given',
+                    });
+                  }
+                }}
+                onSaveClick={() => {
+                  console.log('save', currentReel.id);
+                }}
+                onShareClick={() => {
+                  const success = gamification.onShareGiven(currentReel.id);
+                  if (success) {
+                    FloatingXPOverlay.show({
+                      xpAmount: 5,
+                      source: 'share_given',
+                    });
+                  }
+                  const url = window.location.origin + '/news/' + currentReel.id;
+                  if ((navigator as any).share) {
+                    (navigator as any).share({ title: currentReel.title, url }).catch(() => {});
+                  } else {
+                    void navigator.clipboard.writeText(url);
+                  }
+                }}
                 className="w-full max-w-lg mx-auto"
                 style={{
                   transform: incomingDirection
@@ -660,12 +806,21 @@ export const ReelsView: React.FC = () => {
         
         {/* Global fixed dots removed to keep original look but present on all layers */}
 
+        {/* XP Overlay - embed modunda gizle */}
+        {new URLSearchParams(location.search).get('embed') !== '1' && (
+          <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+            <div style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+              <ReelsXPOverlay state={gamification.state} />
+            </div>
+          </div>
+        )}
+
         {/* Haber Ağacı Açma Butonu - embed modunda gizle */}
         {new URLSearchParams(location.search).get('embed') !== '1' && (
           <div className="absolute top-6 right-4 z-50">
             <button
               onClick={() => setIsTreeOpen(true)}
-              className="px-3 py-2 rounded-md bg-white/80 hover:bg-white text-black text-sm font-semibold shadow"
+              className="px-3 py-2 rounded-md bg-white/80 hover:bg-white text-black text-sm font-semibold shadow pointer-events-auto"
             >
               Haber Ağacı
             </button>

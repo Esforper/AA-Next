@@ -50,7 +50,8 @@ export const useReelsViewModel = (): ReelsViewModel => {
     refreshFeed: refreshInfiniteFeed,
     goToNext: goToNextReel,
     goToPrev: goToPrevReel,
-    goToIndex
+    goToIndex,
+    markUserActive
   } = useInfiniteScroll(20, 3); // Load 20, preload when 3 left
 
   // Expose goToIndex to window for embed/openId jumps (scoped to this instance)
@@ -331,6 +332,21 @@ export const useReelsViewModel = (): ReelsViewModel => {
       fetchReels();
     }
   }, [reels.length, loading, fetchReels]);
+
+  // Kullanıcı etkileşimini dinleyip aktif olarak işaretle (hareketsizlikte istekleri durdurma için)
+  useEffect(() => {
+    const onInteract = () => markUserActive();
+    window.addEventListener('mousemove', onInteract, { passive: true });
+    window.addEventListener('scroll', onInteract, { passive: true });
+    window.addEventListener('keydown', onInteract);
+    window.addEventListener('touchstart', onInteract, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', onInteract as any);
+      window.removeEventListener('scroll', onInteract as any);
+      window.removeEventListener('keydown', onInteract as any);
+      window.removeEventListener('touchstart', onInteract as any);
+    };
+  }, [markUserActive]);
   
   // Cleanup on unmount
   useEffect(() => {

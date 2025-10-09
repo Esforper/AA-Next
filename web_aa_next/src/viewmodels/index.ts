@@ -1,7 +1,7 @@
-// Export all ViewModels from a single entry point
-export * from './useReelsViewModel';
-export * from './useArticlesViewModel';
-export * from './useArticleDetailViewModel';
-export * from './useNavigationViewModel';
-export * from './useNewsViewModel';
-export * from './useAuthViewModel';
+export { useArticleDetailViewModel } from './useArticleDetailViewModel';
+export { useArticlesViewModel } from './useArticlesViewModel';
+export { useAuthViewModel } from './useAuthViewModel';
+export { useNavigationViewModel } from './useNavigationViewModel';
+export { useNewsViewModel } from './useNewsViewModel';
+export { useReelsViewModel } from './useReelsViewModel';
+export { useGamificationViewModel } from './useGamificationViewModel';
