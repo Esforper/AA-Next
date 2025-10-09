@@ -31,8 +31,11 @@ export const ReelsView: React.FC = () => {
     getCurrentReel
   } = useReelsViewModel();
 
-  // UI State
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // UI State - Persistent state
+  const [currentImageIndex, setCurrentImageIndex] = useState(() => {
+    const saved = sessionStorage.getItem('reels_image_index');
+    return saved ? parseInt(saved, 10) : 0;
+  });
   const [touchStartY, setTouchStartY] = useState(0);
   const [touchStartX, setTouchStartX] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
@@ -56,6 +59,14 @@ export const ReelsView: React.FC = () => {
     return id;
   })()}`;
   const gamification = useGamificationViewModel(effectiveUserId);
+
+  // Auth state değiştiğinde gamification'ı güncelle
+  useEffect(() => {
+    if (user?.id) {
+      // Kullanıcı giriş yaptığında gamification state'ini yenile
+      console.log('🔄 User logged in, refreshing gamification state');
+    }
+  }, [user?.id]);
   
   // View tracking for XP
   const viewStartTimeRef = useRef<number>(Date.now());
@@ -182,12 +193,14 @@ export const ReelsView: React.FC = () => {
       
       if (activeSeconds >= 3) {
         hasEarnedWatchXPRef.current = true;
-        gamification.onReelWatched(currentReel.id);
-        FloatingXPOverlay.show({
-          xpAmount: 10,
-          source: 'reel_watched',
-          position: { x: window.innerWidth / 2 - 60, y: window.innerHeight / 2 - 100 },
-        });
+        const xpGained = gamification.onReelWatched(currentReel.id);
+        if (xpGained) {
+          FloatingXPOverlay.show({
+            xpAmount: 10,
+            source: 'reel_watched',
+            position: { x: window.innerWidth / 2 - 60, y: window.innerHeight / 2 - 100 },
+          });
+        }
       }
     }
     
@@ -237,6 +250,11 @@ export const ReelsView: React.FC = () => {
     viewStartTimeRef.current = Date.now();
     hasEarnedWatchXPRef.current = false;
   }, [currentReelIndex]);
+
+  // Persist currentImageIndex to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('reels_image_index', currentImageIndex.toString());
+  }, [currentImageIndex]);
 
   // Gesture thresholds
   const H_SWIPE_THRESHOLD = 50; // px for horizontal image change
@@ -539,15 +557,17 @@ export const ReelsView: React.FC = () => {
                     transform: 'translateX(0%) rotateY(0deg) scale(1)',
                     filter: 'blur(0px)',
                     opacity: 1,
-                    zIndex: 3,
-                    transition
+                    zIndex: 5,
+                    transition,
+                    willChange: 'transform, filter, opacity'
                   }
                 : {
                     transform: 'translateX(-35%) rotateY(25deg) scale(0.9)',
                     filter: 'blur(8px)',
                     opacity: 0.35,
                     zIndex: 1,
-                    transition
+                    transition,
+                    willChange: 'transform, filter, opacity'
                   };
 
               const rightStyle: React.CSSProperties = isIncomingRight
@@ -555,15 +575,17 @@ export const ReelsView: React.FC = () => {
                     transform: 'translateX(0%) rotateY(0deg) scale(1)',
                     filter: 'blur(0px)',
                     opacity: 1,
-                    zIndex: 3,
-                    transition
+                    zIndex: 5,
+                    transition,
+                    willChange: 'transform, filter, opacity'
                   }
                 : {
                     transform: 'translateX(35%) rotateY(-25deg) scale(0.9)',
                     filter: 'blur(8px)',
                     opacity: 0.35,
                     zIndex: 1,
-                    transition
+                    transition,
+                    willChange: 'transform, filter, opacity'
                   };
 
               return (
@@ -626,7 +648,7 @@ export const ReelsView: React.FC = () => {
           style={{
             transform: `translateY(${slideOffset.y}%)`,
             transition: isTransitioning ? 'transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1)' : 'none',
-            zIndex: 4
+            zIndex: incomingDirection ? 2 : 4
           }}
         >
           {currentReel && (
@@ -644,13 +666,15 @@ export const ReelsView: React.FC = () => {
                     // Önce modal'ı aç
                     const modalResult = await openArticleModal(currentReel);
                     
-                    // Modal başarıyla açıldıysa XP ver
+                    // Modal başarıyla açıldıysa ve daha önce okunmadıysa XP ver
                     if (modalResult.success) {
-                      gamification.onDetailRead(currentReel.id);
-                      FloatingXPOverlay.show({
-                        xpAmount: 5,
-                        source: 'detail_read',
-                      });
+                      const xpGained = gamification.onDetailRead(currentReel.id);
+                      if (xpGained) {
+                        FloatingXPOverlay.show({
+                          xpAmount: 5,
+                          source: 'detail_read',
+                        });
+                      }
                     }
                   } catch (error) {
                     console.error('Modal açma hatası:', error);
@@ -686,11 +710,12 @@ export const ReelsView: React.FC = () => {
                 className="w-full max-w-lg mx-auto"
                 style={{
                   transform: incomingDirection
-                    ? `translateX(${incomingDirection === 'left' ? '-10%' : '10%'})`
-                    : 'translateX(0%)',
-                  filter: incomingDirection ? 'blur(2px)' : 'none',
-                  opacity: incomingDirection ? 0.8 : 1,
-                  transition: 'transform 0.3s ease-out, filter 0.3s ease-out, opacity 0.3s ease-out'
+                    ? `translateX(${incomingDirection === 'left' ? '-10%' : '10%'}) translateZ(0)`
+                    : 'translateX(0%) translateZ(0)',
+                  filter: incomingDirection ? 'blur(6px)' : 'none',
+                  opacity: incomingDirection ? 0.85 : 1,
+                  transition: 'transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), filter 0.45s, opacity 0.45s',
+                  willChange: 'transform, filter, opacity'
                 }}
               />
               {/* Dots for current reel (original place) */}

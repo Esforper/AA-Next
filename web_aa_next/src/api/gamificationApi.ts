@@ -266,7 +266,37 @@ export class GamificationApi {
   }
   
   // ============ TRACKING ============
-  
+
+  /**
+   * Reel etkileşimlerini senkronize et
+   * POST /api/gamification/sync-reel-interactions
+   */
+  static async syncReelInteractions(
+    userId: string,
+    reelInteractions: Record<string, { watched: boolean; detailViewed: boolean; shared: boolean; lastInteractionDate: string }>
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${BASE}/api/gamification/sync-reel-interactions`, {
+        method: 'POST',
+        headers: headers(userId),
+        body: JSON.stringify({
+          user_id: userId,
+          reel_interactions: reelInteractions,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      return await res.json();
+    } catch (error) {
+      console.error('❌ syncReelInteractions failed:', error);
+      return { success: false, message: error instanceof Error ? error.message : 'Failed' };
+    }
+  }
+
   /**
    * Aktivite tracking
    * POST /api/gamification/track-activity

@@ -10,7 +10,10 @@ export interface NavigationViewModel {
 }
 
 export const useNavigationViewModel = (): NavigationViewModel => {
-  const [activeTab, setActiveTabState] = useState('home');
+  const [activeTab, setActiveTabState] = useState(() => {
+    const saved = sessionStorage.getItem('active_tab');
+    return saved || 'home';
+  });
 
   const tabs: TabItem[] = [
     {
@@ -45,6 +48,7 @@ export const useNavigationViewModel = (): NavigationViewModel => {
 
   const setActiveTab = useCallback((tabId: string) => {
     setActiveTabState(tabId);
+    sessionStorage.setItem('active_tab', tabId);
   }, []);
 
   return {

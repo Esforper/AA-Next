@@ -1,11 +1,19 @@
 // GamificationModels.ts - Flutter gamification_state.dart'tan uyarlandı
 
+export interface ReelInteraction {
+  watched: boolean;            // Reel izlendi mi
+  detailViewed: boolean;       // Detay görüntülendi mi
+  shared: boolean;            // Paylaşıldı mı
+  lastInteractionDate: string; // Son etkileşim tarihi
+}
+
 export interface GamificationState extends Record<string, unknown> {
   // XP & Level
   currentXP: number;           // Mevcut düğümdeki XP (0-100)
   dailyXPGoal: number;         // Günlük hedef (300 XP)
   totalXP: number;             // Tüm zamanlar toplam XP
   currentLevel: number;        // Seviye (1-100)
+  xpToNextLevel: number;       // Bir sonraki seviyeye kadar gereken XP
   currentNode: number;         // Mevcut düğüm pozisyonu (0-based)
   nodesInLevel: number;        // Bu seviyedeki toplam düğüm sayısı
   

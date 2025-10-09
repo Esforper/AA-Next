@@ -14,13 +14,14 @@ interface FloatingXPOverlayStatic {
 }
 
 const getColorForSource = (source?: string) => {
+  // Flutter ile aynı renkler
   switch (source) {
-    case 'reel_watched': return '#10B981'; // green-500
+    case 'reel_watched': return '#2563EB'; // blue-600
     case 'emoji_given': return '#EC4899';  // pink-500
-    case 'detail_read': return '#6366F1'; // indigo-500
-    case 'share_given': return '#F59E0B'; // amber-500
-    case 'level_up': return '#8B5CF6';    // purple-500
-    default: return '#3B82F6';            // blue-500
+    case 'detail_read': return '#9333EA'; // purple-600
+    case 'share_given': return '#16A34A'; // green-600
+    case 'level_up': return '#F59E0B';    // amber-500
+    default: return '#2563EB';            // blue-600
   }
 };
 

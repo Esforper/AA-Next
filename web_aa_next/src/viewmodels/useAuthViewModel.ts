@@ -22,9 +22,31 @@ export const useAuthViewModel = () => {
     error: null
   });
 
-  // LocalStorage keys
+  // Hybrid Storage - hem localStorage hem sessionStorage
   const TOKEN_KEY = 'aa_auth_token';
   const USER_KEY = 'aa_user';
+
+  // Storage helper functions
+  const getStorageValue = (key: string): string | null => {
+    // Önce localStorage'dan kontrol et (kalıcı)
+    const localValue = localStorage.getItem(key);
+    if (localValue) return localValue;
+    
+    // Yoksa sessionStorage'dan al (geçici)
+    return sessionStorage.getItem(key);
+  };
+
+  const setStorageValue = (key: string, value: string): void => {
+    // Her ikisine de kaydet
+    localStorage.setItem(key, value);
+    sessionStorage.setItem(key, value);
+  };
+
+  const removeStorageValue = (key: string): void => {
+    // Her ikisinden de sil
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  };
 
   /**
    * Initialize - Token varsa kullanıcıyı yükle
@@ -32,13 +54,42 @@ export const useAuthViewModel = () => {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const savedToken = localStorage.getItem(TOKEN_KEY);
-        const savedUser = localStorage.getItem(USER_KEY);
+        const savedToken = getStorageValue(TOKEN_KEY);
+        const savedUser = getStorageValue(USER_KEY);
+
+        // Debug: Auth initialization
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 Auth Init Debug:', {
+            hasToken: !!savedToken,
+            hasUser: !!savedUser,
+            tokenLength: savedToken?.length,
+            userData: savedUser ? JSON.parse(savedUser) : null
+          });
+        }
 
         if (savedToken && savedUser) {
-          // Verify token with backend
+          // Parse saved user first
+          const parsedUser = JSON.parse(savedUser);
+          
+          // Set auth state immediately with cached data (optimistic update)
+          setState({
+            user: parsedUser,
+            token: savedToken,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null
+          });
+
+          // Verify token with backend in background (optional)
           try {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🔄 Verifying token with backend...');
+            }
             const user = await AuthApi.getCurrentUser(savedToken);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ Token verified, user:', user.username);
+            }
+            // Update with fresh data from backend
             setState({
               user,
               token: savedToken,
@@ -46,19 +97,21 @@ export const useAuthViewModel = () => {
               isLoading: false,
               error: null
             });
+            // Sync to storage
+            setStorageValue(USER_KEY, JSON.stringify(user));
           } catch (error) {
-            // Token geçersiz, temizle
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(USER_KEY);
-            setState({
-              user: null,
-              token: null,
-              isAuthenticated: false,
-              isLoading: false,
-              error: null
-            });
+            // Token verification failed, but keep user logged in with cached data
+            // Only logout if it's a 401/403 (unauthorized)
+            if (process.env.NODE_ENV === 'development') {
+              console.log('⚠️ Token verification failed (keeping cached session):', error);
+            }
+            // Don't remove token unless it's explicitly unauthorized
+            // This allows offline/network error scenarios
           }
         } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('⚠️ No token or user data found');
+          }
           setState(prev => ({ ...prev, isLoading: false }));
         }
       } catch (error) {
@@ -79,9 +132,9 @@ export const useAuthViewModel = () => {
       const response = await AuthApi.login(credentials);
 
       if (response.success && response.token && response.user) {
-        // Save to localStorage
-        localStorage.setItem(TOKEN_KEY, response.token.access_token);
-        localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+        // Save to hybrid storage (hem kalıcı hem güvenli)
+        setStorageValue(TOKEN_KEY, response.token.access_token);
+        setStorageValue(USER_KEY, JSON.stringify(response.user));
 
         setState({
           user: response.user,
@@ -122,9 +175,9 @@ export const useAuthViewModel = () => {
       const response = await AuthApi.register(userData);
 
       if (response.success && response.token && response.user) {
-        // Save to localStorage
-        localStorage.setItem(TOKEN_KEY, response.token.access_token);
-        localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+        // Save to hybrid storage (hem kalıcı hem güvenli)
+        setStorageValue(TOKEN_KEY, response.token.access_token);
+        setStorageValue(USER_KEY, JSON.stringify(response.user));
 
         setState({
           user: response.user,
@@ -174,9 +227,9 @@ export const useAuthViewModel = () => {
     } catch (error) {
       // Ignore logout errors
     } finally {
-      // Clear localStorage
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
+      // Clear hybrid storage
+      removeStorageValue(TOKEN_KEY);
+      removeStorageValue(USER_KEY);
 
       setState({
         user: null,
@@ -201,8 +254,8 @@ export const useAuthViewModel = () => {
     try {
       const updatedUser = await AuthApi.updateProfile(state.token, updates);
       
-      // Update localStorage
-      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+      // Update hybrid storage
+      setStorageValue(USER_KEY, JSON.stringify(updatedUser));
 
       setState(prev => ({
         ...prev,

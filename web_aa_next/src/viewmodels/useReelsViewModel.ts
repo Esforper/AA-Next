@@ -54,6 +54,11 @@ export const useReelsViewModel = (): ReelsViewModel => {
     markUserActive
   } = useInfiniteScroll(20, 3); // Load 20, preload when 3 left
 
+  // Persist currentReelIndex to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('reels_current_index', currentIndex.toString());
+  }, [currentIndex]);
+
   // Expose goToIndex to window for embed/openId jumps (scoped to this instance)
   useEffect(() => {
     (window as any).__goToIndex = (idx: number) => {
