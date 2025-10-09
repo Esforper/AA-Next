@@ -16,3 +16,9 @@ MobileAANext/windows/flutter/generated_plugins.cmake
 MobileAANext/linux/flutter/
 MobileAANext/linux/flutter/generated_plugin_registrant.h
 RSS_Database/__pycache__/
+RSS_Database/final/audio/
+RSS_Database/final/audio_parts/
+RSS_Database/final/
+BackendAPIDemo/audio/
+AANextDemo/yedek/
+AANextDemo/reels.json

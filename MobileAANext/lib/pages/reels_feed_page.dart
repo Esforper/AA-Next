@@ -1,6 +1,6 @@
 // lib/pages/reels_feed_page.dart
 // GÜNCELLEME: Navigasyon ortada + Görsel kırpma düzenlemesi
-
+import '../services/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -32,25 +32,36 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
   bool _hasEarnedWatchXP = false;
   String? _currentReelId;
   bool _subtitlesEnabled = true;
+// 2️⃣ initState SONUNA EKLE (satır 42'den sonra)
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<ReelsProvider>();
+      
+      // ✅ YENİ: İlk reel'in sesini başlat
       if (provider.reels.isNotEmpty) {
         _startReelTracking(provider.current!.id);
+        final audioService = context.read<AudioService>();
+        final firstReel = provider.current!;
+        if (firstReel.audioUrl.isNotEmpty) {
+          audioService.play(firstReel.audioUrl, firstReel.id);
+        }
       }
     });
   }
+  // 3️⃣ didChangeAppLifecycleState DÜZENLENSİN (satır 47 civarı)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final reelsProvider = context.read<ReelsProvider>();
+    // ❌ KALDIRILAN: final reelsProvider = context.read<ReelsProvider>();
+    // ✅ YENİ:
+    final audioService = context.read<AudioService>();
     
     if (state == AppLifecycleState.paused) {
       // Arka plana geçince sesi devam ettir
-      if (!reelsProvider.audioService.isPlaying) {
-        reelsProvider.audioService.resume();
+      if (!audioService.isPlaying) {
+        audioService.resume();
       }
     }
   }
@@ -61,8 +72,10 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
     _currentReelId = reelId;
   }
 
+  // 4️⃣ _onPageChanged İÇİNE EKLE (satır 62-78 arası)
   void _onPageChanged(int index) {
     final reelsProvider = context.read<ReelsProvider>();
+    final audioService = context.read<AudioService>();  // ✅ YENİ
     
     if (!_hasEarnedWatchXP && _reelStartTime != null && _currentReelId != null) {
       final duration = DateTime.now().difference(_reelStartTime!);
@@ -75,8 +88,17 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
     }
 
     reelsProvider.setIndex(index);
+    
+    // ✅ YENİ: Yeni reel'in sesini çal
     if (reelsProvider.current != null) {
-      _startReelTracking(reelsProvider.current!.id);
+      final reel = reelsProvider.current!;
+      _startReelTracking(reel.id);
+      
+      if (reel.audioUrl.isNotEmpty) {
+        audioService.play(reel.audioUrl, reel.id);
+      } else {
+        audioService.stop();
+      }
     }
   }
 
@@ -219,17 +241,18 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
           allowImplicitScrolling: true,
           itemCount: reels.length,
           onPageChanged: _onPageChanged,
-          itemBuilder: (context, i) {
-            final reel = reels[i];
-            return KeyedSubtree(
-              key: ValueKey(reel.id),
-              child: _ReelView(
-                reel: reel,
-                subtitlesEnabled: _subtitlesEnabled,
-                audioService: provider.audioService,
-              ),
-            );
-},
+        itemBuilder: (context, i) {
+          final reel = reels[i];
+          // ❌ KALDIRILAN: audioService: provider.audioService,
+          return KeyedSubtree(
+            key: ValueKey(reel.id),
+            child: _ReelView(
+              reel: reel,
+              subtitlesEnabled: _subtitlesEnabled,
+              // ✅ audioService parametresini kaldırdık, Consumer kullanacağız
+            ),
+          );
+        },
         );
     }
   }
@@ -405,15 +428,16 @@ void dispose() {
   super.dispose();
 }
 }
+// 6️⃣ _ReelView CLASS'I TAMAMEN DEĞİŞSİN (satır 485 civarı)
 class _ReelView extends StatelessWidget {
   final Reel reel;
   final bool subtitlesEnabled;
-  final dynamic audioService;
+  // ❌ KALDIRILAN: final dynamic audioService;
 
   const _ReelView({
     required this.reel,
     required this.subtitlesEnabled,
-    required this.audioService,
+    // ❌ KALDIRILAN: required this.audioService,
   });
 
   @override
@@ -443,9 +467,10 @@ class _ReelView extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 240,
-            child: AnimatedBuilder(
-              animation: audioService,
-              builder: (context, _) {
+            // ❌ KALDIRILAN: AnimatedBuilder(animation: audioService,...)
+            // ✅ YENİ: Consumer kullan
+            child: Consumer<AudioService>(
+              builder: (context, audioService, _) {
                 return SubtitleWidget(
                   subtitles: reel.subtitles!,
                   currentPosition: audioService.position,
@@ -455,7 +480,7 @@ class _ReelView extends StatelessWidget {
             ),
           ),
 
-        // Başlık ve özet
+        // Başlık ve özet (değişmedi, aynı kalacak)
         Positioned(
           left: 0,
           right: 0,

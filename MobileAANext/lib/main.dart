@@ -1,5 +1,5 @@
 // lib/main.dart
-// Auth entegrasyonu + Splash ekranı eklendi
+// Auth entegrasyonu + Splash ekranı + Audio Service eklendi
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,9 +10,11 @@ import 'providers/reels_provider.dart';
 import 'providers/gamification_provider.dart';
 import 'providers/saved_reels_provider.dart';
 import 'providers/chat_provider.dart';
+import 'services/audio_service.dart';  // ✅ YENİ IMPORT
 
 import 'pages/splash_page.dart';
 import 'pages/reels_feed_page.dart';
+import 'pages/login_page.dart';
 import 'views/home_view.dart';
 import 'views/profile_view.dart';
 
@@ -34,7 +36,12 @@ class AanextApp extends StatelessWidget {
           create: (_) => AuthProvider(),
         ),
         
-        // Reels Provider
+        // ✅ YENİ: Audio Service Provider (ReelsProvider'dan ÖNCE!)
+        ChangeNotifierProvider<AudioService>(
+          create: (_) => AudioService(),
+        ),
+        
+        // Reels Provider - Audio service'i kullanıyor
         ChangeNotifierProvider<ReelsProvider>(
           create: (_) => ReelsProvider()..loadReels(),
         ),
@@ -127,28 +134,27 @@ class _MainNavigatorState extends State<MainNavigator> {
             fontSize: 12,
           ),
           unselectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w500,
             fontSize: 11,
           ),
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined, size: 26),
-              activeIcon: Icon(Icons.home, size: 26),
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
               label: 'Ana Sayfa',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.play_circle_outline, size: 26),
-              activeIcon: Icon(Icons.play_circle, size: 26),
+              icon: Icon(Icons.play_circle_outline),
+              activeIcon: Icon(Icons.play_circle),
               label: 'Reels',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.gamepad_outlined, size: 26),
-              activeIcon: Icon(Icons.gamepad, size: 26),
+              icon: Icon(Icons.sports_esports_outlined),
+              activeIcon: Icon(Icons.sports_esports),
               label: 'Oyunlar',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline, size: 26),
-              activeIcon: Icon(Icons.person, size: 26),
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
               label: 'Profil',
             ),
           ],
@@ -158,7 +164,7 @@ class _MainNavigatorState extends State<MainNavigator> {
   }
 }
 
-// Placeholder View
+// Placeholder View - Henüz geliştirilmemiş sayfalar için
 class PlaceholderView extends StatelessWidget {
   final String title;
   final String icon;
@@ -172,11 +178,11 @@ class PlaceholderView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: Text(title),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
+        elevation: 0,
       ),
       body: Center(
         child: Column(
@@ -188,19 +194,19 @@ class PlaceholderView extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              '$title çok yakında!',
-              style: TextStyle(
-                fontSize: 20,
+              title,
+              style: const TextStyle(
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: Colors.black87,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Bu özellik üzerinde çalışıyoruz',
+              'Yakında geliyor...',
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
+                fontSize: 16,
+                color: Colors.grey[600],
               ),
             ),
           ],

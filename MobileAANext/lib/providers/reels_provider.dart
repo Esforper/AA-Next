@@ -8,7 +8,8 @@ enum FeedStatus { initial, loading, loaded, error }
 
 class ReelsProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  final AudioService _audioService = AudioService();
+  // ❌ KALDIRILDI: final AudioService _audioService = AudioService();
+  // ✅ YENİ: AudioService artık main.dart'tan inject edilecek
   
   final List<Reel> _reels = [];
   int _current = 0;
@@ -18,7 +19,9 @@ class ReelsProvider with ChangeNotifier {
   int get currentIndex => _current;
   Reel? get current => _reels.isEmpty ? null : _reels[_current];
   FeedStatus get status => _status;
-  AudioService get audioService => _audioService;
+  
+  // ✅ YENİ: AudioService getter - context.read<AudioService>() ile alınacak
+  // Bu getter artık kullanılmayacak, doğrudan Provider.of<AudioService> kullanılacak
 
   Future<void> loadReels() async {
     if (_status == FeedStatus.loading) return;
@@ -33,10 +36,8 @@ class ReelsProvider with ChangeNotifier {
         ..addAll(data);
       _current = 0;
 
-      // ✅ İlk reel'in sesini başlat
-      if (_reels.isNotEmpty && _reels[0].audioUrl.isNotEmpty) {
-        await _audioService.play(_reels[0].audioUrl, _reels[0].id);
-      }
+      // ❌ KALDIRILDI: İlk reel'in sesini başlatma kodu
+      // Audio artık reels_feed_page.dart'ta kontrol edilecek
 
       _status = FeedStatus.loaded;
     } catch (e, st) {
@@ -48,7 +49,7 @@ class ReelsProvider with ChangeNotifier {
     }
   }
 
-  void setIndex(int i) async {
+  void setIndex(int i) {
     if (i < 0 || i >= _reels.length || i == _current) return;
     _current = i;
 
@@ -62,12 +63,8 @@ class ReelsProvider with ChangeNotifier {
         category: reel.category,
       );
 
-      // ✅ Yeni reel'in sesini çal
-      if (reel.audioUrl.isNotEmpty) {
-        await _audioService.play(reel.audioUrl, reel.id);
-      } else {
-        await _audioService.stop();
-      }
+      // ❌ KALDIRILDI: Audio play kodu
+      // Audio artık reels_feed_page.dart'ta kontrol edilecek
     }
 
     notifyListeners();
@@ -75,7 +72,8 @@ class ReelsProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    _audioService.dispose();
+    // ❌ KALDIRILDI: _audioService.dispose()
+    // AudioService artık ayrı bir provider, kendi dispose'unu kendisi yapacak
     super.dispose();
   }
 }
