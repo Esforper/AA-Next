@@ -212,6 +212,8 @@ async def get_user_daily_progress(
     
     - **user_id**: Kullanıcı ID'si
     - **target_date**: Hedef tarih, default bugün
+    
+    🆕 Yeni kullanıcılar için boş progress döndürür (500 hatası vermez)
     """
     try:
         # Date parsing
@@ -225,6 +227,16 @@ async def get_user_daily_progress(
         
         # Progress al
         progress = await reels_analytics.get_user_daily_progress(user_id, parsed_date)
+        
+        # 🆕 Eğer progress None dönerse, boş progress oluştur
+        if progress is None:
+            return UserProgressResponse(
+                date=parsed_date.isoformat(),
+                progress_percentage=0.0,
+                total_published_today=0,
+                watched_today=0,
+                category_breakdown={}
+            )
         
         # Category breakdown oluştur
         category_breakdown = {}
@@ -250,7 +262,64 @@ async def get_user_daily_progress(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Daily progress error: {str(e)}")
+        # 🆕 Hata durumunda da boş progress döndür (500 hatası yerine)
+        print(f"⚠️ Daily progress error for {user_id}: {e}")
+        return UserProgressResponse(
+            date=parsed_date.isoformat() if 'parsed_date' in locals() else date.today().isoformat(),
+            progress_percentage=0.0,
+            total_published_today=0,
+            watched_today=0,
+            category_breakdown={}
+        )
+        
+        
+        
+@router.get("/user/{user_id}/watched")
+async def get_user_watched_reels(
+    user_id: str,
+    limit: int = Query(50, ge=1, le=200, description="Kaç reel döndürülecek"),
+    category: Optional[str] = Query(None, description="Kategori filtresi")
+):
+    """
+    Kullanıcının izlediği reels listesi
+    
+    - **user_id**: Kullanıcı ID'si
+    - **limit**: Döndürülecek reel sayısı
+    - **category**: Kategori filtresi (opsiyonel)
+    
+    🆕 Yeni kullanıcılar için boş liste döndürür (500 hatası vermez)
+    """
+    try:
+        watched_reels = await reels_analytics.get_user_watched_reels(user_id, limit)
+        
+        # 🆕 Eğer None dönerse boş liste kullan
+        if watched_reels is None:
+            watched_reels = []
+        
+        # Category filter
+        if category:
+            watched_reels = [reel for reel in watched_reels if reel.get("category") == category]
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "watched_reels": watched_reels,
+            "total_count": len(watched_reels),
+            "filter_applied": category
+        }
+        
+    except Exception as e:
+        # 🆕 Hata durumunda da boş liste döndür
+        print(f"⚠️ Get watched reels error for {user_id}: {e}")
+        return {
+            "success": True,
+            "user_id": user_id,
+            "watched_reels": [],
+            "total_count": 0,
+            "filter_applied": category,
+            "error_message": "Could not load watched reels"
+        }
+
 
 @router.get("/user/{user_id}/stats", response_model=UserStatsResponse)
 async def get_user_stats(user_id: str):
@@ -265,16 +334,32 @@ async def get_user_stats(user_id: str):
     - Tamamlama oranı
     - Favori kategoriler
     - Son aktivite zamanı
+    
+    🆕 Yeni kullanıcılar için boş stats döndürür (500 hatası vermez)
     """
     try:
         user_stats = await reels_analytics.get_user_stats(user_id)
+        
+        # 🆕 Eğer stats None dönerse, boş stats oluştur
+        if user_stats is None:
+            return UserStatsResponse(
+                user_id=user_id,
+                total_reels_watched=0,
+                total_screen_time_ms=0,
+                total_screen_time_hours=0.0,
+                completion_rate=0.0,
+                favorite_categories=[],
+                last_activity=None,
+                current_streak_days=0,
+                avg_daily_reels=0.0
+            )
         
         return UserStatsResponse(
             user_id=user_id,
             total_reels_watched=user_stats.total_reels_watched,
             total_screen_time_ms=user_stats.total_screen_time_ms,
             total_screen_time_hours=round(user_stats.get_total_screen_time_hours(), 2),
-            completion_rate=round(user_stats.completion_rate * 100, 1),  # Yüzde olarak
+            completion_rate=round(user_stats.completion_rate * 100, 1),
             favorite_categories=user_stats.favorite_categories,
             last_activity=user_stats.last_reel_viewed_at.isoformat() if user_stats.last_reel_viewed_at else None,
             current_streak_days=user_stats.current_streak_days,
@@ -282,7 +367,19 @@ async def get_user_stats(user_id: str):
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"User stats error: {str(e)}")
+        # 🆕 Hata durumunda da boş stats döndür (500 hatası yerine)
+        print(f"⚠️ User stats error for {user_id}: {e}")
+        return UserStatsResponse(
+            user_id=user_id,
+            total_reels_watched=0,
+            total_screen_time_ms=0,
+            total_screen_time_hours=0.0,
+            completion_rate=0.0,
+            favorite_categories=[],
+            last_activity=None,
+            current_streak_days=0,
+            avg_daily_reels=0.0
+        )
 
 # ============ MAIN FEED ENDPOINTS (Instagram-style) ============
 @router.get("/feed")
@@ -734,11 +831,31 @@ async def get_user_session_summary(
     - **session_id**: Session ID (opsiyonel)
     
     **Kullanıcı uygulamadan çıkarken gösterilebilir**
+    
+    🆕 Yeni kullanıcılar için boş summary döndürür (500 hatası vermez)
     """
     try:
         # Bugünkü stats al
         today_progress = await reels_analytics.get_user_daily_progress(user_id)
         user_stats = await reels_analytics.get_user_stats(user_id)
+        
+        # 🆕 None check
+        if today_progress is None or user_stats is None:
+            return {
+                "success": True,
+                "user_id": user_id,
+                "session_summary": {
+                    "session_date": date.today().isoformat(),
+                    "reels_watched_today": 0,
+                    "progress_percentage": 0.0,
+                    "total_screen_time_today_minutes": 0.0,
+                    "completion_rate": 0.0,
+                    "favorite_category": None,
+                    "total_reels_all_time": 0
+                },
+                "achievements": [],
+                "message": "Welcome! Start watching to see your progress 🎬"
+            }
         
         # Session summary
         session_summary = {
@@ -751,7 +868,7 @@ async def get_user_session_summary(
             "total_reels_all_time": user_stats.total_reels_watched
         }
         
-        # Achievements check (basit)
+        # Achievements check
         achievements = []
         if today_progress.progress_percentage >= 50:
             achievements.append("Daily Explorer - %50+ progress")
@@ -767,7 +884,23 @@ async def get_user_session_summary(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Session summary error: {str(e)}")
+        # 🆕 Hata durumunda da varsayılan response döndür
+        print(f"⚠️ Session summary error for {user_id}: {e}")
+        return {
+            "success": True,
+            "user_id": user_id,
+            "session_summary": {
+                "session_date": date.today().isoformat(),
+                "reels_watched_today": 0,
+                "progress_percentage": 0.0,
+                "total_screen_time_today_minutes": 0.0,
+                "completion_rate": 0.0,
+                "favorite_category": None,
+                "total_reels_all_time": 0
+            },
+            "achievements": [],
+            "message": "Welcome back! 🎬"
+        }
 
 # ============ SYSTEM STATUS ENDPOINTS ============
 

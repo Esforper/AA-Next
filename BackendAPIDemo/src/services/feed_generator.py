@@ -42,6 +42,13 @@ class FeedGenerator:
     def __init__(self):
         print("✅ Feed Generator initialized")
     
+    
+    
+    
+    
+    # BackendAPIDemo/src/services/feed_generator.py
+    # SADECE generate_feed METODUNU DÜZELTİYORUZ
+
     async def generate_feed(
         self,
         user_id: str,
@@ -66,36 +73,62 @@ class FeedGenerator:
             
             print(f"📱 Generating feed for {user_id} (level: {personalization_level})")
             
+            # 🆕 ÖNCE TOPLAM REEL SAYISINI AL
+            total_available = await self._get_total_available(user_id)
+            print(f"📊 Total available reels: {total_available}")
+            
             # Personalization seviyesine göre feed oluştur
             if personalization_level == "cold":
-                reels = await self._cold_start_feed(user_id, limit)
-                trending_count = int(limit * 0.7)
-                fresh_count = int(limit * 0.3)
+                all_reels = await self._cold_start_feed(user_id, total_available)  # 🆕 Tüm reels'i al
+                trending_count = int(len(all_reels) * 0.7)
+                fresh_count = int(len(all_reels) * 0.3)
                 personalized_count = 0
                 exploration_count = 0
                 
             elif personalization_level == "warm":
-                reels = await self._warm_feed(user_id, limit)
+                all_reels = await self._warm_feed(user_id, total_available)  # 🆕 Tüm reels'i al
                 trending_count = 0
                 fresh_count = 0
-                personalized_count = int(limit * 0.8)
-                exploration_count = int(limit * 0.2)
+                personalized_count = int(len(all_reels) * 0.8)
+                exploration_count = int(len(all_reels) * 0.2)
                 
             else:  # hot
-                reels = await self._hot_feed(user_id, limit)
+                all_reels = await self._hot_feed(user_id, total_available)  # 🆕 Tüm reels'i al
                 trending_count = 0
                 fresh_count = 0
-                personalized_count = int(limit * 0.85)
-                exploration_count = int(limit * 0.15)
+                personalized_count = int(len(all_reels) * 0.85)
+                exploration_count = int(len(all_reels) * 0.15)
             
-            # Pagination metadata
+            # 🆕 CURSOR-BASED PAGINATION
+            start_index = 0
+            if cursor:
+                try:
+                    # Cursor'daki reel'in indexini bul
+                    start_index = next(
+                        i + 1 for i, reel in enumerate(all_reels) 
+                        if reel.id == cursor
+                    )
+                    print(f"🔍 Found cursor at index: {start_index}")
+                except StopIteration:
+                    print(f"⚠️ Cursor not found: {cursor}, starting from 0")
+                    start_index = 0
+            
+            # Sayfa verisini al
+            page_reels = all_reels[start_index:start_index + limit]
+            
+            # 🆕 DÜZELTİLMİŞ PAGINATION MANTĞI
+            has_next = start_index + limit < len(all_reels)
+            next_cursor = page_reels[-1].id if page_reels and has_next else None
+            
             pagination = FeedPagination(
                 current_page=1,
-                has_next=len(reels) >= limit,
-                has_previous=False,
-                next_cursor=reels[-1].id if len(reels) >= limit else None,
-                total_available=await self._get_total_available(user_id)
+                has_next=has_next,  # ✅ Doğru mantık
+                has_previous=start_index > 0,
+                next_cursor=next_cursor,  # ✅ Her zaman son reel'in ID'si
+                total_available=len(all_reels)
             )
+            
+            print(f"📄 Pagination: hasNext={has_next}, cursor={next_cursor}, total={len(all_reels)}")
             
             # Feed metadata
             metadata = FeedMetadata(
@@ -109,7 +142,7 @@ class FeedGenerator:
             
             return FeedResponse(
                 success=True,
-                reels=reels[:limit],
+                reels=page_reels,  # ✅ Sadece limit kadar döndür
                 pagination=pagination,
                 feed_metadata=metadata,
                 generated_at=datetime.now()
@@ -117,14 +150,25 @@ class FeedGenerator:
             
         except Exception as e:
             print(f"❌ Feed generation error: {e}")
+            import traceback
+            traceback.print_exc()
+            
             # Fallback: latest reels
             fallback_reels = await self._get_latest_reels(limit)
             return FeedResponse(
                 success=False,
                 reels=fallback_reels,
-                pagination=FeedPagination(),
+                pagination=FeedPagination(
+                    has_next=False,
+                    total_available=len(fallback_reels)
+                ),
                 feed_metadata=FeedMetadata()
             )
+    
+    
+    
+    
+    
     
     async def _cold_start_feed(self, user_id: str, limit: int) -> List[ReelFeedItem]:
         """

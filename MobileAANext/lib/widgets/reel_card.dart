@@ -144,11 +144,11 @@ class _ReelCardState extends State<ReelCard>
                 await ApiService().trackEmoji(
                   reelId: reel.id,
                   emoji: emoji,
-                  category: reel.category,
                 );
                 
-                // mounted kontrolü async işlemden sonra yapıldığı için doğrudur.
-                if (!mounted) return;
+                // ✅ DÜZELTİLDİ: mounted kontrolü
+                if (!context.mounted) return;
+                
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
                   ..showSnackBar(

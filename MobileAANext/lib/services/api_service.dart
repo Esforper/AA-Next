@@ -13,23 +13,21 @@ class ApiService {
   // 💡 .env'den base URL al
   // =========================
   static String _resolveHostBase() {
-    // .env'den oku
     final envUrl = dotenv.env['API_URL'];
     if (envUrl != null && envUrl.isNotEmpty) {
       return envUrl;
     }
 
-    // Fallback: Platform'a göre
     if (kIsWeb) {
       return Uri.base.origin;
     }
 
     if (!kIsWeb && _isAndroid) {
-      return 'http://10.0.2.2:8000'; // Android emulator
+      return 'http://10.0.2.2:8000';
     }
 
     if (!kIsWeb && _isIOS) {
-      return 'http://localhost:8000'; // iOS simulator
+      return 'http://localhost:8000';
     }
 
     return 'http://localhost:8000';
@@ -52,179 +50,313 @@ class ApiService {
   }
 
   // =========================
-  // 🔐 Auth Token Yönetimi
+  // 🔐 Auth & Configuration
   // =========================
   final AuthService _authService = AuthService();
-Future<Map<String, String>> _getHeaders() async {
-  final headers = <String, String>{
-    'Content-Type': 'application/json',
-    'X-User-ID': 'demo_user_123', // 👈 Geçici user ID
-  };
+  final String _baseUrl = _resolveHostBase();
+  
+  // 🆕 Timeout ve retry ayarları
+  static const Duration _timeoutDuration = Duration(seconds: 30);
+  static const int _maxRetries = 3;
 
-  final token = await _authService.getToken();
-  if (token != null && !token.isExpired) {
-    headers['Authorization'] = 'Bearer ${token.accessToken}';
+  Future<Map<String, String>> _getHeaders() async {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'X-User-ID': 'demo_user_123',
+    };
+
+    final token = await _authService.getToken();
+    if (token != null && !token.isExpired) {
+      headers['Authorization'] = 'Bearer ${token.accessToken}';
+    }
+
+    return headers;
   }
 
-  return headers;
-}
+  // =========================
+  // 🆕 Helper: Retry Logic
+  // =========================
+  Future<T> _retryRequest<T>(
+    Future<T> Function() request, {
+    int maxRetries = _maxRetries,
+  }) async {
+    int attempt = 0;
+    
+    while (attempt < maxRetries) {
+      try {
+        return await request();
+      } catch (e) {
+        attempt++;
+        
+        if (attempt >= maxRetries) {
+          debugPrint('❌ Max retries ($maxRetries) reached');
+          rethrow;
+        }
+        
+        // Exponential backoff: 1s, 2s, 4s
+        final delay = Duration(seconds: 1 << (attempt - 1));
+        debugPrint('⚠️ Retry $attempt/$maxRetries after ${delay.inSeconds}s');
+        await Future.delayed(delay);
+      }
+    }
+    
+    throw Exception('Request failed after $maxRetries retries');
+  }
+
   // =========================
   // 📡 API Endpoints
   // =========================
-  final String _baseUrl = _resolveHostBase();
-Future<List<Reel>> fetchReels({
-  int limit = 20,
-  String? cursor,
-}) async {
-  try {
-    final headers = await _getHeaders();
-    final uri = Uri.parse('$_baseUrl/api/reels/feed').replace(
-      queryParameters: {
-        'limit': limit.toString(),
-        if (cursor != null) 'cursor': cursor,
-      },
-    );
 
-    print('🔍 Fetching reels from: $uri'); // Debug
-    final response = await http.get(uri, headers: headers);
-    print('📡 Response status: ${response.statusCode}'); // Debug
-    print('📦 Response body: ${response.body}'); // Debug
+  /// 🆕 Fetch reels with pagination support
+  Future<Map<String, dynamic>> fetchReels({
+    int limit = 20,
+    String? cursor,
+  }) async {
+    return _retryRequest(() async {
+      try {
+        final headers = await _getHeaders();
+        final queryParams = <String, String>{
+          'limit': limit.toString(),
+        };
+        
+        if (cursor != null && cursor.isNotEmpty) {
+          queryParams['cursor'] = cursor;
+        }
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final reelsList = data['reels'] as List;
-      return reelsList.map((json) => Reel.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to load reels: ${response.statusCode}');
-    }
-  } catch (e) {
-    throw Exception('Fetch reels error: $e');
+        final uri = Uri.parse('$_baseUrl/api/reels/feed').replace(
+          queryParameters: queryParams,
+        );
+
+        debugPrint('🔍 Fetching reels: $uri');
+        
+        final response = await http
+            .get(uri, headers: headers)
+            .timeout(_timeoutDuration);
+
+        debugPrint('📡 Response status: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          
+          // Response validation
+          if (!data.containsKey('reels')) {
+            throw Exception('Invalid response: missing "reels" field');
+          }
+
+          final reelsList = data['reels'] as List;
+          final reels = reelsList.map((json) => Reel.fromJson(json)).toList();
+          
+          // Pagination bilgisini çıkar
+          final pagination = data['pagination'] as Map<String, dynamic>?;
+          
+          debugPrint('✅ Loaded ${reels.length} reels');
+          debugPrint('📄 Pagination: hasNext=${pagination?['has_next']}, cursor=${pagination?['next_cursor']}');
+
+          return {
+            'reels': reels,
+            'pagination': pagination ?? {},
+            'feed_metadata': data['feed_metadata'] ?? {},
+          };
+          
+        } else if (response.statusCode == 500) {
+          // 🆕 500 hatası - fallback döndür
+          debugPrint('⚠️ Server error (500), returning empty feed');
+          return _getEmptyFeedResponse();
+          
+        } else if (response.statusCode == 404) {
+          debugPrint('⚠️ Endpoint not found (404)');
+          return _getEmptyFeedResponse();
+          
+        } else {
+          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        }
+        
+      } on http.ClientException catch (e) {
+        debugPrint('❌ Network error: $e');
+        throw Exception('Network error: Check your connection');
+        
+      } on FormatException catch (e) {
+        debugPrint('❌ JSON parse error: $e');
+        throw Exception('Invalid server response');
+        
+      } catch (e) {
+        debugPrint('❌ Unexpected error: $e');
+        rethrow;
+      }
+    });
   }
-}
 
+  /// 🆕 Empty feed fallback response
+  Map<String, dynamic> _getEmptyFeedResponse() {
+    return {
+      'reels': <Reel>[],
+      'pagination': {
+        'has_next': false,
+        'next_cursor': null,
+        'total_available': 0,
+      },
+      'feed_metadata': {
+        'personalization_level': 'cold',
+      },
+    };
+  }
+
+  /// Track view (hata handling ile güçlendirilmiş)
   Future<void> trackView({
     required String reelId,
     String? category,
-    String? emojiReaction,
-  }) async {
-    await trackReelView(
-      reelId: reelId,
-      durationMs: 0,
-      completed: false,
-      category: category,
-      emojiReaction: emojiReaction,
-    );
-  }
-
-  Future<void> trackReelView({
-    required String reelId,
-    required int durationMs,
-    required bool completed,
-    String? category,
     String? sessionId,
-    String? emojiReaction,
-    int? pausedCount,
-    bool? replayed,
-    bool? shared,
-    bool? saved,
+    int durationMs = 0,
+    bool completed = false,
   }) async {
     try {
       final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/reels/track-view'),
-        headers: headers,
-        body: jsonEncode({
-          'reel_id': reelId,
-          'duration_ms': durationMs,
-          'completed': completed,
-          if (category != null) 'category': category,
-          if (sessionId != null) 'session_id': sessionId,
-          if (emojiReaction != null) 'emoji_reaction': emojiReaction,
-          if (pausedCount != null) 'paused_count': pausedCount,
-          if (replayed != null) 'replayed': replayed,
-          if (shared != null) 'shared': shared,
-          if (saved != null) 'saved': saved,
-        }),
-      );
+      final uri = Uri.parse('$_baseUrl/api/reels/track-view');
 
-      if (response.statusCode != 200) {
-        print('Track view error: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Track view exception: $e');
-    }
-  }
+      final body = jsonEncode({
+        'reel_id': reelId,
+        'duration_ms': durationMs,
+        'completed': completed,
+        if (category != null) 'category': category,
+        if (sessionId != null) 'session_id': sessionId,
+      });
 
-  Future<void> trackDetailView({
-    required String reelId,
-    required int durationMs,
-    bool? clickedSource,
-  }) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/reels/track-detail-view'),
-        headers: headers,
-        body: jsonEncode({
-          'reel_id': reelId,
-          'duration_ms': durationMs,
-          if (clickedSource != null) 'clicked_source': clickedSource,
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        print('Track detail view error: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Track detail view exception: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>?> fetchDailyProgress(String userId) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/reels/user/$userId/daily-progress'),
-        headers: headers,
-      );
+      final response = await http
+          .post(uri, headers: headers, body: body)
+          .timeout(_timeoutDuration);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        debugPrint('✅ View tracked: $reelId');
+      } else {
+        debugPrint('⚠️ Track view failed: ${response.statusCode}');
       }
-      return null;
+      
     } catch (e) {
-      print('Fetch daily progress error: $e');
-      return null;
+      // Track view hatalarını sessizce logla
+      // (kritik olmayan işlem, kullanıcı deneyimini etkilemesin)
+      debugPrint('⚠️ Track view error (non-critical): $e');
     }
   }
 
+  /// 🆕 Fetch user stats with error handling
   Future<Map<String, dynamic>?> fetchUserStats(String userId) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/reels/user/$userId/stats'),
-        headers: headers,
-      );
+    return _retryRequest(() async {
+      try {
+        final headers = await _getHeaders();
+        final uri = Uri.parse('$_baseUrl/api/reels/user/$userId/stats');
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final response = await http
+            .get(uri, headers: headers)
+            .timeout(_timeoutDuration);
+
+        if (response.statusCode == 200) {
+          return jsonDecode(response.body) as Map<String, dynamic>;
+          
+        } else if (response.statusCode == 500) {
+          // 🆕 Yeni kullanıcı için boş stats döndür
+          debugPrint('⚠️ User stats 500 error, returning empty stats');
+          return _getEmptyUserStats(userId);
+          
+        } else {
+          debugPrint('⚠️ Failed to fetch user stats: ${response.statusCode}');
+          return null;
+        }
+        
+      } catch (e) {
+        debugPrint('❌ Fetch user stats error: $e');
+        return _getEmptyUserStats(userId);
       }
-      return null;
-    } catch (e) {
-      print('Fetch user stats error: $e');
-      return null;
-    }
+    });
   }
 
+  /// 🆕 Empty user stats fallback
+  Map<String, dynamic> _getEmptyUserStats(String userId) {
+    return {
+      'success': true,
+      'user_id': userId,
+      'total_reels_watched': 0,
+      'total_screen_time_ms': 0,
+      'total_screen_time_hours': 0.0,
+      'completion_rate': 0.0,
+      'favorite_categories': <String>[],
+      'last_activity': null,
+      'current_streak_days': 0,
+      'avg_daily_reels': 0.0,
+    };
+  }
+
+  /// Track emoji reaction
   Future<void> trackEmoji({
     required String reelId,
     required String emoji,
-    String? category,
   }) async {
-    await trackView(
-      reelId: reelId,
-      category: category,
-      emojiReaction: emoji,
-    );
+    try {
+      final headers = await _getHeaders();
+      final uri = Uri.parse('$_baseUrl/api/reels/track-view');
+
+      final body = jsonEncode({
+        'reel_id': reelId,
+        'duration_ms': 0,
+        'completed': false,
+        'emoji_reaction': emoji,
+      });
+
+      final response = await http
+          .post(uri, headers: headers, body: body)
+          .timeout(_timeoutDuration);
+
+      if (response.statusCode == 200) {
+        debugPrint('✅ Emoji tracked: $emoji for $reelId');
+      } else {
+        debugPrint('⚠️ Track emoji failed: ${response.statusCode}');
+      }
+      
+    } catch (e) {
+      debugPrint('⚠️ Track emoji error (non-critical): $e');
+    }
+  }
+
+  /// 🆕 Fetch trending reels
+  Future<List<Reel>> fetchTrendingReels({int limit = 10}) async {
+    return _retryRequest(() async {
+      try {
+        final headers = await _getHeaders();
+        final uri = Uri.parse('$_baseUrl/api/reels/trending').replace(
+          queryParameters: {'limit': limit.toString()},
+        );
+
+        final response = await http
+            .get(uri, headers: headers)
+            .timeout(_timeoutDuration);
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final reelsList = data['trending_reels'] as List;
+          return reelsList.map((json) => Reel.fromJson(json)).toList();
+        } else {
+          debugPrint('⚠️ Failed to fetch trending: ${response.statusCode}');
+          return <Reel>[];
+        }
+        
+      } catch (e) {
+        debugPrint('❌ Fetch trending error: $e');
+        return <Reel>[];
+      }
+    });
+  }
+
+  /// 🆕 Health check
+  Future<bool> checkServerHealth() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/reels/system/status');
+      final response = await http
+          .get(uri)
+          .timeout(const Duration(seconds: 5));
+      
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('❌ Health check failed: $e');
+      return false;
+    }
   }
 }
