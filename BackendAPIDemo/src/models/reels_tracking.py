@@ -378,27 +378,29 @@ class DailyProgress(BaseModel):
         return (cat_data.get("watched", 0) / cat_data["published"]) * 100.0
 
 # ============ FEED & REEL MODELS ============
+# Bu dosyada sadece ReelFeedItem class'ını değiştireceğiz
+# TAM DOSYAYI DEĞİŞTİRME, SADECE BU BÖLÜMÜ BUL VE DEĞİŞTİR:
 
 class ReelFeedItem(BaseModel):
-    """Feed'deki bir reel item'i"""
-    id: str = Field(..., description="Reel unique ID")
-    
-    # News data
+    """
+    ✅ UPDATED: Instagram-style reel feed item with real NewsData
+    """
+    id: str = Field(..., description="Reel ID")
     news_data: NewsData = Field(..., description="Haber verisi")
     
     # TTS & Audio
-    tts_content: str = Field(..., description="TTS için kullanılan metin")
+    tts_content: str = Field(default="", description="TTS için kullanılan metin")  # ✅ default eklendi
     voice_used: str = Field(default="alloy")
     model_used: str = Field(default="tts-1")
     
     # Audio files
-    audio_url: str = Field(..., description="Ses dosyası URL'i")
-    duration_seconds: int = Field(..., description="Ses süresi")
+    audio_url: str = Field(default="", description="Ses dosyası URL'i")  # ✅ default eklendi
+    duration_seconds: float = Field(default=0.0, description="Ses süresi")  # ✅ int → float
     file_size_mb: float = Field(default=0.0)
     
     # Publishing info
     status: ReelStatus = Field(default=ReelStatus.PUBLISHED)
-    published_at: datetime = Field(...)
+    published_at: datetime = Field(default_factory=datetime.now)  # ✅ default eklendi
     created_at: datetime = Field(default_factory=datetime.now)
     
     # Analytics
@@ -427,6 +429,9 @@ class ReelFeedItem(BaseModel):
     # Thumbnail
     thumbnail_url: Optional[str] = None
     
+    # ✅ YENİ: Subtitles
+    subtitles: Optional[List[Dict[str, Any]]] = Field(default=None, description="Alt yazılar")
+    
     def is_recent(self, hours: int = 3) -> bool:
         """Son X saat içinde yayınlandı mı"""
         from datetime import timedelta
@@ -437,7 +442,8 @@ class ReelFeedItem(BaseModel):
         if self.total_views == 0:
             return 0.0
         return (self.total_screen_time_ms / 1000) / (self.duration_seconds * self.total_views)
-
+    
+    
 class TrendingReels(BaseModel):
     """Trend olan reels listesi"""
     period: TrendPeriod = Field(default=TrendPeriod.DAILY)

@@ -75,11 +75,28 @@ def _setup_middleware(app: FastAPI):
 def _setup_static_files(app: FastAPI):
     """Static file serving setup"""
     
-    # Audio dosyaları için static serving
-    audio_path = Path(settings.storage_base_path)
+    # ✅ Audio dosyaları için path
+    audio_path = Path(settings.storage_base_path) / "reels_data" / "audio"
     audio_path.mkdir(parents=True, exist_ok=True)
     
-    app.mount("/audio", StaticFiles(directory=audio_path), name="audio")
+    print(f"📁 Audio files serving from: {audio_path.absolute()}")
+    print(f"   Exists: {audio_path.exists()}")
+    
+    # ✅ Dosya sayısını kontrol et
+    if audio_path.exists():
+        mp3_files = list(audio_path.glob("*.mp3"))
+        print(f"   MP3 files found: {len(mp3_files)}")
+        if mp3_files:
+            print(f"   First file: {mp3_files[0].name}")
+    
+    # ✅ Static mount
+    try:
+        app.mount("/audio", StaticFiles(directory=str(audio_path)), name="audio")
+        print("✅ Audio static files mounted successfully!")
+    except Exception as e:
+        print(f"❌ Failed to mount audio files: {e}")
+        
+        
 
 def _register_core_routes(app: FastAPI):
     """Core system routes (health, info vb.)"""
