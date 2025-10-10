@@ -30,13 +30,38 @@ export const ProfileView: React.FC = () => {
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
-
+  
   // Auth durumu değiştiğinde viewMode'u sıfırla
   React.useEffect(() => {
     if (isAuthenticated && viewMode !== 'main') {
       setViewMode('main');
     }
   }, [isAuthenticated, viewMode]);
+
+  // Auth state debug
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 ProfileView Auth Debug:', {
+        isAuthenticated,
+        isLoading,
+        user: user?.username,
+        error,
+        viewMode
+      });
+    }
+  }, [isAuthenticated, isLoading, user, error, viewMode]);
+
+  // Auth state yüklenene kadar loading göster
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20 sm:pb-24 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-aa-blue border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Form input change handler
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -78,7 +78,17 @@ interface UseInfiniteScrollReturn {
 }
 
 const API_BASE = API_CONFIG.BASE_URL;
-const USER_ID = 'web_user_' + Math.random().toString(36).substr(2, 9); // Generate random user ID
+
+// Persistent User ID - her sayfa yenilendiğinde aynı ID kullan
+const getUserId = () => {
+  let userId = localStorage.getItem('feed_user_id');
+  if (!userId) {
+    userId = 'web_user_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('feed_user_id', userId);
+  }
+  return userId;
+};
+const USER_ID = getUserId();
 
 export const useInfiniteScroll = (
   initialLimit: number = 20,
@@ -87,7 +97,10 @@ export const useInfiniteScroll = (
   
   // State
   const [reels, setReels] = useState<ReelData[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const saved = sessionStorage.getItem('reels_current_index');
+    return saved ? parseInt(saved, 10) : 0;
+  });
   const [loading, setLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);

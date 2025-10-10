@@ -12,6 +12,7 @@ const defaultState: GamificationState = {
   dailyXPGoal: 300,
   totalXP: 0,
   currentLevel: 1,
+  xpToNextLevel: 100, // İlk seviye için 100 XP gerekli
   currentNode: 0,
   nodesInLevel: 2,
   currentStreak: 0,
@@ -31,6 +32,11 @@ const getNodesForLevel = (level: number): number => {
   if (level <= 10) return 4;
   if (level <= 15) return 6;
   return 8; // 16+
+};
+
+// XP hesaplama: Her seviye için gereken toplam XP
+const getRequiredXPForLevel = (level: number): number => {
+  return level * 100; // Basit formül: her seviye 100 XP
 };
 
 const calculatePercentile = (streak: number): number => {
@@ -54,6 +60,7 @@ export function useGamificationViewModel(userId: string = 'web_user') {
   const dailyProgress = state.xpEarnedToday / state.dailyXPGoal;
   const nodeProgress = state.currentXP / 100;
   const levelProgress = state.nodesInLevel > 0 ? state.currentNode / state.nodesInLevel : 0;
+  const xpToNextLevel = getRequiredXPForLevel(state.currentLevel + 1) - state.totalXP;
 
   // ============ STORAGE FUNCTIONS ============
   
@@ -65,6 +72,7 @@ export function useGamificationViewModel(userId: string = 'web_user') {
       localStorage.setItem(getStorageKey(userId), JSON.stringify(nextState));
       localStorage.setItem(getEmojiTrackingKey(userId), JSON.stringify(Array.from(emojiGivenRef.current)));
       localStorage.setItem(getShareTrackingKey(userId), JSON.stringify(Array.from(shareGivenRef.current)));
+      localStorage.setItem(`reel_interactions_${userId}`, JSON.stringify(reelInteractionsRef.current));
     } catch (e) {
       console.error('❌ Storage kayıt hatası:', e);
     }
@@ -126,6 +134,12 @@ export function useGamificationViewModel(userId: string = 'web_user') {
         shareGivenRef.current = new Set(data);
       }
       
+      // Reel interactions yükle
+      const interactionsStr = localStorage.getItem(`reel_interactions_${userId}`);
+      if (interactionsStr) {
+        reelInteractionsRef.current = JSON.parse(interactionsStr);
+      }
+      
       console.log(`✅ Gamification storage yüklendi (${userId})`);
     } catch (e) {
       console.error('❌ Storage yükleme hatası:', e);
@@ -165,8 +179,10 @@ export function useGamificationViewModel(userId: string = 'web_user') {
       streakPercentile: percentile,
     };
     
+    // Flutter'daki gibi tüm tracking'leri temizle
     emojiGivenRef.current.clear();
     shareGivenRef.current.clear();
+    reelInteractionsRef.current = {}; // Günlük reset: Tüm reel interactions temizle
     
     setState(nextState);
     saveToStorage(nextState);
@@ -211,7 +227,7 @@ export function useGamificationViewModel(userId: string = 'web_user') {
             saveToStorage(remoteState);
           } else if (localState.totalXP > remoteState.totalXP) {
             // Local state daha güncel, backend'e gönder
-            await GamificationApi.syncState(userId, localState);
+            await GamificationApi.syncState(userId, localState as Record<string, unknown>);
           }
         }
       } catch (e) {
@@ -308,42 +324,90 @@ export function useGamificationViewModel(userId: string = 'web_user') {
     });
   }, [state, userId, saveToStorage]);
 
+  // ============ REEL INTERACTION TRACKING ============
+  // Flutter'daki yapı: Her reel için watch/emoji/detail/share ayrı ayrı takip edilir
+  
+  const reelInteractionsRef = useRef<Record<string, {
+    watched: boolean;
+    emojiGiven: boolean;
+    detailRead: boolean;
+    shareGiven: boolean;
+  }>>({});
+  
+  const getReelInteraction = (reelId: string) => {
+    if (!reelInteractionsRef.current[reelId]) {
+      reelInteractionsRef.current[reelId] = {
+        watched: false,
+        emojiGiven: false,
+        detailRead: false,
+        shareGiven: false,
+      };
+    }
+    return reelInteractionsRef.current[reelId];
+  };
+  
   // ============ XP KAYNAKLARI ============
   
-  const onReelWatched = useCallback((reelId: string) => {
+  /// Reels izlendi (3+ saniye) - 10 XP
+  const onReelWatched = useCallback((reelId: string): boolean => {
+    const interaction = getReelInteraction(reelId);
+    
+    // Bu reel daha önce izlendiyse XP verme
+    if (interaction.watched) {
+      return false;
+    }
+    
+    interaction.watched = true;
     addXP(10, 'reel_watched', { reelId });
+    return true;
   }, [addXP]);
 
+  /// Emoji atıldı (sadece 1 kere) - 5 XP
   const onEmojiGiven = useCallback((reelId: string): boolean => {
+    const interaction = getReelInteraction(reelId);
     const now = Date.now();
     const lastActionTime = lastActionTimestampRef.current[`emoji_${reelId}`] || 0;
     
-    // Aynı reel için emoji verildiyse veya son işlemden 2 saniye geçmediyse XP verme
-    if (emojiGivenRef.current.has(reelId) || (now - lastActionTime) < 2000) {
+    // Bu reel'e daha önce emoji atıldıysa veya son işlemden 2 saniye geçmediyse XP verme
+    if (interaction.emojiGiven || (now - lastActionTime) < 2000) {
       return false;
     }
     
     lastActionTimestampRef.current[`emoji_${reelId}`] = now;
-    emojiGivenRef.current.add(reelId);
+    interaction.emojiGiven = true;
+    emojiGivenRef.current.add(reelId); // Eski sistem için backward compatibility
     addXP(5, 'emoji_given', { reelId });
     return true;
   }, [addXP]);
 
-  const onDetailRead = useCallback((reelId: string) => {
+  /// Detail okundu (10+ saniye) - 5 XP
+  const onDetailRead = useCallback((reelId: string): boolean => {
+    const interaction = getReelInteraction(reelId);
+    
+    // Bu reel'in detayı daha önce okunduysa XP verme
+    if (interaction.detailRead) {
+      return false;
+    }
+    
+    interaction.detailRead = true;
     addXP(5, 'detail_read', { reelId });
+    return true;
   }, [addXP]);
 
+  /// Paylaşım yapıldı (ilk paylaşım) - 5 XP
   const onShareGiven = useCallback((reelId: string): boolean => {
+    const interaction = getReelInteraction(reelId);
     const now = Date.now();
     const lastActionTime = lastActionTimestampRef.current[`share_${reelId}`] || 0;
     
-    // Aynı reel için paylaşım yapıldıysa veya son işlemden 2 saniye geçmediyse XP verme
-    if (shareGivenRef.current.has(reelId) || (now - lastActionTime) < 2000) {
+    // Bu reel daha önce paylaşıldıysa veya son işlemden 2 saniye geçmediyse XP verme
+    if (interaction.shareGiven || (now - lastActionTime) < 2000) {
       return false;
     }
     
     lastActionTimestampRef.current[`share_${reelId}`] = now;
-    shareGivenRef.current.add(reelId);
+    interaction.shareGiven = true;
+    shareGivenRef.current.add(reelId); // Eski sistem için backward compatibility
     addXP(5, 'share_given', { reelId });
     return true;
   }, [addXP]);
@@ -369,11 +433,23 @@ export function useGamificationViewModel(userId: string = 'web_user') {
   // ============ HELPER METHODS ============
   
   const hasEmojiGiven = useCallback((reelId: string): boolean => {
-    return emojiGivenRef.current.has(reelId);
+    const interaction = reelInteractionsRef.current[reelId];
+    return interaction?.emojiGiven || false;
   }, []);
 
   const hasShareGiven = useCallback((reelId: string): boolean => {
-    return shareGivenRef.current.has(reelId);
+    const interaction = reelInteractionsRef.current[reelId];
+    return interaction?.shareGiven || false;
+  }, []);
+  
+  const hasWatched = useCallback((reelId: string): boolean => {
+    const interaction = reelInteractionsRef.current[reelId];
+    return interaction?.watched || false;
+  }, []);
+  
+  const hasDetailRead = useCallback((reelId: string): boolean => {
+    const interaction = reelInteractionsRef.current[reelId];
+    return interaction?.detailRead || false;
   }, []);
 
   const forceResetDaily = useCallback(() => {
@@ -388,6 +464,7 @@ export function useGamificationViewModel(userId: string = 'web_user') {
     // State
     state: {
       ...state,
+      xpToNextLevel,
       dailyProgress,
       nodeProgress,
       levelProgress,
@@ -405,6 +482,8 @@ export function useGamificationViewModel(userId: string = 'web_user') {
     // Helpers
     hasEmojiGiven,
     hasShareGiven,
+    hasWatched,
+    hasDetailRead,
     forceResetDaily,
     addTestXP,
   };

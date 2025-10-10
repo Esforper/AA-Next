@@ -70,9 +70,29 @@ export const LevelChainDisplay: React.FC<LevelChainDisplayProps> = ({
                   isCurrent && 'ring-3 ring-orange-700'
                 )}
               >
-                {isCompleted && <span className="text-white text-sm">✓</span>}
+                {isCompleted && <span className="text-white text-base">✓</span>}
                 {isCurrent && (
-                  <div className="w-6 h-6 rounded-full border-3 border-white/30 border-t-white animate-spin" />
+                  <svg className="w-6 h-6 animate-spin">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="white"
+                      strokeWidth="3"
+                      fill="none"
+                    />
+                    <circle
+                      className="opacity-75"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="white"
+                      strokeWidth="3"
+                      fill="none"
+                      strokeDasharray={`${nodeProgress * 62.8} 62.8`}
+                    />
+                  </svg>
                 )}
                 {!isCompleted && !isCurrent && <div className="w-3.5 h-3.5 rounded-full bg-gray-400" />}
               </div>
