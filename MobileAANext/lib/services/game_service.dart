@@ -6,8 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import '../models/game_models.dart';
+import 'dart:io' show Platform;
 import 'auth_service.dart';
-
+import 'package:flutter/foundation.dart';
 /// Game Service - Oyun API'leri ile iletişim
 class GameService {
   static final GameService _instance = GameService._internal();
@@ -15,11 +16,32 @@ class GameService {
   GameService._internal();
   final AuthService _authService = AuthService();
   // Base URL
-  String get _baseUrl {
-    final backendIp = dotenv.env['API_URL'] ?? 'http://10.0.2.2:8000';
-    return backendIp;
+  // ✅ FIX: Web için doğru URL
+// ✅ SONRA:
+String get _baseUrl {
+  final envUrl = dotenv.env['API_URL'];
+  if (envUrl != null && envUrl.isNotEmpty) {
+    return envUrl;
   }
 
+  if (kIsWeb) {
+    // WEB: localhost kullan
+    final backendPort = dotenv.env['BACKEND_PORT'] ?? '8000';
+    return 'http://localhost:$backendPort';
+  }
+
+  // Mobile platforms
+  try {
+    if (!kIsWeb && Platform.isAndroid) {
+      return 'http://10.0.2.2:8000';
+    }
+    if (!kIsWeb && Platform.isIOS) {
+      return 'http://localhost:8000';
+    }
+  } catch (_) {}
+
+  return 'http://localhost:8000';
+}
   // Timeout
   final _timeoutDuration = const Duration(seconds: 30);
 

@@ -43,7 +43,6 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
 
 
 # ============ TRACKING ENDPOINTS ============
-
 @router.post("/track-view", response_model=TrackViewResponse)
 async def track_view(
     request: TrackViewRequest,
@@ -85,8 +84,27 @@ async def track_view(
             saved=request.saved or False,
         )
         
-        # Analytics'e kaydet
+        # Analytics'e kaydet (reels_analytics)
         response = await reels_analytics.track_reel_view(user_id, request)
+        
+        # ✅ FIX: OYUN SİSTEMİ İÇİN user_viewed_news_storage'A DA KAYDET
+        from ...models.user_viewed_news import user_viewed_news_storage
+        
+        # Sadece meaningful view'ları kaydet (3+ saniye)
+        if view.is_meaningful_view():
+            user_viewed_news_storage.add_view(
+                user_id=user_id,
+                reel_id=request.reel_id,
+                news_title=reel.news_data.title,
+                news_url=reel.news_data.url,
+                category=reel.news_data.category,
+                keywords=reel.news_data.keywords,
+                duration_ms=request.duration_ms,
+                completed=request.completed,
+                emoji_reaction=request.emoji_reaction,
+                engagement_score=view.get_engagement_score()
+            )
+            print(f"✅ Added to user_viewed_news_storage for game system")
         
         # User stats al
         user_stats = await reels_analytics.get_user_stats(user_id)

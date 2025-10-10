@@ -54,7 +54,7 @@ class ApiService {
   // 🔐 Auth & Configuration
   // =========================
   final AuthService _authService = AuthService();
-  final String _baseUrl = _resolveHostBase();
+  String get _baseUrl => _resolveHostBase();
   
 
 

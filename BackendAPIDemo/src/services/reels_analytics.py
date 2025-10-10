@@ -66,10 +66,10 @@ class ReelsAnalyticsService:
         """
         Persistent data'yı dosyalardan yükle
         
-        🆕 Hata durumunda logla ama exception fırlatma
+        ✅ FIX: views, user_stats ve analytics dosyalarını da yüklüyor
         """
         try:
-            # Load reels
+            # 1. Load reels
             if self.reels_file.exists():
                 with open(self.reels_file, 'r', encoding='utf-8') as f:
                     reels_data = json.load(f)
@@ -91,19 +91,83 @@ class ReelsAnalyticsService:
             
             print(f"📂 Loaded {len(self.reel_storage)} reels from persistent storage")
             
+            # ============ 2. Load VIEWS ============
+            if self.views_file.exists():
+                with open(self.views_file, 'r', encoding='utf-8') as f:
+                    views_data = json.load(f)
+                
+                for user_id, views_list in views_data.items():
+                    try:
+                        # Convert each view dict to ReelView object
+                        self.view_storage[user_id] = []
+                        for view_dict in views_list:
+                            # Convert datetime strings
+                            if 'viewed_at' in view_dict:
+                                view_dict['viewed_at'] = datetime.fromisoformat(view_dict['viewed_at'])
+                            
+                            view = ReelView(**view_dict)
+                            self.view_storage[user_id].append(view)
+                            
+                    except Exception as e:
+                        print(f"⚠️ Could not load views for {user_id}: {e}")
+            
+            print(f"📂 Loaded views for {len(self.view_storage)} users")
+            
+            # ============ 3. Load USER STATS ============
+            if self.stats_file.exists():
+                with open(self.stats_file, 'r', encoding='utf-8') as f:
+                    stats_data = json.load(f)
+                
+                for user_id, stats_dict in stats_data.items():
+                    try:
+                        # Convert datetime strings
+                        if 'last_reel_viewed_at' in stats_dict and stats_dict['last_reel_viewed_at']:
+                            stats_dict['last_reel_viewed_at'] = datetime.fromisoformat(stats_dict['last_reel_viewed_at'])
+                        if 'last_view_date' in stats_dict and stats_dict['last_view_date']:
+                            stats_dict['last_view_date'] = datetime.fromisoformat(stats_dict['last_view_date']).date()
+                        
+                        stats = UserReelStats(**stats_dict)
+                        self.user_stats[user_id] = stats
+                        
+                    except Exception as e:
+                        print(f"⚠️ Could not load stats for {user_id}: {e}")
+            
+            print(f"📂 Loaded stats for {len(self.user_stats)} users")
+            
+            # ============ 4. Load ANALYTICS ============
+            if self.analytics_file.exists():
+                with open(self.analytics_file, 'r', encoding='utf-8') as f:
+                    analytics_data = json.load(f)
+                
+                for reel_id, analytics_dict in analytics_data.items():
+                    try:
+                        # Convert datetime strings
+                        if 'published_at' in analytics_dict:
+                            analytics_dict['published_at'] = datetime.fromisoformat(analytics_dict['published_at'])
+                        
+                        analytics = ReelAnalytics(**analytics_dict)
+                        self.reel_analytics[reel_id] = analytics
+                        
+                    except Exception as e:
+                        print(f"⚠️ Could not load analytics for {reel_id}: {e}")
+            
+            print(f"📂 Loaded analytics for {len(self.reel_analytics)} reels")
+            
         except Exception as e:
-            # 🆕 Hata durumunda logla ama devam et
+            # Hata durumunda logla ama devam et
             print(f"⚠️ Error loading persistent data: {e}")
+            import traceback
+            traceback.print_exc()
             # Boş storage ile devam et
-    
+        
     def _save_persistent_data(self):
         """
         Persistent data'yı dosyalara kaydet
         
-        🆕 Hata durumunda logla ama exception fırlatma
+        ✅ FIX: views, user_stats ve analytics dosyalarını da kaydediyor
         """
         try:
-            # Save reels
+            # 1. Save reels
             reels_data = {}
             for reel_id, reel in self.reel_storage.items():
                 try:
@@ -120,14 +184,55 @@ class ReelsAnalyticsService:
                     print(f"⚠️ Could not serialize reel {reel_id}: {e}")
             
             with open(self.reels_file, 'w', encoding='utf-8') as f:
-                json.dump(reels_data, f, indent=2, ensure_ascii=False)
+                json.dump(reels_data, f, ensure_ascii=False, indent=2, default=str)
             
             print(f"💾 Saved {len(reels_data)} reels to persistent storage")
             
+            # ============ 2. Save VIEWS ============
+            views_data = {}
+            for user_id, views_list in self.view_storage.items():
+                try:
+                    views_data[user_id] = [
+                        view.model_dump() for view in views_list
+                    ]
+                except Exception as e:
+                    print(f"⚠️ Could not serialize views for {user_id}: {e}")
+            
+            with open(self.views_file, 'w', encoding='utf-8') as f:
+                json.dump(views_data, f, ensure_ascii=False, indent=2, default=str)
+            
+            print(f"💾 Saved views for {len(views_data)} users")
+            
+            # ============ 3. Save USER STATS ============
+            stats_data = {}
+            for user_id, stats in self.user_stats.items():
+                try:
+                    stats_data[user_id] = stats.model_dump()
+                except Exception as e:
+                    print(f"⚠️ Could not serialize stats for {user_id}: {e}")
+            
+            with open(self.stats_file, 'w', encoding='utf-8') as f:
+                json.dump(stats_data, f, ensure_ascii=False, indent=2, default=str)
+            
+            print(f"💾 Saved stats for {len(stats_data)} users")
+            
+            # ============ 4. Save ANALYTICS ============
+            analytics_data = {}
+            for reel_id, analytics in self.reel_analytics.items():
+                try:
+                    analytics_data[reel_id] = analytics.model_dump()
+                except Exception as e:
+                    print(f"⚠️ Could not serialize analytics for {reel_id}: {e}")
+            
+            with open(self.analytics_file, 'w', encoding='utf-8') as f:
+                json.dump(analytics_data, f, ensure_ascii=False, indent=2, default=str)
+            
+            print(f"💾 Saved analytics for {len(analytics_data)} reels")
+            
         except Exception as e:
-            # 🆕 Hata durumunda logla ama devam et
-            print(f"⚠️ Error saving persistent data: {e}")
-            # Exception fırlatma, sistem çalışmaya devam etsin
+            print(f"❌ Error saving persistent data: {e}")
+            import traceback
+            traceback.print_exc()
     
     # ============ WORKER HELPER METHODS (NEW) ============
     
