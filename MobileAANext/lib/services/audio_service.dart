@@ -1,4 +1,7 @@
 // lib/services/audio_service.dart
+// ⚠️ MEVCUT DOSYAYA EKLENECEK/GÜNCELLENECEKTİR
+// AudioService class'ına aşağıdaki değişiklikleri yapın
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,19 +15,24 @@ class AudioService extends ChangeNotifier {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
+  // ✅ YENİ: Pause count tracking
+  int _pauseCountForCurrentReel = 0;
+
   bool get isPlaying => _isPlaying;
   Duration get position => _position;
   Duration get duration => _duration;
   String? get currentReelId => _currentReelId;
+  
+  // ✅ YENİ: Pause count getter
+  int get pauseCountForCurrentReel => _pauseCountForCurrentReel;
 
   AudioService() {
-    // ✅ YENİ: PlayerMode ayarla
     _player.setReleaseMode(ReleaseMode.stop);
     _player.setPlayerMode(PlayerMode.mediaPlayer);
     
     _player.onPlayerStateChanged.listen((state) {
       _isPlaying = state == PlayerState.playing;
-      debugPrint('🎵 Player state: $state');  // ✅ Debug log
+      debugPrint('🎵 Player state: $state');
       notifyListeners();
     });
 
@@ -35,28 +43,23 @@ class AudioService extends ChangeNotifier {
 
     _player.onDurationChanged.listen((dur) {
       _duration = dur;
-      debugPrint('🎵 Duration: $dur');  // ✅ Debug log
+      debugPrint('🎵 Duration: $dur');
       notifyListeners();
     });
     
-    // ✅ YENİ: Error listener
     _player.onPlayerComplete.listen((event) {
       debugPrint('🎵 Player completed');
     });
   }
 
-  // ✅ YENİ: Base URL'i al (.env'den)
   String _getBaseUrl() {
     final envUrl = dotenv.env['API_URL'];
     if (envUrl != null && envUrl.isNotEmpty) {
       return envUrl;
     }
 
-    // Fallback
     if (kIsWeb) {
-      // Web tarayıcısı bilgisayarda çalıştığı için 'localhost' kullanır.
-      final backendPort = dotenv.env['BACKEND_PORT'] ?? '8000';
-      return 'http://localhost:$backendPort';
+      return Uri.base.origin;
     }
 
     try {
@@ -78,19 +81,21 @@ class AudioService extends ChangeNotifier {
     try {
       _currentReelId = reelId;
       
-      // ✅ URL'i düzelt
+      // ✅ YENİ: Yeni reel başladığında pause count'u sıfırla
+      _pauseCountForCurrentReel = 0;
+      
       String fullUrl = audioUrl;
       if (!audioUrl.startsWith('http://') && !audioUrl.startsWith('https://')) {
         final baseUrl = _getBaseUrl();
-        final cleanAudioUrl = audioUrl.startsWith('/') ? audioUrl.substring(1) : audioUrl;
+        final cleanAudioUrl = audioUrl.startsWith('/') ?
+            audioUrl.substring(1) : audioUrl;
         fullUrl = '$baseUrl/$cleanAudioUrl';
       }
       
       debugPrint('🎵 Playing audio: $fullUrl');
       
-      // ✅ DEĞİŞTİ: Basit yaklaşım - direkt play
-      await _player.stop();  // Önce durdur
-      await _player.play(UrlSource(fullUrl), volume: 1.0);  // Volume ekle
+      await _player.stop();
+      await _player.play(UrlSource(fullUrl), volume: 1.0);
       
       _isPlaying = true;
       notifyListeners();
@@ -103,10 +108,15 @@ class AudioService extends ChangeNotifier {
     }
   }
 
-  /// Sesi duraklat
+  /// ✅ GÜNCELLEME: Sesi duraklat + pause count artır
   Future<void> pause() async {
     await _player.pause();
     _isPlaying = false;
+    
+    // ✅ YENİ: Pause count artır
+    _pauseCountForCurrentReel++;
+    debugPrint('⏸️ Paused (count: $_pauseCountForCurrentReel)');
+    
     notifyListeners();
   }
 
@@ -123,12 +133,35 @@ class AudioService extends ChangeNotifier {
     _isPlaying = false;
     _position = Duration.zero;
     _currentReelId = null;
+    
+    // ✅ YENİ: Stop edildiğinde pause count'u sıfırla
+    _pauseCountForCurrentReel = 0;
+    
     notifyListeners();
   }
 
   /// Belirli pozisyona git
   Future<void> seek(Duration position) async {
     await _player.seek(position);
+  }
+
+  /// ✅ YENİ: Completed kontrolü (reel'in %80'i izlendi mi?)
+  bool isCompleted() {
+    if (_duration == Duration.zero) return false;
+    
+    // %80+ izlendiyse completed
+    final completionThreshold = _duration.inMilliseconds * 0.8;
+    final isCompleted = _position.inMilliseconds >= completionThreshold;
+    
+    debugPrint('🎯 Completion check: ${_position.inMilliseconds}ms / ${_duration.inMilliseconds}ms = ${isCompleted ? "COMPLETED" : "PARTIAL"}');
+    
+    return isCompleted;
+  }
+
+  /// ✅ YENİ: Pause count'u sıfırla (yeni reel başladığında dışarıdan çağrılabilir)
+  void resetPauseCount() {
+    _pauseCountForCurrentReel = 0;
+    debugPrint('🔄 Pause count reset');
   }
 
   @override

@@ -8,14 +8,21 @@ class ReadingAnalyticsService {
   Timer? _timer;
   final Stopwatch _stopwatch = Stopwatch();
   double _maxScrollDepth = 0.0; // 0.0 ile 1.0 arasında
-
+  late DateTime startTime;
   // Servis, belirli bir makale ID'si ile başlatılır.
   ReadingAnalyticsService({required this.articleId});
+
+
+
 
   /// Takip oturumunu başlatır.
   /// Okumaya başlama zamanını kaydeder.
   void startTracking() {
     debugPrint('[Analytics] Tracking started for article: $articleId');
+    
+    // ✅ YENİ: Başlangıç zamanını kaydet
+    startTime = DateTime.now();
+    
     _stopwatch.start();
   }
 

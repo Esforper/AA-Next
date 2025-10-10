@@ -208,37 +208,103 @@ class ApiService {
   /// Track view (hata handling ile güçlendirilmiş)
   Future<void> trackView({
     required String reelId,
+    required int durationMs,
+    required bool completed,
     String? category,
     String? sessionId,
-    int durationMs = 0,
-    bool completed = false,
+    String? emojiReaction,
+    int pauseCount = 0,
+    bool shared = false,
+    bool saved = false,
   }) async {
     try {
       final headers = await _getHeaders();
       final uri = Uri.parse('$_baseUrl/api/reels/track-view');
 
+      // TAM BODY - Tüm tracking bilgileri
       final body = jsonEncode({
         'reel_id': reelId,
         'duration_ms': durationMs,
         'completed': completed,
         if (category != null) 'category': category,
         if (sessionId != null) 'session_id': sessionId,
+        if (emojiReaction != null) 'emoji_reaction': emojiReaction,
+        'paused_count': pauseCount,
+        'shared': shared,
+        'saved': saved,
       });
+
+      debugPrint('📊 Tracking view: $reelId');
+      debugPrint('  ├─ Duration: ${durationMs}ms');
+      debugPrint('  ├─ Completed: $completed');
+      debugPrint('  ├─ Emoji: ${emojiReaction ?? "none"}');
+      debugPrint('  ├─ Pause count: $pauseCount');
+      debugPrint('  ├─ Shared: $shared');
+      debugPrint('  └─ Saved: $saved');
 
       final response = await http
           .post(uri, headers: headers, body: body)
           .timeout(_timeoutDuration);
 
       if (response.statusCode == 200) {
-        debugPrint('✅ View tracked: $reelId');
+        final data = jsonDecode(response.body);
+        debugPrint('✅ View tracked successfully');
+        debugPrint('  └─ Engagement score: ${data['engagement_score']}');
       } else {
         debugPrint('⚠️ Track view failed: ${response.statusCode}');
+        debugPrint('  └─ Response: ${response.body}');
       }
       
     } catch (e) {
       // Track view hatalarını sessizce logla
       // (kritik olmayan işlem, kullanıcı deneyimini etkilemesin)
       debugPrint('⚠️ Track view error (non-critical): $e');
+    }
+  }
+
+  /// ✅ YENİ: Track detail view - TAM İMPLEMENTASYON
+  /// Detay okuma kaydını backend'e gönderir
+  Future<void> trackDetailView({
+    required String reelId,
+    required int readDurationMs,
+    required double scrollDepth,
+    bool sharedFromDetail = false,
+    bool savedFromDetail = false,
+    String? sessionId,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+      final uri = Uri.parse('$_baseUrl/api/reels/track-detail-view');
+
+      final body = jsonEncode({
+        'reel_id': reelId,
+        'read_duration_ms': readDurationMs,
+        'scroll_depth': scrollDepth,
+        'shared_from_detail': sharedFromDetail,
+        'saved_from_detail': savedFromDetail,
+        if (sessionId != null) 'session_id': sessionId,
+      });
+
+      debugPrint('📖 Tracking detail view: $reelId');
+      debugPrint('  ├─ Read duration: ${readDurationMs}ms');
+      debugPrint('  ├─ Scroll depth: ${(scrollDepth * 100).toStringAsFixed(1)}%');
+      debugPrint('  ├─ Shared: $sharedFromDetail');
+      debugPrint('  └─ Saved: $savedFromDetail');
+
+      final response = await http
+          .post(uri, headers: headers, body: body)
+          .timeout(_timeoutDuration);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint('✅ Detail view tracked successfully');
+        debugPrint('  └─ Meaningful read: ${data['meaningful_read']}');
+      } else {
+        debugPrint('⚠️ Track detail view failed: ${response.statusCode}');
+      }
+      
+    } catch (e) {
+      debugPrint('⚠️ Track detail view error (non-critical): $e');
     }
   }
 

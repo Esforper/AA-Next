@@ -136,11 +136,11 @@ class ReelsProvider with ChangeNotifier {
     if (reel != null) {
       debugPrint('[Reels] Visible -> ${reel.id} (${i + 1}/${_reels.length})');
       
-      // View tracking
-      _apiService.trackView(
-        reelId: reel.id,
-        category: reel.category,
-      );
+      // // View tracking
+      // _apiService.trackView(
+      //   reelId: reel.id,
+      //   category: reel.category,
+      // );
 
       // 🆕 Otomatik load more trigger
       // Eğer son 3 reel'den birine gelindiyse, yeni sayfa yükle

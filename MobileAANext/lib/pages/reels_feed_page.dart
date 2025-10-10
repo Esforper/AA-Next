@@ -15,7 +15,7 @@ import '../widgets/read_handle.dart';
 import '../widgets/gamification/reels_xp_overlay.dart';
 import '../widgets/gamification/floating_xp.dart';
 import '../widgets/subtitle_widget.dart';
-
+import '../services/reel_tracker_service.dart';
 class ReelsFeedPage extends StatefulWidget {
   const ReelsFeedPage({super.key});
 
@@ -33,6 +33,11 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
   late PageController _pageController;
   bool _isInitialized = false;
 
+  ReelTrackerService? _currentTracker;
+
+  // ✅ YENİ: Emoji panel state
+  bool _showEmojis = false;
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +51,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
         _startReelTracking(provider.current!.id);
         final audioService = context.read<AudioService>();
         final firstReel = provider.current!;
+        _startReelTracking(firstReel);
         if (firstReel.audioUrl.isNotEmpty) {
           audioService.play(firstReel.audioUrl, firstReel.id);
         }
@@ -63,16 +69,58 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
     }
   }
 
-  void _startReelTracking(String reelId) {
+  void _startReelTracking(Reel reel) {
+    // Önceki tracker'ı durdur (varsa)
+    _stopCurrentTracker();
+    
+    // Yeni tracker oluştur
+    _currentTracker = ReelTrackerService(
+      reelId: reel.id,
+      category: reel.category,
+    );
+    _currentTracker!.start();
+    
+    // Gamification için
     _reelStartTime = DateTime.now();
     _hasEarnedWatchXP = false;
-    _currentReelId = reelId;
+    _currentReelId = reel.id;
+    
+    debugPrint('🎬 Started tracking: ${reel.id}');
   }
 
-  void _onPageChanged(int index) {
+
+
+
+    /// ✅ YENİ: Mevcut tracker'ı durdur
+  Future<void> _stopCurrentTracker() async {
+    if (_currentTracker == null || _currentTracker!.isStopped) return;
+    
+    try {
+      final audioService = context.read<AudioService>();
+      final completed = audioService.isCompleted();
+      
+      debugPrint('🛑 Stopping tracker...');
+      debugPrint('  ├─ Reel: ${_currentTracker!.reelId}');
+      debugPrint('  ├─ Duration: ${_currentTracker!.currentDurationMs}ms');
+      debugPrint('  ├─ Completed: $completed');
+      debugPrint('  └─ Pause count: ${audioService.pauseCountForCurrentReel}');
+      
+      await _currentTracker!.stop(completed: completed);
+      
+    } catch (e) {
+      debugPrint('❌ Error stopping tracker: $e');
+    }
+  }
+
+  /// ✅ GÜNCELLEME: Page değişimi
+  void _onPageChanged(int index) async {
     final reelsProvider = context.read<ReelsProvider>();
     final audioService = context.read<AudioService>();
     
+    // ✅ Önceki tracker'ı durdur ve backend'e gönder
+    await _stopCurrentTracker();
+    
+    // ✅ Gamification XP (3+ saniye izlendiyse)
     if (!_hasEarnedWatchXP && _reelStartTime != null && _currentReelId != null) {
       final duration = DateTime.now().difference(_reelStartTime!);
       if (duration.inSeconds >= 3) {
@@ -83,19 +131,185 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
       }
     }
 
+    // Yeni reel'e geç
     reelsProvider.setIndex(index);
     
     if (reelsProvider.current != null) {
       final reel = reelsProvider.current!;
-      _startReelTracking(reel.id);
       
+      // ✅ Yeni tracker başlat
+      _startReelTracking(reel);
+      
+      // Audio çal
       if (reel.audioUrl.isNotEmpty) {
         audioService.play(reel.audioUrl, reel.id);
-      } else {
-        audioService.stop();
+      }
+      
+      // Infinite scroll check
+      if (index >= reelsProvider.reels.length - 3) {
+        debugPrint('📜 Near end of feed, loading more...');
+        reelsProvider.loadMore();
       }
     }
   }
+
+  /// ✅ YENİ: Emoji seçildiğinde
+  void _onEmojiSelected(String emoji, Reel reel) {
+    // 1. Tracker'a kaydet
+    if (_currentTracker != null) {
+      _currentTracker!.onEmoji(emoji);
+      debugPrint('❤️ Emoji tracked: $emoji for ${reel.id}');
+    }
+    
+    // 2. Gamification
+    final gamificationProvider = context.read<GamificationProvider>();
+    final success = gamificationProvider.onEmojiGiven(reel.id);
+    
+    if (success) {
+      _showFloatingXP(5, 'emoji_given');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('Tepkiniz gönderildi: $emoji +5 XP'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.pink[600],
+            ),
+          );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('Bu habere zaten emoji attın!'),
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+    }
+    
+    // 3. Panel'i kapat
+    setState(() => _showEmojis = false);
+  }
+Future<void> _onShareTapped(Reel reel) async {
+  // 1. Tracker'a kaydet
+  if (_currentTracker != null) {
+    _currentTracker!.onShare();
+    debugPrint('📤 Share tracked for ${reel.id}');
+  }
+  
+  // 2. Gamification
+  final gamificationProvider = context.read<GamificationProvider>();
+  
+  if (gamificationProvider.hasShareGiven(reel.id)) {
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Bu haberi zaten paylaştın!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    }
+    return;
+  }
+  
+ // 3. ✅ Share.share() - result yok, void döndürüyor
+  try {
+    await Share.share(
+      '${reel.title}\n\n${reel.summary}\n\nAA Haber uygulamasından paylaşıldı.',
+      subject: reel.title,
+    );
+    
+    // ✅ Share.share() başarılı olduğunu varsay (void döndüğü için)
+    // Kullanıcı share dialog'u açtıysa başarılıdır
+    gamificationProvider.onShareGiven(reel.id);
+    _showFloatingXP(10, 'share_given');
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Haber paylaşıldı! +10 XP'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+    }
+  } catch (e) {
+    debugPrint('❌ Share error: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Paylaşım başarısız oldu'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+    }
+  }
+}
+
+
+/// ✅ YENİ: Kaydetme yapıldığında çağrılır
+void _onSaveTapped(Reel reel) {
+  // 1. Tracker'a kaydet
+  if (_currentTracker != null) {
+    _currentTracker!.onSave();
+    debugPrint('💾 Save tracked for ${reel.id}');
+  }
+  
+  // 2. Saved reels provider'a ekle/çıkar
+  final savedReelsProvider = context.read<SavedReelsProvider>();
+  final isSaved = savedReelsProvider.isSaved(reel.id);
+  
+  if (isSaved) {
+    // Kaydedilmişten çıkar
+    savedReelsProvider.unsaveReel(reel.id);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Kaydedilenlerden çıkarıldı'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    }
+  } else {
+    // Kaydet
+    savedReelsProvider.saveReel(
+      reelId: reel.id,
+      title: reel.title,
+      imageUrl: reel.imageUrls.isNotEmpty ? reel.imageUrls.first : '',
+      content: reel.fullContent.join('\n\n'),
+    );
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Kaydedilenlere eklendi 💾'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.blue,
+          ),
+        );
+    }
+  }
+}
+
 
   void _showFloatingXP(int amount, String source) {
     FloatingXPOverlay.show(
@@ -157,34 +371,77 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
               child: ReadHandle(
                 threshold: 35,
                 onAction: (action) {
-                  final reels = provider.reels;
-                  if (reels.isEmpty) return;
-                  final reel = reels[provider.currentIndex];
-
+                  final currentReel = provider.current;
+                  if (currentReel == null) return;
+                  
                   switch (action) {
                     case HandleAction.up:
-                      _openArticle(context, reel);
+                      // Detay okuma
+                      debugPrint('[Handle] UP - Article Detail');
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => ArticleReaderSheet(
+                          articleId: currentReel.id,
+                          title: currentReel.title,
+                          body: currentReel.fullContent.join('\n\n'),
+                          imageUrls: currentReel.imageUrls,
+                          category: currentReel.category,
+                          publishedDate: _formatDate(currentReel.publishedAt),
+                          onClose: () => Navigator.pop(context),
+                        ),
+                      );
                       break;
+                    
                     case HandleAction.right:
-                      _openEmojis(context, reel);
+                      // Emoji panel aç
+                      debugPrint('[Handle] RIGHT - Emoji Panel');
+                      _openEmojis(context, currentReel);  // ✅ Mevcut fonksiyonu kullan
                       break;
+                    
                     case HandleAction.down:
-                      _onShareTap(context, reel);
+                      // Paylaş
+                      debugPrint('[Handle] DOWN - Share');
+                      _onShareTapped(currentReel);  // ✅ YENİ HANDLER
                       break;
+                    
                     case HandleAction.left:
-                      _saveReel(context, reel);
+                      // Kaydet
+                      debugPrint('[Handle] LEFT - Save');
+                      _onSaveTapped(currentReel);  // ✅ YENİ HANDLER
                       break;
+                    
                     case HandleAction.none:
                       break;
                   }
                 },
-              ),
+              )
             ),
           ),
         ],
       ),
     );
   }
+
+// reels_feed_page.dart içine ekle
+String _formatDate(DateTime date) {
+  final now = DateTime.now();
+  final diff = now.difference(date);
+  
+  if (diff.inMinutes < 60) {
+    return '${diff.inMinutes} dakika önce';
+  } else if (diff.inHours < 24) {
+    return '${diff.inHours} saat önce';
+  } else if (diff.inDays < 7) {
+    return '${diff.inDays} gün önce';
+  } else {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+}
+
+
+
 
   Widget _buildBody(BuildContext context, ReelsProvider provider) {
     switch (provider.status) {
@@ -399,10 +656,10 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
         publicEmojis: const ['👍', '❤️', '🔥', '⭐', '👏'],
         premiumEmojis: const ['😍', '🤔', '😮', '🎉', '💎'],
         onPick: (emoji) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$emoji emoji gönderildi!')),
-          );
+          Navigator.pop(context);  // Modal'ı kapat
+          
+          // ✅ YENİ HANDLER'I ÇAĞIR:
+          _onEmojiSelected(emoji, reel);
         },
         onTapPremium: () {
           Navigator.pop(context);
@@ -453,6 +710,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
 
   @override
   void dispose() {
+    _stopCurrentTracker();
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     FloatingXPOverlay.remove();
