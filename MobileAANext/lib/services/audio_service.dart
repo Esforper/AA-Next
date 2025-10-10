@@ -54,7 +54,9 @@ class AudioService extends ChangeNotifier {
 
     // Fallback
     if (kIsWeb) {
-      return Uri.base.origin;
+      // Web tarayıcısı bilgisayarda çalıştığı için 'localhost' kullanır.
+      final backendPort = dotenv.env['BACKEND_PORT'] ?? '8000';
+      return 'http://localhost:$backendPort';
     }
 
     try {

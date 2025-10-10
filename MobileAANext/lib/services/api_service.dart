@@ -17,9 +17,10 @@ class ApiService {
     if (envUrl != null && envUrl.isNotEmpty) {
       return envUrl;
     }
-
     if (kIsWeb) {
-      return Uri.base.origin;
+      // Web tarayıcısı bilgisayarda çalıştığı için 'localhost' kullanır.
+      final backendPort = dotenv.env['BACKEND_PORT'] ?? '8000';
+      return 'http://localhost:$backendPort';
     }
 
     if (!kIsWeb && _isAndroid) {
@@ -54,6 +55,9 @@ class ApiService {
   // =========================
   final AuthService _authService = AuthService();
   final String _baseUrl = _resolveHostBase();
+  
+
+
   
   // 🆕 Timeout ve retry ayarları
   static const Duration _timeoutDuration = Duration(seconds: 30);

@@ -10,13 +10,14 @@ import 'providers/reels_provider.dart';
 import 'providers/gamification_provider.dart';
 import 'providers/saved_reels_provider.dart';
 import 'providers/chat_provider.dart';
-import 'services/audio_service.dart';  // ✅ YENİ IMPORT
+import 'services/audio_service.dart';
 
 import 'pages/splash_page.dart';
 import 'pages/reels_feed_page.dart';
 import 'pages/login_page.dart';
 import 'views/home_view.dart';
 import 'views/profile_view.dart';
+import 'pages/game_menu_page.dart'; // ✅ YENİ: Oyun menüsü import edildi
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +37,7 @@ class AanextApp extends StatelessWidget {
           create: (_) => AuthProvider(),
         ),
         
-        // ✅ YENİ: Audio Service Provider (ReelsProvider'dan ÖNCE!)
+        // Audio Service Provider (ReelsProvider'dan ÖNCE!)
         ChangeNotifierProvider<AudioService>(
           create: (_) => AudioService(),
         ),
@@ -94,12 +95,14 @@ class MainNavigator extends StatefulWidget {
 class _MainNavigatorState extends State<MainNavigator> {
   int _currentIndex = 0;
 
+  // 🔽 DEĞİŞİKLİK BURADA 🔽
   final List<Widget> _screens = [
     const HomeView(),
     const ReelsFeedPage(),
-    const PlaceholderView(title: 'Oyunlar', icon: '🎮'),
+    const GameMenuPage(), // ✅ Placeholder yerine GameMenuPage geldi
     const ProfileView(),
   ];
+  // 🔼 DEĞİŞİKLİK BURADA 🔼
 
   @override
   Widget build(BuildContext context) {

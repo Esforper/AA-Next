@@ -7,7 +7,7 @@ import '../providers/gamification_provider.dart';
 import '../widgets/gamification/daily_progress_card.dart';
 import '../widgets/gamification/level_chain_display.dart';
 import 'chat_rooms_view.dart';
-
+import '../pages/game_menu_page.dart';
 /// Home View - Ana Sayfa
 /// Günlük ilerleme, level sistemi, oyun modları
 class HomeView extends StatelessWidget {
@@ -163,12 +163,18 @@ class HomeView extends StatelessWidget {
                       children: [
                         _buildGameModeCard(
                           context,
-                          icon: '🎯',
-                          title: 'Günlük Hedef',
-                          subtitle: '300 XP',
-                          color: Colors.blue,
+                          icon: '⚔️',
+                          title: 'Haber Kapışması',
+                          subtitle: 'Bilgini konuştur',
+                          color: Colors.red,
                           onTap: () {
-                            // Navigate to reels
+                            // TODO: Kullanıcıyı direkt olarak Oyunlar sekmesine yönlendir.
+                            // Bu genellikle BottomNavBar'ın state'ini yöneten bir Provider
+                            // veya callback ile yapılır. Şimdilik doğrudan sayfaya gidelim:
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const GameMenuPage()),
+                            );
                           },
                         ),
                         _buildGameModeCard(

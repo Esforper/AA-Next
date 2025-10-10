@@ -8,6 +8,14 @@ class Settings(BaseSettings):
     Yeni sistem eklerken buraya yeni ayarlar ekle
     """
     
+    backend_cors_origins: List[str] = [
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        # Flutter'ın kullandığı diğer portlar eklenebilir
+    ]    
+    
+    
     # ============ CORE SETTINGS ============
     debug: bool = False
     app_name: str = "AA News Universal API"
@@ -72,11 +80,15 @@ class Settings(BaseSettings):
     
     # ============ GAME SYSTEM ============
     # Oyun sistemi eklemek için bu bölümü kullan
-    game_enabled: bool = False
     game_max_players: int = 100
     game_tick_rate: float = 0.1  # seconds
     game_world_size: int = 1000
     game_save_interval: int = 30  # seconds
+    # 🆕🆕🆕 GAME SYSTEM (YENİ SATIRLAR - BURADAN İTİBAREN EKLE) 🆕🆕🆕
+    game_enabled: bool = True
+    game_min_common_reels: int = 8
+    game_question_count: int = 8
+    game_xp_per_correct: int = 20
     
     # ============ AI CHAT SYSTEM ============
     # AI chat sistemi eklemek için

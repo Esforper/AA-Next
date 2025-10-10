@@ -58,6 +58,10 @@ from .user import (
     UserRole, UserStatus
 )
 
+from .user_viewed_news import (
+    UserViewedNews,
+    UserViewStats
+)
 
 # Reels Tracking models - Updated with new models
 try:
@@ -192,6 +196,8 @@ __all__ = [
     "TTSVoice",
     "TTSModel",
     "SubtitleSegment",
+    "UserViewedNews",
+    "UserViewStats",
     
     # Storage models
     "StorageFile",

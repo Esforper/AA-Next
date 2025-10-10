@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/user_model.dart';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
 /// Authentication Service
 /// Backend auth API'leri ile iletişim + Token yönetimi
 class AuthService {
@@ -17,9 +17,15 @@ class AuthService {
   
   // ✅ .env dosyasından al
   String get _baseUrl {
-    final backendIp = dotenv.env['API_URL'] ?? 'localhost';
-    final backendPort = dotenv.env['BACKEND_PORT'] ?? '8000';
-    return '$backendIp';
+    if (kIsWeb) {
+      // Web tarayıcısı bilgisayarda çalıştığı için 'localhost' kullanır.
+      final backendPort = dotenv.env['BACKEND_PORT'] ?? '8000';
+      return 'http://localhost:$backendPort';
+    } else {
+      // Mobil emülatörler özel IP adresleri kullanır.
+      // .env dosyasında muhtemelen 'http://10.0.2.2:8000' yazıyor.
+      return dotenv.env['API_URL'] ?? 'http://10.0.2.2:8000';
+    }
   }
 
 

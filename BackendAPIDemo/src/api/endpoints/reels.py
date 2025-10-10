@@ -14,6 +14,7 @@ from ...models.reels_tracking import (
     DetailViewEvent,
     EmojiType
 )
+from ...models.user_viewed_news import user_viewed_news_storage
 from fastapi import APIRouter, Query, HTTPException, Depends, Header
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, HttpUrl, Field
@@ -106,13 +107,7 @@ async def track_view(
     user_id: str = Header(..., alias="X-User-ID")
 ):
     """
-    Reel izleme kaydı oluştur (UPDATED: Emoji support)
-    
-    Frontend'den her reel izlendiğinde çağrılır.
-    
-    New features:
-    - Emoji reaction tracking
-    - Paused count, replayed, shared, saved signals
+    Reel izleme kaydı oluştur (UPDATED: Emoji support + user_viewed_news)
     """
     try:
         # Reel'in var olup olmadığını kontrol et
@@ -142,26 +137,60 @@ async def track_view(
             saved=request.saved or False
         )
         
-        # Track view
+        # Track view (mevcut sistem)
         response = await reels_analytics.track_reel_view(user_id, request)
         
-        # NEW: Preference engine güncelle
+        # NEW: Preference engine güncelle (MEVCUT KOD)
         await preference_engine.update_from_view(user_id, reel, view)
         
-        # User stats al
+        # 🆕🆕🆕 YENİ: User viewed news storage'a kaydet (OYUN İÇİN) 🆕🆕🆕
+        if view.is_meaningful_view():
+            engagement_score = view.get_engagement_score()
+            
+            emoji_str = None
+            if request.emoji_reaction:
+                emoji_str = (
+                    request.emoji_reaction.value 
+                    if hasattr(request.emoji_reaction, 'value') 
+                    else str(request.emoji_reaction)
+                )
+            
+            try:
+                user_viewed_news_storage.add_view(
+                    user_id=user_id,
+                    reel_id=request.reel_id,
+                    news_title=reel.news_data.title,
+                    news_url=reel.news_data.url,
+                    category=reel.news_data.category,
+                    keywords=reel.news_data.keywords or [],
+                    duration_ms=request.duration_ms,
+                    completed=request.completed,
+                    emoji_reaction=emoji_str,
+                    engagement_score=engagement_score
+                )
+                print(f"✅ Saved to user_viewed_news: {user_id} -> {reel.news_data.title[:30]}...")
+            except Exception as e:
+                print(f"⚠️ Failed to save to user_viewed_news: {e}")
+        
+        # User stats al (MEVCUT KOD)
         user_stats = await reels_analytics.get_user_stats(user_id)
         
-        # Response oluştur
+        # ===================================================================
+        # ✅ HATA DÜZELTİLDİ: .get() yerine doğrudan özelliklere erişiyoruz.
+        # ===================================================================
         return TrackViewResponse(
             success=True,
             message="View tracked successfully",
-            view_id=response.get("view_id"),
+            view_id=response.view_id, # ✅ DÜZELTME
             meaningful_view=view.is_meaningful_view(),
             engagement_score=view.get_engagement_score(),
+            # Not: user_stats.get_personalization_level() bir metot olabilir,
+            # hata vermediği için ona dokunmuyoruz.
             personalization_level=user_stats.get_personalization_level(),
             total_interactions=user_stats.total_reels_watched,
-            daily_progress_updated=response.get("daily_progress_updated", False)
+            daily_progress_updated=response.daily_progress_updated # ✅ DÜZELTME
         )
+        # ===================================================================
         
     except HTTPException:
         raise
