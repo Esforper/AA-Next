@@ -1,6 +1,8 @@
 // lib/models/game_models.dart
 // Haber Kapışması Oyunu - Data Modelleri
 
+import 'package:flutter/material.dart';
+
 /// Matchmaking yanıtı - Rakip arama sonucu
 class MatchmakingResponse {
   final bool success;
@@ -266,11 +268,157 @@ class GameEligibility {
 }
 
 
+/// Oyun geçmişi item - Liste için
+class GameHistoryItem {
+  final String gameId;
+  final String opponentId;
+  final String result; // "win", "lose", "draw"
+  final int myScore;
+  final int opponentScore;
+  final String playedAt; // ISO datetime string
+  final int newsCount;
 
+  GameHistoryItem({
+    required this.gameId,
+    required this.opponentId,
+    required this.result,
+    required this.myScore,
+    required this.opponentScore,
+    required this.playedAt,
+    required this.newsCount,
+  });
+
+  factory GameHistoryItem.fromJson(Map<String, dynamic> json) {
+    return GameHistoryItem(
+      gameId: json['game_id'] ?? '',
+      opponentId: json['opponent_id'] ?? '',
+      result: json['result'] ?? 'draw',
+      myScore: json['my_score'] ?? 0,
+      opponentScore: json['opponent_score'] ?? 0,
+      playedAt: json['played_at'] ?? '',
+      newsCount: json['news_count'] ?? 0,
+    );
+  }
+
+  /// Kazandın mı?
+  bool get isWinner => result == 'win';
+
+  /// Kaybettin mi?
+  bool get isLoser => result == 'lose';
+
+  /// Berabere mi?
+  bool get isDraw => result == 'draw';
+
+  /// Sonuç ikonu
+  String get resultIcon {
+    if (isWinner) return '🏆';
+    if (isLoser) return '😢';
+    return '🤝';
+  }
+
+  /// Sonuç rengi
+  Color get resultColor {
+    if (isWinner) return Colors.amber;
+    if (isLoser) return Colors.grey;
+    return Colors.blue;
+  }
+
+  /// Tarih formatı (örn: "2 gün önce")
+  String get formattedDate {
+    try {
+      final date = DateTime.parse(playedAt);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inDays > 0) {
+        return '${difference.inDays} gün önce';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours} saat önce';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes} dakika önce';
+      } else {
+        return 'Az önce';
+      }
+    } catch (e) {
+      return playedAt;
+    }
+  }
+}
+
+/// Oyun geçmişi detayı - Tek oyun için
+class GameHistoryDetail {
+  final bool success;
+  final String gameId;
+  final String player1Id;
+  final String player2Id;
+  final int player1Score;
+  final int player2Score;
+  final String? winnerId;
+  final String createdAt;
+  final String? finishedAt;
+  final int totalRounds;
+  final List<Map<String, dynamic>> roundHistory; // Round detayları
+  final List<NewsDiscussed> newsDiscussed;
+
+  GameHistoryDetail({
+    required this.success,
+    required this.gameId,
+    required this.player1Id,
+    required this.player2Id,
+    required this.player1Score,
+    required this.player2Score,
+    this.winnerId,
+    required this.createdAt,
+    this.finishedAt,
+    required this.totalRounds,
+    required this.roundHistory,
+    required this.newsDiscussed,
+  });
+
+  factory GameHistoryDetail.fromJson(Map<String, dynamic> json) {
+    return GameHistoryDetail(
+      success: json['success'] ?? true,
+      gameId: json['game_id'] ?? '',
+      player1Id: json['player1_id'] ?? '',
+      player2Id: json['player2_id'] ?? '',
+      player1Score: json['player1_score'] ?? 0,
+      player2Score: json['player2_score'] ?? 0,
+      winnerId: json['winner_id'],
+      createdAt: json['created_at'] ?? '',
+      finishedAt: json['finished_at'],
+      totalRounds: json['total_rounds'] ?? 8,
+      roundHistory: List<Map<String, dynamic>>.from(
+        json['round_history'] ?? [],
+      ),
+      newsDiscussed: (json['news_discussed'] as List<dynamic>?)
+              ?.map((item) => NewsDiscussed.fromJson(item))
+              .toList() ??
+          [],
+    );
+  }
+
+  /// Kim kazandı?
+  String getResult(String myUserId) {
+    if (winnerId == myUserId) return 'win';
+    if (winnerId == null) return 'draw';
+    return 'lose';
+  }
+
+  /// Benim skorum
+  int getMyScore(String myUserId) {
+    return myUserId == player1Id ? player1Score : player2Score;
+  }
+
+  /// Rakip skoru
+  int getOpponentScore(String myUserId) {
+    return myUserId == player1Id ? player2Score : player1Score;
+  }
+}
 
 
   // Bu class'ı MatchmakingResponse'dan SONRA ekle:
 
+/// Matchmaking durumu - Polling için
 /// Matchmaking durumu - Polling için
 class MatchmakingStatusResponse {
   final bool success;
@@ -297,7 +445,7 @@ class MatchmakingStatusResponse {
 
   factory MatchmakingStatusResponse.fromJson(Map<String, dynamic> json) {
     return MatchmakingStatusResponse(
-      success: json['success'] ?? false,
+      success: json['success'] ?? true,
       inQueue: json['in_queue'] ?? false,
       matched: json['matched'] ?? false,
       gameId: json['game_id'],
@@ -309,3 +457,4 @@ class MatchmakingStatusResponse {
     );
   }
 }
+

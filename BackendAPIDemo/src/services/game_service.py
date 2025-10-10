@@ -186,9 +186,19 @@ class GameService:
         )
         
         # 8. Memory'e kaydet
+        # self.active_games[game_id] = session
+        
+        
+        
+        # 🆕 Oyunu otomatik başlat
+        session.status = "active"  # waiting yerine
+        session.started_at = datetime.now()
+
+        # 8. Memory'e kaydet
         self.active_games[game_id] = session
         
         print(f"✅ Game created: {game_id} with {len(questions)} questions")
+        print(f"🎮 Active games count: {len(self.active_games)}")
         
         return session
     
@@ -204,14 +214,8 @@ class GameService:
         Returns:
             {reel_id: emoji} dict
         """
-        user_views = user_viewed_news_storage.get_user_views(user_id, days=30)
-        
-        emoji_map = {}
-        for view in user_views:
-            if view.reel_id in reel_ids and view.emoji_reaction:
-                emoji_map[view.reel_id] = view.emoji_reaction
-        
-        return emoji_map
+        # 🆕 Artık user_viewed_news_storage'ın yeni fonksiyonunu kullan
+        return user_viewed_news_storage.get_user_emojis_for_reels(user_id, reel_ids)
     
     
     # ============ AI SCENARIO GENERATION (OPTIMIZED!) ============
@@ -274,6 +278,7 @@ class GameService:
             
             # Parse AI response
             ai_output = json.loads(response.choices[0].message.content)
+            print("AI sonuç üretti")
             
             # AI'dan gelen soruları GameQuestion'a çevir
             questions = []
@@ -316,7 +321,7 @@ class GameService:
         """
         Tüm haberler için tek bir batch prompt oluştur
         
-        Bu sayede tek bir AI çağrısı ile tüm soruları üretiyoruz!
+        🆕 Emoji bazlı dinamik cevaplar içerir
         """
         
         news_list = []
@@ -325,55 +330,75 @@ class GameService:
             p1_emoji = player1_emojis.get(reel.id)
             p2_emoji = player2_emojis.get(reel.id)
             
+            # Soran kişinin emojisi
+            asker_emoji = p1_emoji if player_turn == 1 else p2_emoji
+            # Cevaplayan kişinin emojisi
+            responder_emoji = p2_emoji if player_turn == 1 else p1_emoji
+            
             news_list.append({
                 "index": i,
                 "title": reel.news_data.title,
-                "summary": reel.news_data.summary[:200],
+                "summary": reel.news_data.summary[:300],  # Daha uzun özet
                 "player_asking": player_turn,
-                "asker_emoji": p1_emoji if player_turn == 1 else p2_emoji,
-                "responder_emoji": p2_emoji if player_turn == 1 else p1_emoji
+                "asker_emoji": asker_emoji,
+                "responder_emoji": responder_emoji
             })
         
-        prompt = f"""
-Bir haber quiz oyunu için {len(reels)} adet soru senaryosu oluştur.
+        prompt = f"""Sen bir haber quiz oyunu için doğal WhatsApp tarzı sohbet diyalogları üreten bir asistansın.
 
-HABERLER:
-{json.dumps(news_list, ensure_ascii=False, indent=2)}
+    İKİ OYUNCU VAR:
+    - Player 1 (Soru sıraları: 0, 2, 4, 6)
+    - Player 2 (Soru sıraları: 1, 3, 5, 7)
 
-GÖREV:
-Her haber için bir diyalog senaryosu üret. Player 1 ve Player 2 sırayla soru soruyor (0,2,4,6->P1, 1,3,5,7->P2).
+    HABERLER ({len(reels)} adet):
+    {json.dumps(news_list, ensure_ascii=False, indent=2)}
 
-Her soru için üret:
-1. question: Soran kişinin sorusu (örn: "... biliyor muydun?")
-2. correct_option: Doğru cevap seçeneği (habere uygun detay)
-3. wrong_option: Yanlış cevap seçeneği (mantıklı ama yanlış detay)
-4. correct_response: Doğru cevapta verilecek yanıt (örn: "Evet evet!")
-5. wrong_response: Yanlış cevapta verilecek yanıt (örn: "Yok ya, öyle değildi")
-6. pass_response: Pas geçilirse açıklama (haberin kısa özeti)
-7. emoji_responses: Emoji'ye göre ekstra yorumlar (varsa)
+    GÖREV:
+    Her haber için WhatsApp tarzı doğal bir diyalog senaryosu oluştur.
 
-ÖNEMLI:
-- Samimi ve doğal Türkçe konuşma tarzı
-- Kısa ve öz cevaplar (max 50-60 kelime)
-- Emoji varsa yoruma dahil et
-- Her haber için FARKLI sorular
+    SORU FORMATI:
+    Player soruyor: "[Haber başlığı] haberini duydun mu?" veya benzeri doğal bir soru
 
-JSON formatında dön:
-{{
-  "questions": [
+    CEVAP SEÇENEKLERİ (2 adet):
+    1. DOĞRU seçenek: Haberin gerçek bir detayı (40-60 kelime, somut bilgi)
+    2. YANLIŞ seçenek: Mantıklı ama yanlış bir detay (40-60 kelime, gerçekçi görünmeli)
+
+    CEVAP MESAJLARI:
+    - correct_response: Doğru cevap verildiğinde (5-15 kelime, samimi onay)
+    - wrong_response: Yanlış cevap verildiğinde (10-20 kelime, kibarca düzelt)
+    - pass_response: Pas geçildiğinde (30-50 kelime, haberi özetle)
+
+    EMOJİ YORUMLARı:
+    Eğer cevaplayan kişinin emoji'si varsa (responder_emoji), doğru cevap durumunda emoji'ye uygun bir yorum ekle:
+    - ❤️ → "Ben de çok beğenmiştim bu haberi!"
+    - 😢 → "Gerçekten üzücüydü"
+    - 👍 → "Aynen, çok iyi gelişme"
+    - 😮 → "Ben de çok şaşırmıştım"
+    - 😡 → "Gerçekten sinir bozucuydu"
+
+    ÖNEMLI KURALLAR:
+    1. Samimi, doğal Türkçe konuşma tarzı kullan
+    2. Her haber için FARKLI sorular oluştur
+    3. Seçenekler somut, spesifik detaylar içermeli
+    4. Emoji varsa mutlaka yoruma dahil et
+    5. Kısa ve öz cevaplar (WhatsApp tarzı)
+
+    JSON formatında dön:
     {{
-      "question": "...",
-      "correct_option": "...",
-      "wrong_option": "...",
-      "correct_response": "...",
-      "wrong_response": "...",
-      "pass_response": "...",
-      "emoji_responses": {{"❤️": "...", "👍": "..."}}
-    }},
-    ...
-  ]
-}}
-"""
+    "questions": [
+        {{
+        "question": "...",
+        "correct_option": "...",
+        "wrong_option": "...",
+        "correct_response": "...",
+        "wrong_response": "...",
+        "pass_response": "...",
+        "emoji_comment": "..." // Sadece emoji varsa
+        }},
+        ...
+    ]
+    }}
+    """
         return prompt
     
     
@@ -452,7 +477,8 @@ JSON formatında dön:
         game_id: str,
         player_id: str,
         round_index: int,
-        is_correct: bool
+        is_correct: bool,
+        is_pass: bool = False  # 🆕 YENİ PARAMETRE
     ) -> Dict:
         """
         Soruya cevap ver ve skoru güncelle
@@ -464,8 +490,8 @@ JSON formatında dön:
         if not session:
             return {"success": False, "message": "Game not found"}
         
-        # Skor güncelle
-        if is_correct:
+        # 🆕 Pas geçilmediyse skor güncelle
+        if not is_pass and is_correct:
             if player_id == session.player1_id:
                 session.player1_score += 20  # 20 XP per correct
             else:
@@ -476,6 +502,7 @@ JSON formatında dön:
             "round": round_index,
             "player_id": player_id,
             "is_correct": is_correct,
+            "is_pass": is_pass,  # 🆕 Pas bilgisi
             "timestamp": datetime.now().isoformat()
         })
         
@@ -486,6 +513,8 @@ JSON formatında dön:
         if session.current_round >= session.total_rounds:
             session.status = "finished"
             session.finished_at = datetime.now()
+            # 🆕 Bitmiş oyunu kaydet
+            self._save_finished_game(session)
         
         return {
             "success": True,
@@ -493,7 +522,8 @@ JSON formatında dön:
             "total_rounds": session.total_rounds,
             "player1_score": session.player1_score,
             "player2_score": session.player2_score,
-            "game_finished": session.status == "finished"
+            "game_finished": session.status == "finished",
+            "xp_earned": 20 if (not is_pass and is_correct) else 0
         }
     
     
@@ -543,6 +573,131 @@ JSON formatında dön:
                 for q in session.questions
             ]
         }
+
+
+
+
+# ============ GAME HISTORY (YENİ BÖLÜM) ============
+
+    def _save_finished_game(self, session: GameSession):
+        """
+        Bitmiş oyunu JSON dosyasına kaydet (oyun geçmişi için)
+        """
+        try:
+            game_file = self.storage_dir / f"{session.game_id}.json"
+            
+            game_data = {
+                "game_id": session.game_id,
+                "player1_id": session.player1_id,
+                "player2_id": session.player2_id,
+                "player1_score": session.player1_score,
+                "player2_score": session.player2_score,
+                "winner_id": self._get_winner_id(session),
+                "created_at": session.created_at.isoformat(),
+                "finished_at": session.finished_at.isoformat() if session.finished_at else None,
+                "total_rounds": session.total_rounds,
+                "round_history": session.round_history,
+                "news_discussed": [
+                    {
+                        "reel_id": q.reel_id,
+                        "title": q.news_title,
+                        "url": q.news_url
+                    }
+                    for q in session.questions
+                ]
+            }
+            
+            with open(game_file, 'w', encoding='utf-8') as f:
+                json.dump(game_data, f, ensure_ascii=False, indent=2, default=str)
+            
+            print(f"💾 Game saved to history: {session.game_id}")
+            
+            # Memory'den sil (optional, oyun bittikten sonra)
+            # del self.active_games[session.game_id]
+            
+        except Exception as e:
+            print(f"❌ Error saving game to history: {e}")
+
+    def _get_winner_id(self, session: GameSession) -> Optional[str]:
+        """Kim kazandı?"""
+        if session.player1_score > session.player2_score:
+            return session.player1_id
+        elif session.player2_score > session.player1_score:
+            return session.player2_id
+        return None  # Berabere
+
+    def get_game_history(self, user_id: str, limit: int = 20) -> List[Dict]:
+        """
+        Kullanıcının oyun geçmişini getir
+        
+        Args:
+            user_id: Kullanıcı ID
+            limit: Kaç oyun getir (default: 20)
+        
+        Returns:
+            List[Dict] - Oyun geçmişi listesi
+        """
+        history = []
+        
+        try:
+            # Tüm game dosyalarını tara
+            for game_file in sorted(self.storage_dir.glob("game_*.json"), reverse=True):
+                if len(history) >= limit:
+                    break
+                
+                with open(game_file, 'r', encoding='utf-8') as f:
+                    game_data = json.load(f)
+                
+                # Bu oyunda kullanıcı var mı?
+                if user_id in [game_data.get("player1_id"), game_data.get("player2_id")]:
+                    # Kullanıcı için sonuç hesapla
+                    is_player1 = user_id == game_data.get("player1_id")
+                    my_score = game_data.get("player1_score" if is_player1 else "player2_score", 0)
+                    opponent_score = game_data.get("player2_score" if is_player1 else "player1_score", 0)
+                    winner_id = game_data.get("winner_id")
+                    
+                    if winner_id == user_id:
+                        result = "win"
+                    elif winner_id is None:
+                        result = "draw"
+                    else:
+                        result = "lose"
+                    
+                    history.append({
+                        "game_id": game_data.get("game_id"),
+                        "opponent_id": game_data.get("player2_id" if is_player1 else "player1_id"),
+                        "result": result,
+                        "my_score": my_score,
+                        "opponent_score": opponent_score,
+                        "played_at": game_data.get("finished_at", game_data.get("created_at")),
+                        "news_count": len(game_data.get("news_discussed", []))
+                    })
+        
+        except Exception as e:
+            print(f"❌ Error loading game history: {e}")
+        
+        return history
+
+    def get_game_detail(self, game_id: str) -> Optional[Dict]:
+        """
+        Belirli bir oyunun detayını getir (geçmişten)
+        
+        Returns:
+            Game detail dict veya None
+        """
+        try:
+            game_file = self.storage_dir / f"{game_id}.json"
+            
+            if not game_file.exists():
+                return None
+            
+            with open(game_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        
+        except Exception as e:
+            print(f"❌ Error loading game detail: {e}")
+            return None
+
 
 
 # Global instance

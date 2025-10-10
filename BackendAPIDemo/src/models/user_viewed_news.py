@@ -46,6 +46,64 @@ class UserViewStats(BaseModel):
 
 # ============ STORAGE SERVICE ============
 
+class UserViewStats(BaseModel):
+    """Kullanıcının genel izlenme istatistikleri"""
+    user_id: str
+    total_views: int = 0
+    completed_views: int = 0
+    total_duration_ms: int = 0
+    favorite_categories: Dict[str, int] = {}
+    last_viewed_at: Optional[datetime] = None
+    recent_keywords: List[str] = []
+
+
+
+    def add_view(
+        self,
+        user_id: str,
+        reel_id: str,
+        news_title: str,
+        news_url: str,
+        category: str,
+        keywords: List[str],
+        duration_ms: int,
+        completed: bool,
+        emoji_reaction: Optional[str] = None,
+        engagement_score: float = 0.0
+    ) -> UserViewedNews:
+        """Yeni izlenme kaydı ekle"""
+        
+        view = UserViewedNews(
+            user_id=user_id,
+            reel_id=reel_id,
+            news_title=news_title,
+            news_url=news_url,
+            category=category,
+            keywords=keywords,
+            viewed_at=datetime.now(),
+            duration_ms=duration_ms,
+            completed=completed,
+            emoji_reaction=emoji_reaction,
+            engagement_score=engagement_score
+        )
+        
+        # Memory'e ekle
+        self.user_views[user_id].append(view)
+        
+        # Stats güncelle
+        self._update_user_stats(user_id, view)
+        
+        # Dosyaya kaydet
+        self._save_to_file()
+        
+        return view
+
+
+
+
+
+# ============ STORAGE SERVICE ============
+
 class UserViewedNewsStorage:
     """
     Kullanıcıların izlediği haberleri persistent olarak saklar
@@ -285,6 +343,73 @@ class UserViewedNewsStorage:
                 matchable_users.append(user_id)
         
         return matchable_users
+    
+    
+    def get_user_emoji_for_reel(
+        self,
+        user_id: str,
+        reel_id: str
+    ) -> Optional[str]:
+        """
+        Kullanıcının belirli bir habere verdiği emoji'yi getir
+        
+        Args:
+            user_id: Kullanıcı ID
+            reel_id: Haber/reel ID
+        
+        Returns:
+            Emoji string (örn: "❤️", "👍", "😢") veya None
+        
+        Example:
+            >>> emoji = storage.get_user_emoji_for_reel("user123", "reel456")
+            >>> if emoji:
+            >>>     print(f"User reacted with {emoji}")
+        """
+        if user_id not in self.user_views:
+            return None
+        
+        # Kullanıcının tüm izlemelerinde bu reel'i ara
+        for view in self.user_views[user_id]:
+            if view.reel_id == reel_id and view.emoji_reaction:
+                return view.emoji_reaction
+        
+        return None
+    
+    def get_user_emojis_for_reels(
+        self,
+        user_id: str,
+        reel_ids: List[str]
+    ) -> Dict[str, str]:
+        """
+        Kullanıcının birden fazla habere verdiği emojileri toplu getir
+        
+        Args:
+            user_id: Kullanıcı ID
+            reel_ids: Haber/reel ID listesi
+        
+        Returns:
+            {reel_id: emoji} dict
+        
+        Example:
+            >>> emojis = storage.get_user_emojis_for_reels("user123", ["reel1", "reel2"])
+            >>> # {"reel1": "❤️", "reel2": "👍"}
+        """
+        emoji_map = {}
+        
+        if user_id not in self.user_views:
+            return emoji_map
+        
+        # Set'e çevir hızlı lookup için
+        reel_id_set = set(reel_ids)
+        
+        for view in self.user_views[user_id]:
+            if view.reel_id in reel_id_set and view.emoji_reaction:
+                emoji_map[view.reel_id] = view.emoji_reaction
+        
+        return emoji_map    
+    
+    
+    
     
     def get_user_stats_summary(self, user_id: str) -> Optional[UserViewStats]:
         """Kullanıcı istatistiklerini getir"""

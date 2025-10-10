@@ -79,11 +79,11 @@ def _setup_middleware(app: FastAPI):
     # CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.debug else ["http://localhost:3000"],
+        allow_origins=["*"],  # 🔥 Hepsine izin ver (development için)
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-    )
+    )   
     
     # Request logging middleware
     @app.middleware("http")

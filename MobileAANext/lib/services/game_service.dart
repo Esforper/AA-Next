@@ -43,7 +43,7 @@ String get _baseUrl {
   return 'http://localhost:8000';
 }
   // Timeout
-  final _timeoutDuration = const Duration(seconds: 30);
+  final _timeoutDuration = const Duration(seconds: 60);
 
   // User ID (ApiService'den alınacak - şimdilik hardcoded)
   Future<String> _getUserId() async {
@@ -528,7 +528,71 @@ Future<Map<String, String>> _getHeaders() async {
   }
 
 
+// ============ GAME HISTORY ============
 
+/// Oyun geçmişini getir
+Future<List<GameHistoryItem>> getGameHistory({int limit = 20}) async {
+  try {
+    final uri = Uri.parse('$_baseUrl/api/game/history?limit=$limit');
+
+    debugPrint('🔗 GET $uri');
+
+    final response = await http.get(
+      uri,
+      headers: await _getHeaders(),
+    ).timeout(_timeoutDuration);
+
+    debugPrint('📡 Game History Response: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      
+      if (data['success'] == true) {
+        final List<dynamic> historyList = data['history'] ?? [];
+        return historyList
+            .map((item) => GameHistoryItem.fromJson(item))
+            .toList();
+      } else {
+        throw Exception('Failed to load game history');
+      }
+    } else {
+      throw Exception('Failed to get game history');
+    }
+  } catch (e) {
+    debugPrint('❌ Get game history error: $e');
+    rethrow;
+  }
+}
+
+/// Oyun detayını getir (geçmişten)
+Future<GameHistoryDetail> getGameHistoryDetail(String gameId) async {
+  try {
+    final uri = Uri.parse('$_baseUrl/api/game/history/$gameId');
+
+    debugPrint('🔗 GET $uri');
+
+    final response = await http.get(
+      uri,
+      headers: await _getHeaders(),
+    ).timeout(_timeoutDuration);
+
+    debugPrint('📡 Game History Detail Response: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return GameHistoryDetail.fromJson(data);
+    } else if (response.statusCode == 404) {
+      throw Exception('Game not found');
+    } else if (response.statusCode == 403) {
+      throw Exception('Not your game');
+    } else {
+      throw Exception('Failed to get game detail');
+    }
+  } catch (e) {
+    debugPrint('❌ Get game detail error: $e');
+    rethrow;
+  }
+}
 
 
 

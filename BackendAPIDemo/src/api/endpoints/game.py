@@ -12,10 +12,11 @@ from ...models.user_viewed_news import user_viewed_news_storage
 from ...services.reels_analytics import reels_analytics
 from ...services.game_service import game_service
 from ..utils.auth_utils import get_current_user_id
+from ...services.game_websocket import game_ws_manager
 from ...services.matchmaking_queue import matchmaking_queue
 router = APIRouter(prefix="/api/game", tags=["game"])
 
-
+from datetime import datetime
 # ============ REQUEST/RESPONSE MODELS ============
 
 class MatchmakingRequest(BaseModel):
@@ -362,7 +363,8 @@ async def answer_question(
             game_id=game_id,
             player_id=user_id,
             round_index=round_number,
-            is_correct=is_correct
+            is_correct=is_correct,
+            is_pass=request.is_pass
         )
         
         # Response mesajı
@@ -373,9 +375,64 @@ async def answer_question(
         else:
             response_message = question.wrong_response
         
-        # Emoji yorumu var mı?
-        # TODO: Kullanıcının bu habere verdiği emoji'yi al ve emoji_responses'tan mesaj döndür
+        # Emoji yorumu
         emoji_comment = None
+        if is_correct and not request.is_pass:
+            user_emoji = user_viewed_news_storage.get_user_emoji_for_reel(
+                user_id=user_id,
+                reel_id=question.reel_id
+            )
+            
+            if user_emoji and user_emoji in question.emoji_responses:
+                emoji_comment = question.emoji_responses[user_emoji]
+        
+        # 🆕 WEBSOCKET BROADCAST - Cevap sonucu
+        await game_ws_manager.send_answer_result(
+            game_id=game_id,
+            answering_player=user_id,
+            data={
+                "round_number": round_number,
+                "is_correct": is_correct,
+                "is_pass": request.is_pass,
+                "response_message": response_message,
+                "emoji_comment": emoji_comment,
+                "xp_earned": result["xp_earned"]
+            }
+        )
+        
+        # 🆕 WEBSOCKET BROADCAST - Skor güncellendi
+        await game_ws_manager.send_score_update(
+            game_id=game_id,
+            scores={
+                "player1_score": result["player1_score"],
+                "player2_score": result["player2_score"],
+                "current_round": result["current_round"]
+            }
+        )
+        
+        # 🆕 Oyun bitti mi?
+        if result["game_finished"]:
+            await game_ws_manager.send_game_finished(
+                game_id=game_id,
+                data={
+                    "player1_score": result["player1_score"],
+                    "player2_score": result["player2_score"]
+                }
+            )
+        else:
+            # 🆕 Yeni soru varsa broadcast
+            next_round = result["current_round"]
+            if next_round < session.total_rounds:
+                next_question = session.questions[next_round]
+                
+                await game_ws_manager.send_new_question(
+                    game_id=game_id,
+                    data={
+                        "round_number": next_round,
+                        "news_title": next_question.news_title,
+                        "question_text": next_question.question_text
+                    }
+                )
         
         return {
             "success": True,
@@ -701,4 +758,284 @@ async def cancel_matchmaking(
         }
         
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    
+@router.get("/history")
+async def get_my_game_history(
+    user_id: str = Depends(get_current_user_id),
+    limit: int = 20
+):
+    """
+    Kullanıcının oyun geçmişini getir
+    
+    Query params:
+        limit: Kaç oyun (default: 20)
+    
+    Returns:
+        List[{game_id, opponent_id, result, scores, played_at}]
+    """
+    try:
+        history = game_service.get_game_history(user_id, limit=limit)
+        
+        return {
+            "success": True,
+            "total": len(history),
+            "history": history
+        }
+        
+    except Exception as e:
+        print(f"❌ Get game history error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/history/{game_id}")
+async def get_game_history_detail(
+    game_id: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Belirli bir oyunun detayını getir (geçmişten)
+    
+    Returns:
+        Oyun detayları + mesajlar + haberler
+    """
+    try:
+        game_detail = game_service.get_game_detail(game_id)
+        
+        if not game_detail:
+            raise HTTPException(status_code=404, detail="Game not found")
+        
+        # Kullanıcı bu oyunda var mı?
+        if user_id not in [game_detail.get("player1_id"), game_detail.get("player2_id")]:
+            raise HTTPException(status_code=403, detail="Not your game")
+        
+        return {
+            "success": True,
+            **game_detail
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Get game detail error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    
+# ============ WEBSOCKET ENDPOINT ============
+
+@router.websocket("/ws/{game_id}")
+async def game_websocket_endpoint(
+    websocket: WebSocket,
+    game_id: str,
+    user_id: str = None  # Query parameter olarak gelecek
+):
+    """
+    Oyun WebSocket Endpoint
+    
+    Bağlantı: ws://localhost:8000/api/game/ws/{game_id}?user_id={user_id}
+    
+    Events:
+    - connected: Bağlantı kuruldu
+    - turn_update: Sıra değişti
+    - answer_result: Cevap sonucu
+    - opponent_answered: Rakip cevap verdi
+    - new_question: Yeni soru
+    - score_update: Skor güncellendi
+    - game_finished: Oyun bitti
+    - player_joined/left: Oyuncu giriş/çıkış
+    """
+    
+    # User ID query'den al (WebSocket header'da auth zor)
+    if not user_id:
+        await websocket.close(code=1008, reason="user_id required")
+        return
+    
+    try:
+        # Oyun var mı kontrol et
+        session = game_service.get_game_session(game_id)
+        if not session:
+            await websocket.close(code=1008, reason="Game not found")
+            return
+        
+        # Kullanıcı bu oyunda mı?
+        if user_id not in [session.player1_id, session.player2_id]:
+            await websocket.close(code=1008, reason="Not your game")
+            return
+        
+        # WebSocket bağlantısını kur
+        room = await game_ws_manager.connect_player(game_id, user_id, websocket)
+        
+        print(f"🔌 WebSocket connected: user={user_id[:8]}, game={game_id}")
+        
+        # Bağlantıyı dinle (keep-alive için)
+        try:
+            while True:
+                # Ping-pong mesajları al
+                data = await websocket.receive_text()
+                
+                # Heartbeat mesajı
+                if data == "ping":
+                    await websocket.send_text("pong")
+                else:
+                    # Diğer mesajları parse et
+                    try:
+                        message = json.loads(data)
+                        # Gelecekte client'tan gelen mesajlar için
+                        print(f"📨 Received from client: {message}")
+                    except:
+                        pass
+        
+        except WebSocketDisconnect:
+            print(f"🔌 WebSocket disconnected: user={user_id[:8]}, game={game_id}")
+        
+    except Exception as e:
+        print(f"❌ WebSocket error: {e}")
+    
+    finally:
+        # Bağlantı koptuğunda temizle
+        await game_ws_manager.disconnect_player(game_id, user_id)
+        
+        
+# ============ DEBUG WEBSOCKET ENDPOINT ============
+
+@router.get("/debug/rooms")
+async def debug_websocket_rooms():
+    """Debug: Aktif WebSocket odalarını göster"""
+    try:
+        rooms = []
+        for game_id in game_ws_manager.rooms.keys():
+            room_status = game_ws_manager.get_room_status(game_id)
+            if room_status:
+                rooms.append(room_status)
+        
+        return {
+            "success": True,
+            "total_rooms": len(rooms),
+            "rooms": rooms
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+        
+        
+# ============ TEST ENDPOINTS ============
+
+@router.post("/test/bot-match")
+async def test_create_bot_match(user_id: str = Depends(get_current_user_id)):
+    """
+    TEST: Bot rakip oluştur ve oyun başlat
+    """
+    try:
+        # Kullanıcının izlediği haberleri al
+        user_views = user_viewed_news_storage.get_user_views(user_id, days=6)
+        
+        if len(user_views) < 4:
+            raise HTTPException(
+                status_code=400,
+                detail=f"En az 4 haber izlemelisin. Şu an: {len(user_views)}"
+            )
+        
+        # Bot kullanıcı ID
+        bot_id = f"bot_{int(datetime.now().timestamp())}"
+        
+        print(f"🤖 Creating bot opponent: {bot_id}")
+        print(f"👤 User has {len(user_views)} views")
+        
+        # Ortak reel ID'leri topla
+        common_reel_ids = []
+        
+        # Aynı haberleri bot'a da ekle
+        for view in user_views[:8]:
+            user_viewed_news_storage.add_view(
+                user_id=bot_id,
+                reel_id=view.reel_id,
+                news_title=view.news_title,
+                news_url=view.news_url,
+                category=view.category,
+                keywords=view.keywords,
+                duration_ms=5000,
+                completed=True,
+                emoji_reaction="👍"
+            )
+            common_reel_ids.append(view.reel_id)
+        
+        print(f"🤖 Bot created with {len(common_reel_ids)} views")
+        
+        # 🔥 MANUEL OYUN OLUŞTURMA (find_common_reels'i bypass et)
+        # Reels bilgilerini al
+        selected_reels = []
+        for reel_id in common_reel_ids:
+            reel = await reels_analytics.get_reel_by_id(reel_id)
+            if reel:
+                selected_reels.append(reel)
+        
+        if len(selected_reels) < 4:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Yeterli haber bulunamadı. Bulunan: {len(selected_reels)}"
+            )
+        
+        print(f"📰 Found {len(selected_reels)} reels")
+        
+        # Emoji bilgilerini al
+        player1_emojis = {}
+        for view in user_views[:8]:
+            if view.emoji_reaction:
+                player1_emojis[view.reel_id] = view.emoji_reaction
+        
+        player2_emojis = {reel_id: "👍" for reel_id in common_reel_ids}
+        
+        # AI ile senaryo üret
+        questions = await game_service._generate_game_scenario(
+            selected_reels[:8],
+            player1_emojis,
+            player2_emojis
+        )
+        
+        print(f"🎯 Generated {len(questions)} questions")
+        
+        # Game ID oluştur
+        game_id = f"game_{user_id[:8]}_{bot_id[:8]}_{int(datetime.now().timestamp())}"
+        
+        # GameSession oluştur (direkt import gerekecek)
+        from ...services.game_service import GameSession
+        
+        session = GameSession(
+            game_id=game_id,
+            player1_id=user_id,
+            player2_id=bot_id,
+            questions=questions
+        )
+        
+        # Oyunu başlat
+        session.status = "active"
+        session.started_at = datetime.now()
+        
+        # Memory'e kaydet
+        game_service.active_games[game_id] = session
+        
+        print(f"✅ Bot game created: {game_id}")
+        print(f"🎮 Active games: {len(game_service.active_games)}")
+        
+        return {
+            "success": True,
+            "matched": True,
+            "game_id": game_id,
+            "opponent_id": bot_id,
+            "common_reels_count": len(questions),
+            "message": "Test oyunu oluşturuldu! Bot ile oynuyorsun."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Bot game creation error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
