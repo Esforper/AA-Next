@@ -13,7 +13,7 @@ from ...services.reels_analytics import reels_analytics
 from ...services.content import content_service
 from ...services.processing import processing_service
 from ...models.reels_tracking import TrackViewRequest
-
+from ...services.auth_service import auth_service
 router = APIRouter(prefix="/api/reels", tags=["reels-management"])
 
 
@@ -43,9 +43,10 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
     token = authorization.split(" ")[1]
     
     try:
-        from ...auth import verify_token
-        payload = verify_token(token)
-        return payload.get("user_id")
+        user = await auth_service.get_current_user(token)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        return user.id
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 

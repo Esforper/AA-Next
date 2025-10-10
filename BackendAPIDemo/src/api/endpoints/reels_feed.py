@@ -11,7 +11,7 @@ from typing import Optional
 from ...services.feed_generator import feed_generator
 from ...services.reels_analytics import reels_analytics
 from ...models.reels_tracking import FeedResponse, TrendPeriod
-
+from ...services.auth_service import auth_service
 router = APIRouter(prefix="/api/reels", tags=["reels-feed"])
 
 
@@ -25,9 +25,10 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
     token = authorization.split(" ")[1]
     
     try:
-        from ...auth import verify_token
-        payload = verify_token(token)
-        return payload.get("user_id")
+        user = await auth_service.get_current_user(token)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        return user.id
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
@@ -65,21 +66,20 @@ async def get_personalized_feed(
         print(f"❌ Feed generation error: {e}")
         raise HTTPException(status_code=500, detail=f"Feed generation failed: {str(e)}")
 
-
 @router.get("/trending")
 async def get_trending_reels(
     user_id: str = Depends(get_current_user_id),
     limit: int = Query(10, ge=1, le=50, description="Kaç reel döndürülecek"),
-    period: TrendPeriod = Query(TrendPeriod.TODAY, description="Trend periyodu")
+    period: TrendPeriod = Query(TrendPeriod.DAILY, description="Trend periyodu")
 ):
     """
     Trend reels listesi (JWT Auth)
     
     **En çok izlenen/engagement alan reels**
     
-    - TODAY: Bugünün trendleri
-    - WEEK: Bu haftanın trendleri
-    - MONTH: Bu ayın trendleri
+    - HOURLY: Son 1 saatin trendleri
+    - DAILY: Bugünün trendleri
+    - WEEKLY: Bu haftanın trendleri
     """
     try:
         trending_reels = await reels_analytics.get_trending_reels(
@@ -102,6 +102,9 @@ async def get_trending_reels(
     except Exception as e:
         print(f"❌ Get trending reels error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    
 
 
 @router.get("/latest-published")

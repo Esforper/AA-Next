@@ -9,7 +9,7 @@ Minimal ama güvenli authentication servisi
 - User storage (JSON file)
 - Register/Login logic
 """
-
+from datetime import datetime, timedelta, timezone
 import json
 import uuid
 from pathlib import Path
@@ -31,11 +31,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def hash_password(password: str) -> str: return pwd_context.hash(password)
 def verify_password(plain_password: str, hashed_password: str) -> bool: return pwd_context.verify(plain_password, hashed_password)
 
-# ============ JWT TOKEN MANAGEMENT ============
+# create_access_token fonksiyonunu güncelleyin:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    if expires_delta: expire = datetime.utcnow() + expires_delta
-    else: expire = datetime.utcnow() + timedelta(hours=settings.jwt_expire_hours)
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta  # ✅ Değişti
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours)  # ✅ Değişti
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
@@ -136,11 +138,14 @@ class AuthService:
         self.storage.update_user(user.id, {"last_login": datetime.now().isoformat()})
         return user, self._create_token_for_user(user)
 
+    # get_current_user metodunu AuthService class'ı içinde güncelleyin:
     async def get_current_user(self, token: str) -> Optional[User]:
         token_data = decode_access_token(token)
-        if not token_data or token_data.exp < datetime.utcnow(): return None
+        if not token_data or token_data.exp < datetime.now(timezone.utc):  # ✅ Değişti
+            return None
         user = self.storage.get_user_by_id(token_data.user_id)
-        if not user or user.status != UserStatus.ACTIVE: return None
+        if not user or user.status != UserStatus.ACTIVE:
+            return None
         return user
 
     async def update_profile(self, user_id: str, updates: UserUpdate) -> Optional[User]:

@@ -571,6 +571,37 @@ class StatsFilter(BaseModel):
     time_range: Optional[TimeRange] = None
     min_duration_ms: Optional[int] = None
 
+
+
+
+
+class UserProgressResponse(BaseModel):
+    """Günlük progress response"""
+    success: bool = True
+    date: str
+    progress_percentage: float = Field(..., description="İlerleme yüzdesi")
+    total_published_today: int = Field(..., description="Bugün yayınlanan toplam")
+    watched_today: int = Field(..., description="Bugün izlenen")
+    category_breakdown: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    
+
+class UserStatsResponse(BaseModel):
+    """Kullanıcı istatistikleri response"""
+    success: bool = True
+    user_id: str
+    total_reels_watched: int
+    total_screen_time_ms: int
+    total_screen_time_hours: float
+    completion_rate: float
+    favorite_categories: List[str]
+    last_activity: Optional[str] = None
+    current_streak_days: int = 0
+    avg_daily_reels: float = 0.0
+
+
+
+
+
 # ============ EXPORTS ============
 
 __all__ = [
@@ -604,4 +635,8 @@ __all__ = [
     # Utilities
     "TimeRange",
     "StatsFilter",
+    
+    "UserProgressResponse",
+    "UserStatsResponse",
+
 ]
