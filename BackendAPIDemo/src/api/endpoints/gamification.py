@@ -255,10 +255,14 @@ async def check_node_eligibility(
         print(f"❌ [Check Node Eligibility] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class SpendNodesRequest(BaseModel):
+    amount: int = Field(..., gt=0, description="Harcanacak node sayısı")
+    reason: str = Field(default="game_entry", description="Harcama nedeni")
+
+
 @router.post("/spend-nodes")
 async def spend_nodes(
-    amount: int = Field(..., gt=0, description="Harcanacak node sayısı"),
-    reason: str = Field(default="game_entry", description="Harcama nedeni"),
+    request: SpendNodesRequest,
     user_id: str = Depends(get_current_user_id)
 ):
     """
@@ -271,12 +275,12 @@ async def spend_nodes(
     try:
         from ...services.gamification_service import gamification_service
         
-        print(f"🎮 [API] Spend nodes request: user={user_id[:8]}, amount={amount}, reason={reason}")
+        print(f"🎮 [API] Spend nodes request: user={user_id[:8]}, amount={request.amount}, reason={request.reason}")
         
         success = gamification_service.spend_nodes(
             user_id=user_id,
-            amount=amount,
-            reason=reason
+            amount=request.amount,
+            reason=request.reason
         )
         
         if not success:
@@ -290,8 +294,8 @@ async def spend_nodes(
         
         return {
             "success": True,
-            "message": f"{amount} node harcandı",
-            "nodes_spent": amount,
+            "message": f"{request.amount} node harcandı",
+            "nodes_spent": request.amount,
             "current_level": level_data["current_level"],
             "current_node": level_data["current_node"],
             "total_xp": level_data["total_xp"],
@@ -302,10 +306,15 @@ async def spend_nodes(
         print(f"❌ [Spend Nodes] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+class AddNodesRequest(BaseModel):
+    amount: int = Field(..., gt=0, description="Eklenecek node sayısı")
+    source: str = Field(default="game_reward", description="Node kaynağı")
+
+
 @router.post("/add-nodes")
 async def add_nodes(
-    amount: int = Field(..., gt=0, description="Eklenecek node sayısı"),
-    source: str = Field(default="game_reward", description="Node kaynağı"),
+    request: AddNodesRequest,
     user_id: str = Depends(get_current_user_id)
 ):
     """
@@ -318,18 +327,18 @@ async def add_nodes(
     try:
         from ...services.gamification_service import gamification_service
         
-        print(f"🎮 [API] Add nodes request: user={user_id[:8]}, amount={amount}, source={source}")
+        print(f"🎮 [API] Add nodes request: user={user_id[:8]}, amount={request.amount}, source={request.source}")
         
         result = gamification_service.add_nodes(
             user_id=user_id,
-            amount=amount,
-            source=source
+            amount=request.amount,
+            source=request.source
         )
         
         return {
             "success": True,
-            "message": f"{amount} node eklendi",
-            "nodes_added": amount,
+            "message": f"{request.amount} node eklendi",
+            "nodes_added": request.amount,
             "current_level": result["current_level"],
             "current_node": result["current_node"],
             "total_xp": result["total_xp"],

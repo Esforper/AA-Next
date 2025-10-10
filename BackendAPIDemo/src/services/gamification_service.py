@@ -22,7 +22,7 @@ class GamificationData:
         
         # XP & Level
         self.total_xp: int = 0
-        self.current_level: int = 1
+        self.current_level: int = 0 
         self.current_node: int = 0  # 0-based (0 = ilk node)
         self.current_xp: int = 0     # Mevcut node'daki XP (0-100)
         
@@ -77,7 +77,7 @@ class GamificationData:
         """Dict'ten oluştur"""
         obj = cls(data['user_id'])
         obj.total_xp = data.get('total_xp', 0)
-        obj.current_level = data.get('current_level', 1)
+        obj.current_level = data.get('current_level', 0)
         obj.current_node = data.get('current_node', 0)
         obj.current_xp = data.get('current_xp', 0)
         obj.current_streak = data.get('current_streak', 0)
@@ -100,12 +100,15 @@ class GamificationService:
     """
     Gamification Service - Main Logic
     
-    Level System:
-    - Her level'de farklı sayıda node var
-    - Level 1: 2 node
-    - Level 2-9: 3 node
-    - Level 10+: 4 node
-    - Her node 100 XP
+    Level System (YENİ):
+    - Başlangıç: Level 0, Node 0
+    - Her 5 levelda bir 2 node artar:
+      * Level 0-4:   2 node (200 XP)
+      * Level 5-9:   4 node (400 XP)
+      * Level 10-14: 6 node (600 XP)
+      * Level 15-19: 8 node (800 XP)
+      * Level 20+:   10 node (1000 XP)
+    - Her node: 100 XP
     
     XP Sources:
     - Reel izleme: 10 XP
@@ -178,13 +181,26 @@ class GamificationService:
     # ============ LEVEL CALCULATIONS ============
     
     def _get_nodes_in_level(self, level: int) -> int:
-        """Bu level'de kaç node var?"""
-        if level == 1:
+        """
+        Bu level'de kaç node var?
+        
+        Yeni Sistem: Her 5 levelda bir 2 node artar
+        - Level 0-4:   2 node
+        - Level 5-9:   4 node
+        - Level 10-14: 6 node
+        - Level 15-19: 8 node
+        - Level 20+:   10 node
+        """
+        if level < 5:
             return 2
         elif level < 10:
-            return 3
-        else:
             return 4
+        elif level < 15:
+            return 6
+        elif level < 20:
+            return 8
+        else:
+            return 10  # Max
     
     def _calculate_level_and_node(self, total_xp: int) -> tuple[int, int, int]:
         """
@@ -192,9 +208,14 @@ class GamificationService:
         
         Returns:
             (level, node, current_xp)
+        
+        Örnek:
+            0 XP → Level 0, Node 0, XP 0
+            100 XP → Level 0, Node 1, XP 0
+            200 XP → Level 1, Node 0, XP 0
         """
         remaining_xp = total_xp
-        level = 1
+        level = 0  # ✅ DEĞİŞTİ: 1 → 0
         
         while True:
             nodes_in_level = self._get_nodes_in_level(level)
@@ -204,6 +225,9 @@ class GamificationService:
                 # Bu level'deyiz
                 node = remaining_xp // 100
                 current_xp = remaining_xp % 100
+                
+                print(f"🔢 [Calculate] Total XP: {total_xp} → Level {level}, Node {node}, Current XP {current_xp}")
+                
                 return (level, node, current_xp)
             
             # Sonraki level'e geç
@@ -212,6 +236,7 @@ class GamificationService:
             
             # Safety: Max level 100
             if level > 100:
+                print(f"⚠️ [Calculate] Max level reached!")
                 return (100, 0, 0)
 # ============ NODE MANAGEMENT ============
     
