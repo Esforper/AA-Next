@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+// Providers
 import 'providers/auth_provider.dart';
 import 'providers/reels_provider.dart';
 import 'providers/gamification_provider.dart';
@@ -12,12 +13,18 @@ import 'providers/saved_reels_provider.dart';
 import 'providers/chat_provider.dart';
 import 'services/audio_service.dart';
 
+// Core (Yeni eklenenler)
+import 'core/theme/app_theme.dart';
+import 'core/theme/web_theme.dart';
+import 'core/utils/platform_utils.dart';
+
+// Pages & Views (Mevcut)
 import 'pages/splash_page.dart';
 import 'pages/reels_feed_page.dart';
 import 'pages/login_page.dart';
+import 'pages/game_menu_page.dart';
 import 'views/home_view.dart';
 import 'views/profile_view.dart';
-import 'pages/game_menu_page.dart'; // ✅ YENİ: Oyun menüsü import edildi
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,18 +72,8 @@ class AanextApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'AA-Next',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-          useMaterial3: true,
-          inputDecorationTheme: InputDecorationTheme(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
+        // Platform-aware theme
+        theme: PlatformUtils.isWeb ? WebTheme.theme : AppTheme.theme,
         // ⚠️ ÖNEMLİ: SplashPage ile başla (auth kontrolü için)
         home: const SplashPage(),
       ),

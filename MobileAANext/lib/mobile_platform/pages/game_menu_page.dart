@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/game_models.dart';
-import '../services/game_service.dart';
+import '../../models/game_models.dart';
+import '../../services/game_service.dart';
 import 'game_matchmaking_page.dart';
 
 class GameMenuPage extends StatefulWidget {

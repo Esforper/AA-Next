@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/gamification_provider.dart';
+import '../../../providers/gamification_provider.dart';
 
 /// Reels XP Overlay - Temizlenmiş ve Minimal
 /// - Tek satır: Level sayısı + Düğüm görseli + Düğüm sayısı + XP

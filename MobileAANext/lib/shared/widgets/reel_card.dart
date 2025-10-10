@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/reel_model.dart';
+import '../../models/reel_model.dart';
 import 'image_carousel.dart';
 import 'read_handle.dart';
 import 'emoji_panel.dart';
@@ -7,7 +7,7 @@ import 'emoji_panel.dart';
 import 'article_reader_sheet.dart'; 
 // DÜZELTME 2: Artık kullanılmayan eski import'u siliyoruz.
 // import 'article_overlay.dart'; 
-import '../services/api_service.dart';
+import '../../services/api_service.dart';
 
 class ReelCard extends StatefulWidget {
   final Reel reel;

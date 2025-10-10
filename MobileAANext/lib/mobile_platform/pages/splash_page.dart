@@ -2,9 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart';
 import 'login_page.dart';
-import '../main.dart'; // MainNavigator için
+import '../../main.dart'; // MainNavigator için
 
 /// Splash Screen - Uygulama başlangıcı
 /// Token kontrolü yapar ve yönlendirir

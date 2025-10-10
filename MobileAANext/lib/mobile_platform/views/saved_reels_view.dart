@@ -2,8 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/saved_reels_provider.dart';
-import '../providers/reels_provider.dart';
+import '../../providers/saved_reels_provider.dart';
+import '../../providers/reels_provider.dart';
 
 class SavedReelsView extends StatelessWidget {
   const SavedReelsView({super.key});

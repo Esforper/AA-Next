@@ -2,9 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/chat_provider.dart';
-import '../providers/reels_provider.dart';
-import '../models/chat_room.dart';
+import '../../providers/chat_provider.dart';
+import '../../providers/reels_provider.dart';
+import '../../models/chat_room.dart';
 
 class ChatRoomDetailView extends StatefulWidget {
   final ChatRoom room;

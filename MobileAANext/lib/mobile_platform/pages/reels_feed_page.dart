@@ -1,21 +1,21 @@
 // lib/pages/reels_feed_page.dart
 // ESKİ ARAYÜZ + YENİ İNFİNİTE SCROLL
-import '../services/audio_service.dart';
+import '../../services/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../widgets/article_reader_sheet.dart'; 
-import '../providers/reels_provider.dart';
-import '../providers/saved_reels_provider.dart';
-import '../providers/gamification_provider.dart';
-import '../models/reel_model.dart';
-import '../widgets/image_carousel.dart';
-import '../widgets/emoji_panel.dart';
-import '../widgets/read_handle.dart';
-import '../widgets/gamification/reels_xp_overlay.dart';
-import '../widgets/gamification/floating_xp.dart';
-import '../widgets/subtitle_widget.dart';
-import '../services/reel_tracker_service.dart';
+import '../../shared/widgets/article_reader_sheet.dart'; 
+import '../../providers/reels_provider.dart';
+import '../../providers/saved_reels_provider.dart';
+import '../../providers/gamification_provider.dart';
+import '../../models/reel_model.dart';
+import '../../shared/widgets/image_carousel.dart';
+import '../../shared/widgets/emoji_panel.dart';
+import '../../shared/widgets/read_handle.dart';
+import '../../shared/widgets/gamification/reels_xp_overlay.dart';
+import '../../shared/widgets/gamification/floating_xp.dart';
+import '../../shared/widgets/subtitle_widget.dart';
+import '../../services/reel_tracker_service.dart';
 class ReelsFeedPage extends StatefulWidget {
   const ReelsFeedPage({super.key});
 
@@ -48,7 +48,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
       final provider = context.read<ReelsProvider>();
       if (provider.reels.isNotEmpty && !_isInitialized) {
         _isInitialized = true;
-        _startReelTracking(provider.current!.id);
+        _startReelTracking(provider.current!);
         final audioService = context.read<AudioService>();
         final firstReel = provider.current!;
         _startReelTracking(firstReel);

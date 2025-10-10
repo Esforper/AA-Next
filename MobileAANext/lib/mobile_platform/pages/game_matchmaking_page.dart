@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../models/game_models.dart';
-import '../services/game_service.dart';
-import '../pages/game_play_page.dart'; // Dosya yolu projenize göre güncellenecek
+import '../../models/game_models.dart';
+import '../../services/game_service.dart';
+import 'game_play_page.dart'; // Dosya yolu projenize göre güncellenecek
 
 class GameMatchmakingPage extends StatefulWidget {
   const GameMatchmakingPage({Key? key}) : super(key: key);

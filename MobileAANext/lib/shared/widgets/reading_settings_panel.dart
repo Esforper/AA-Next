@@ -1,8 +1,8 @@
 // lib/widgets/reading_settings_panel.dart
 
 import 'package:flutter/material.dart';
-import '../models/reading_preferences.dart';
-import '../services/reading_preferences_service.dart';
+import '../../models/reading_preferences.dart';
+import '../../services/reading_preferences_service.dart';
 
 /// Kullanıcının okuma ayarlarını (font boyutu, ailesi, satır aralığı)
 /// değiştirebileceği bir bottom sheet paneli.

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../models/game_models.dart';
-import '../services/game_service.dart';
+import '../../models/game_models.dart';
+import '../../services/game_service.dart';
 import 'game_result_page.dart';
 
 class GamePlayPage extends StatefulWidget {

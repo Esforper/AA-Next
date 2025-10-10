@@ -8,7 +8,7 @@ BU DOSYA KULLANILMIYOR, YEDEK OLARAK SAKLANIYOR.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart';
 import 'reels_feed_page.dart';
 
 class AuthPage extends StatefulWidget {

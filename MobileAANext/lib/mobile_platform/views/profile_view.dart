@@ -3,10 +3,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/gamification_provider.dart';
-import '../providers/auth_provider.dart';
-import '../widgets/gamification/level_chain_display.dart';
-import '../widgets/gamification/streak_display.dart';
+import '../../providers/gamification_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../shared/widgets/gamification/level_chain_display.dart';
+import '../../shared/widgets/gamification/streak_display.dart';
 import '../pages/login_page.dart';
 import 'saved_reels_view.dart';
 

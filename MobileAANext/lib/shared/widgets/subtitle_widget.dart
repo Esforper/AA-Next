@@ -1,6 +1,6 @@
 // lib/widgets/subtitle_widget.dart
 import 'package:flutter/material.dart';
-import '../models/reel_model.dart';
+import '../../models/reel_model.dart';
 
 class SubtitleWidget extends StatelessWidget {
   final List<SubtitleSegment> subtitles;

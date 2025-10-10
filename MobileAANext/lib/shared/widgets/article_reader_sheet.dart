@@ -1,10 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:visibility_detector/visibility_detector.dart';
-import '../models/reading_preferences.dart';
-import '../services/reading_analytics_service.dart';
-import '../services/reading_preferences_service.dart';
-import '../services/api_service.dart';
+import '../../models/reading_preferences.dart';
+import '../../services/reading_analytics_service.dart';
+import '../../services/reading_preferences_service.dart';
+import '../../services/api_service.dart';
 import 'article_image_viewer.dart';
 import 'reading_settings_panel.dart';
 

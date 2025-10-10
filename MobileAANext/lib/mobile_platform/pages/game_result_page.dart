@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../models/game_models.dart';
-import '../services/game_service.dart';
+import '../../models/game_models.dart';
+import '../../services/game_service.dart';
 // Anasayfa veya oyun menüsü yolu projenize göre güncellenecek
-import '../pages/game_menu_page.dart'; 
-import '../pages/reels_feed_page.dart';
+import 'game_menu_page.dart'; 
+import 'reels_feed_page.dart';
 
 class GameResultPage extends StatefulWidget {
   final String gameId;

@@ -3,9 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/gamification_provider.dart';
-import '../widgets/gamification/daily_progress_card.dart';
-import '../widgets/gamification/level_chain_display.dart';
+import '../../providers/gamification_provider.dart';
+import '../../shared/widgets/gamification/daily_progress_card.dart';
+import '../../shared/widgets/gamification/level_chain_display.dart';
 import 'chat_rooms_view.dart';
 import '../pages/game_menu_page.dart';
 /// Home View - Ana Sayfa
