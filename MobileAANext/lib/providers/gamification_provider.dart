@@ -4,12 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/gamification_state.dart';
-
+import '../services/auth_service.dart';
+import '../services/gamification_api_service.dart';
 /// Gamification Provider
 /// XP, Level, Streak yönetimi + Local Storage
 class GamificationProvider extends ChangeNotifier {
   GamificationState _state = const GamificationState();
-  
+  final AuthService _authService = AuthService();
+  Future<String?> _getUserId() async {
+    final user = await _authService.getUser();
+    return user?.id;
+  }
   // Reels tracking için
   final Map<String, bool> _emojiGivenPerReel = {};
   final Map<String, bool> _shareGivenPerReel = {};
@@ -38,17 +43,31 @@ class GamificationProvider extends ChangeNotifier {
   
   // ============ XP İŞLEMLERİ ============
   
-  /// XP Ekle (Generic)
-  void addXP(int amount, String source) {
+  // XP eklerken backend'e de gönder
+  Future<void> addXP(int amount, String source) async {
+    // 1. Local state güncelle
     _state = _state.addXP(amount, source);
-    _state = _state.checkLevelUp();
     
-    _saveToStorage();
+    // 2. Backend'e sync (opsiyonel)
+    final userId = await _getUserId();
+    if (userId != null) {
+      await _syncToBackend(userId, amount, source);
+    }
+    
     notifyListeners();
-    
-    // Level up kontrolü
-    if (_state.currentNode == 0 && _state.currentLevel > 1) {
-      _onLevelUp();
+  }
+
+    Future<void> _syncToBackend(String userId, int xp, String source) async {
+    try {
+      // Backend API çağrısı
+      await GamificationApiService().addXP(
+        userId: userId,
+        xpAmount: xp,
+        source: source,
+      );
+    } catch (e) {
+      debugPrint('⚠️ Backend sync failed: $e');
+      // Hata olsa bile local state güncel
     }
   }
   

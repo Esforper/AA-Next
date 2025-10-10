@@ -3,7 +3,7 @@ import 'dart:async';
 import '../../models/game_models.dart';
 import '../../services/game_service.dart';
 import 'game_result_page.dart';
-
+import '../../services/auth_service.dart';
 class GamePlayPage extends StatefulWidget {
   final String gameId;
   const GamePlayPage({super.key, required this.gameId});
@@ -14,6 +14,7 @@ class GamePlayPage extends StatefulWidget {
 
 class _GamePlayPageState extends State<GamePlayPage> {
   final GameService _gameService = GameService();
+  final AuthService _authService = AuthService();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -30,10 +31,8 @@ class _GamePlayPageState extends State<GamePlayPage> {
 
   Future<void> _initializeGame() async {
     try {
-      if (_gameService.userId == null) {
-        // Bu ID Auth sisteminden gelmeli, şimdilik test için.
-        _gameService.setUserId("test_user_1");
-      }
+      // 🔥 UPDATED: setUserId() çağrısı KALDIRILDI
+      // GameService artık otomatik olarak AuthService'den user ID alıyor
       
       final session = await _gameService.getGameStatus(widget.gameId);
       if (!mounted) return;
@@ -85,8 +84,7 @@ class _GamePlayPageState extends State<GamePlayPage> {
     });
 
     try {
-      // ✅ BÜYÜK HATA DÜZELTİLDİ: 'answerQuestion' artık 'selectedIndex' istiyor.
-      // Seçilen string'in index'ini bulup gönderiyoruz.
+      // Seçilen string'in index'ini bulup gönder
       final selectedIndex = _currentQuestion!.options.indexOf(selectedOption);
       if (selectedIndex == -1) throw Exception("Seçenek bulunamadı!");
 
@@ -97,35 +95,37 @@ class _GamePlayPageState extends State<GamePlayPage> {
       );
       if (!mounted) return;
       
-      // Skoru ve round'u manuel olarak güncelliyoruz.
+      // 🔥 FIXED: Doğru player'ın skorunu güncelle
+      final myUserId = await _authService.getUser();
+      final amIPlayer1 = _session!.player1Id == myUserId;
+      
       setState(() {
-        // Backend'den gelen güncel skorları modele yansıt
-        final amIPlayer1 = _session!.player1Id == _gameService.userId;
-        _session = GameSession(
-          success: _session!.success,
-          gameId: _session!.gameId,
-          status: _session!.status,
-          player1Id: _session!.player1Id,
-          player2Id: _session!.player2Id,
-          // ✅ HATA DÜZELTİLDİ: Skorlar artık backend'den gelen güncel değerler
-          player1Score: amIPlayer1 ? response.currentScore : _session!.player1Score,
-          player2Score: !amIPlayer1 ? response.currentScore : _session!.player2Score,
-          currentRound: _currentRound + 1, // Round'u manuel ilerlet
-          totalRounds: _session!.totalRounds,
-          createdAt: _session!.createdAt,
-        );
+        if (_session != null) {
+          _session = GameSession(
+            success: _session!.success,
+            gameId: _session!.gameId,
+            status: _session!.status,
+            player1Id: _session!.player1Id,
+            player2Id: _session!.player2Id,
+            // Doğru player'ın skorunu güncelle
+            player1Score: amIPlayer1 ? response.currentScore : _session!.player1Score,
+            player2Score: !amIPlayer1 ? response.currentScore : _session!.player2Score,
+            currentRound: _currentRound + 1,
+            totalRounds: _session!.totalRounds,
+            createdAt: _session!.createdAt,
+          );
+        }
         _isLoading = false;
       });
 
-      Timer(const Duration(seconds: 2, milliseconds: 500), () {
-        if (mounted) {
-          _fetchQuestion(_currentRound + 1);
-        }
-      });
-
+      // Kısa bir bekleme sonrası bir sonraki soruya geç
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+      _fetchQuestion(_currentRound + 1);
+      
     } catch (e) {
       if (!mounted) return;
-       setState(() {
+      setState(() {
         _isLoading = false;
         _errorMessage = "Cevap gönderilemedi: $e";
       });
@@ -133,7 +133,7 @@ class _GamePlayPageState extends State<GamePlayPage> {
   }
 
   void _endGame() {
-     Navigator.pushReplacement(
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => GameResultPage(gameId: widget.gameId),
@@ -143,131 +143,133 @@ class _GamePlayPageState extends State<GamePlayPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Haber Kapışması'),
-        automaticallyImplyLeading: false,
-      ),
-      body: _buildBody(),
-    );
-  }
-
-  Widget _buildBody() {
     if (_errorMessage != null) {
-      return Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)));
-    }
-    if (_session == null || _currentQuestion == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    return Column(
-      children: [
-        _buildScoreBoard(),
-        const Divider(),
-        Expanded(
-          child: _isLoading && _selectedOption == null
-              ? const Center(child: CircularProgressIndicator())
-              : _buildQuestionArea(),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildScoreBoard() {
-    // ✅ HATA DÜZELTİLDİ: Artık public 'userId' getter'ı var
-    final bool amIPlayer1 = _session!.player1Id == _gameService.userId;
-    final myScore = amIPlayer1 ? _session!.player1Score : _session!.player2Score;
-    final opponentScore = amIPlayer1 ? _session!.player2Score : _session!.player1Score;
-    
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _playerScoreColumn("Sen", myScore),
-          Text("${_currentRound + 1}/${_session!.totalRounds}", style: Theme.of(context).textTheme.headlineSmall),
-          _playerScoreColumn("Rakip", opponentScore),
-        ],
-      ),
-    );
-  }
-  
-  Widget _playerScoreColumn(String title, int score) {
-    return Column(
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        Text(score.toString(), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
-  Widget _buildQuestionArea() {
-    bool isMyTurnToAnswer = _currentQuestion!.askerId != _gameService.userId;
-    
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blueGrey.shade800,
-              borderRadius: BorderRadius.circular(16)
-            ),
-            child: Text(
-              _currentQuestion!.questionText,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
-            ),
-          ),
-          const SizedBox(height: 30),
-          ..._currentQuestion!.options.map((option) {
-              return _buildOptionButton(option, isMyTurnToAnswer);
-          }).toList(),
-          const SizedBox(height: 20),
-          if (!isMyTurnToAnswer && _selectedOption == null)
-            const Text("Rakibin cevabı bekleniyor..."),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildOptionButton(String option, bool isMyTurnToAnswer) {
-    Color? buttonColor;
-    IconData? icon;
-
-    if (_selectedOption != null) {
-      final correctOptionText = _currentQuestion!.options[_currentQuestion!.correctIndex];
-      if (option == correctOptionText) {
-        buttonColor = Colors.green;
-        icon = Icons.check_circle;
-      } else if (option == _selectedOption) {
-        buttonColor = Colors.red;
-        icon = Icons.cancel;
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: AbsorbPointer(
-        absorbing: _selectedOption != null || !isMyTurnToAnswer,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: buttonColor,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          onPressed: () => _submitAnswer(option),
-          child: Row(
+      return Scaffold(
+        appBar: AppBar(title: const Text('Oyun')),
+        body: Center(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (icon != null) ...[Icon(icon), const SizedBox(width: 8)],
-              Expanded(child: Text(option, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16))),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Geri Dön'),
+              ),
             ],
           ),
         ),
+      );
+    }
+
+    if (_isLoading || _session == null || _currentQuestion == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Oyun Yükleniyor...')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Tur ${_currentRound + 1}/${_session!.totalRounds}'),
       ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Skor göstergesi
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildScoreCard(
+                  'Sen',
+                  _session!.player1Score,
+                  Colors.blue,
+                ),
+                const Text('VS', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                _buildScoreCard(
+                  'Rakip',
+                  _session!.player2Score,
+                  Colors.red,
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+            
+            // Soru
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  _currentQuestion!.questionText,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Haber başlığı
+            Text(
+              'Haber: ${_currentQuestion!.newsTitle}',
+              style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+            
+            // Seçenekler
+            ..._currentQuestion!.options.map((option) {
+              final isSelected = _selectedOption == option;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ElevatedButton(
+                  onPressed: _selectedOption == null ? () => _submitAnswer(option) : null,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: isSelected ? Colors.blue : null,
+                    foregroundColor: isSelected ? Colors.white : null,
+                  ),
+                  child: Text(
+                    option,
+                    style: const TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScoreCard(String label, int score, Color color) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 16, color: color, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            border: Border.all(color: color, width: 2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '$score',
+            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: color),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -6,13 +6,14 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import '../models/game_models.dart';
+import 'auth_service.dart';
 
 /// Game Service - Oyun API'leri ile iletişim
 class GameService {
   static final GameService _instance = GameService._internal();
   factory GameService() => _instance;
   GameService._internal();
-
+  final AuthService _authService = AuthService();
   // Base URL
   String get _baseUrl {
     final backendIp = dotenv.env['API_URL'] ?? 'http://10.0.2.2:8000';
@@ -23,23 +24,26 @@ class GameService {
   final _timeoutDuration = const Duration(seconds: 30);
 
   // User ID (ApiService'den alınacak - şimdilik hardcoded)
-  String? _userId;
-  String? get userId => _userId;
-  void setUserId(String userId) {
-    _userId = userId;
-    debugPrint('🎮 Game Service - User ID set: $userId');
+  Future<String> _getUserId() async {
+    final user = await _authService.getUser();
+    if (user != null) {
+      debugPrint('🎮 Game Service - Using real user ID: ${user.id}');
+      return user.id;
+    }
+    debugPrint('⚠️ Game Service - No user logged in, using: anonymous_user');
+    return 'anonymous_user';
   }
-
-  String get _userIdHeader => _userId ?? 'anonymous_user';
 
   // ============ MATCHMAKING ============
 
   /// Oyun uygunluğunu kontrol et
-  Future<GameEligibility> checkEligibility({
+Future<GameEligibility> checkEligibility({
     int days = 6,
     int minReels = 8,
   }) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
+      
       final uri = Uri.parse('$_baseUrl/api/game/check-eligibility')
           .replace(queryParameters: {
         'days': days.toString(),
@@ -51,7 +55,7 @@ class GameService {
       final response = await http.get(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);
@@ -76,6 +80,7 @@ class GameService {
     int minCommonReels = 8,
   }) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/matchmaking/start');
 
       debugPrint('🔗 POST $uri');
@@ -84,7 +89,7 @@ class GameService {
       final response = await http.post(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
@@ -109,15 +114,17 @@ class GameService {
     }
   }
 
+
   /// Matchmaking iptal et
   Future<void> cancelMatchmaking() async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/matchmaking/cancel');
 
       await http.post(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);
@@ -133,6 +140,7 @@ class GameService {
   /// Oyun durumunu getir
   Future<GameSession> getGameStatus(String gameId) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/session/$gameId');
 
       debugPrint('🔗 GET $uri');
@@ -140,7 +148,7 @@ class GameService {
       final response = await http.get(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);
@@ -164,6 +172,7 @@ class GameService {
   /// Oyunu başlat (her iki oyuncu hazır olunca)
   Future<void> startGame(String gameId) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/session/$gameId/start');
 
       debugPrint('🔗 POST $uri');
@@ -171,7 +180,7 @@ class GameService {
       final response = await http.post(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);
@@ -189,9 +198,12 @@ class GameService {
     }
   }
 
+
+
   /// Belirli bir round'un sorusunu getir
   Future<GameQuestion> getQuestion(String gameId, int roundNumber) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri =
           Uri.parse('$_baseUrl/api/game/session/$gameId/question/$roundNumber');
 
@@ -200,7 +212,7 @@ class GameService {
       final response = await http.get(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);
@@ -229,6 +241,7 @@ class GameService {
     bool isPass = false,
   }) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri =
           Uri.parse('$_baseUrl/api/game/session/$gameId/answer/$roundNumber');
 
@@ -238,7 +251,7 @@ class GameService {
       final response = await http.post(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
@@ -265,6 +278,7 @@ class GameService {
   /// Oyun sonucunu getir
   Future<GameResult> getGameResult(String gameId) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/session/$gameId/result');
 
       debugPrint('🔗 GET $uri');
@@ -272,7 +286,7 @@ class GameService {
       final response = await http.get(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);
@@ -296,12 +310,13 @@ class GameService {
   /// Oyundan ayrıl (forfeit)
   Future<void> leaveGame(String gameId) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/session/$gameId/leave');
 
       await http.post(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);
@@ -320,6 +335,7 @@ class GameService {
     int minCommon = 8,
   }) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/debug/matchable-users')
           .replace(queryParameters: {
         'days': days.toString(),
@@ -329,7 +345,7 @@ class GameService {
       final response = await http.get(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);
@@ -348,6 +364,7 @@ class GameService {
   /// Debug: Kendi izlediğim haberler
   Future<Map<String, dynamic>> getMyViews({int days = 6}) async {
     try {
+      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/debug/my-views')
           .replace(queryParameters: {
         'days': days.toString(),
@@ -356,7 +373,7 @@ class GameService {
       final response = await http.get(
         uri,
         headers: {
-          'X-User-ID': _userIdHeader,
+          'X-User-ID': userId, // 🔥 UPDATED
           'Content-Type': 'application/json',
         },
       ).timeout(_timeoutDuration);

@@ -63,15 +63,27 @@ class ApiService {
   static const Duration _timeoutDuration = Duration(seconds: 30);
   static const int _maxRetries = 3;
 
-  Future<Map<String, String>> _getHeaders() async {
+Future<Map<String, String>> _getHeaders() async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
-      'X-User-ID': 'demo_user_123',
     };
 
+    // 1. Token'ı al (authentication için)
     final token = await _authService.getToken();
     if (token != null && !token.isExpired) {
       headers['Authorization'] = 'Bearer ${token.accessToken}';
+    }
+
+    // 2. 🔥 UPDATED: Gerçek User ID'yi al
+    final user = await _authService.getUser();
+    if (user != null) {
+      // Kullanıcı giriş yapmışsa gerçek ID'sini kullan
+      headers['X-User-ID'] = user.id;
+      debugPrint('✅ Using real user ID: ${user.id}');
+    } else {
+      // Kullanıcı giriş yapmamışsa guest kullan
+      headers['X-User-ID'] = 'anonymous_user';
+      debugPrint('⚠️ No user logged in, using: anonymous_user');
     }
 
     return headers;

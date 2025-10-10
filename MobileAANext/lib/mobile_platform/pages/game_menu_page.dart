@@ -17,8 +17,8 @@ class _GameMenuPageState extends State<GameMenuPage> {
   @override
   void initState() {
     super.initState();
-    // TODO: Gerçek kullanıcı ID'si Auth Provider'dan alınmalı.
-    _gameService.setUserId("test_user_1"); 
+    // 🔥 UPDATED: setUserId() çağrısı KALDIRILDI
+    // GameService artık otomatik olarak AuthService'den user ID alıyor
     _eligibilityFuture = _gameService.checkEligibility();
   }
 
@@ -72,15 +72,12 @@ class _GameMenuPageState extends State<GameMenuPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            // ✅ HATA DÜZELTİLDİ: eligibility.isEligible -> eligibility.eligible
             eligibility.eligible ? Icons.gamepad_outlined : Icons.info_outline,
             size: 100,
-            // ✅ HATA DÜZELTİLDİ: eligibility.isEligible -> eligibility.eligible
             color: eligibility.eligible ? Colors.green : Colors.amber,
           ),
           const SizedBox(height: 24),
           Text(
-            // ✅ HATA DÜZELTİLDİ: eligibility.isEligible -> eligibility.eligible
             eligibility.eligible ? 'Oyuna Hazırsın!' : 'Henüz Hazır Değilsin',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
@@ -91,7 +88,6 @@ class _GameMenuPageState extends State<GameMenuPage> {
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 40),
-          // ✅ HATA DÜZELTİLDİ: eligibility.isEligible -> eligibility.eligible
           if (eligibility.eligible)
             ElevatedButton.icon(
               icon: const Icon(Icons.search),
