@@ -619,7 +619,8 @@ async def join_matchmaking_queue(
         
         if opponent_id:
             # ✅ Eşleşme bulundu! Oyun oluştur
-            # matchmaking_queue.remove_from_queue(opponent_id)
+            matchmaking_queue.remove_from_queue(opponent_id)
+            matchmaking_queue.remove_from_queue(user_id)  # Kendini de çıkar
             
             game_session = await game_service.create_game_session(
                 player1_id=user_id,
@@ -665,17 +666,35 @@ async def get_matchmaking_status(
     """
     Matchmaking durumunu kontrol et (polling için)
     
-    Mobile her 2 saniyede bir bu endpoint'i çağırır
+    Mobile her 3 saniyede bir bu endpoint'i çağırır
     """
     try:
         # Temizlik yap (expired entries)
         matchmaking_queue.cleanup_expired()
         
+        # 🔥 FIX 1: Önce aktif oyunları kontrol et!
+        # Kullanıcının şu an aktif bir oyunu var mı?
+        for game_id, session in game_service.active_games.items():
+            if user_id in [session.player1_id, session.player2_id]:
+                # ✅ Aktif oyunda! Eşleşmiş demektir
+                opponent_id = session.player2_id if user_id == session.player1_id else session.player1_id
+                
+                print(f"🎯 User {user_id[:8]} found in active game: {game_id}")
+                
+                return MatchmakingStatusResponse(
+                    success=True,
+                    in_queue=False,
+                    matched=True,
+                    game_id=game_id,
+                    opponent_id=opponent_id,
+                    message="Rakip bulundu!"
+                )
+        
         # Kullanıcı kuyrukta mı?
         queue_info = matchmaking_queue.get_queue_info(user_id)
         
         if not queue_info:
-            # Kuyrukta değil
+            # Kuyrukta değil VE aktif oyunu da yok
             return MatchmakingStatusResponse(
                 success=True,
                 in_queue=False,
@@ -683,7 +702,7 @@ async def get_matchmaking_status(
                 message="Kuyrukta değilsiniz."
             )
         
-        # Kuyruktaki kullanıcı için eşleşme ara
+        # 🔥 FIX 2: Kuyrukta iken eşleşme ara
         user_views = user_viewed_news_storage.get_user_views(user_id, days=6)
         matchable_users = user_viewed_news_storage.find_matchable_users(
             current_user_id=user_id,
@@ -696,6 +715,10 @@ async def get_matchmaking_status(
         if opponent_id:
             # 🎯 EŞLEŞME BULUNDU!
             try:
+                # Kuyruktan çıkar
+                matchmaking_queue.remove_from_queue(opponent_id)
+                matchmaking_queue.remove_from_queue(user_id)
+                
                 game_session = await game_service.create_game_session(
                     player1_id=user_id,
                     player2_id=opponent_id,

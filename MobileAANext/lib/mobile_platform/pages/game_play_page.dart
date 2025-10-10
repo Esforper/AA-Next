@@ -194,7 +194,7 @@ void _handleWebSocketMessage(GameWebSocketMessage message) {
     case GameWebSocketEventType.newQuestion:
       // Yeni soru geldi
       final roundNumber = message.data['round_number'] as int?;
-      if (roundNumber != null && roundNumber > _currentRound) {
+      if (roundNumber != null && roundNumber >= _currentRound) {
         _loadQuestion(roundNumber);
       }
       break;
@@ -280,15 +280,15 @@ Future<void> _submitAnswer({int? selectedIndex, bool isPass = false}) async {
     
     if (!mounted) return;
     
-    // 🆕 WebSocket varsa, backend otomatik broadcast yapacak
-    // Polling varsa manuel güncelle
+    // 🔥 FIX: WebSocket varsa bekle, yoksa manuel yükle
     if (!_wsService.isConnected) {
+      debugPrint('📡 Polling mode: manually loading next question');
+      
       // Yanıt mesajını chat'e ekle (sadece polling modunda)
       _addChatBubble(
         isFromMe: false,
         text: response.responseMessage,
         isCorrect: response.isCorrect,
-        emojiComment: response.emojiComment,
       );
       
       if (response.emojiComment != null && response.emojiComment!.isNotEmpty) {
@@ -331,15 +331,26 @@ Future<void> _submitAnswer({int? selectedIndex, bool isPass = false}) async {
             createdAt: _session!.createdAt,
           );
         }
+        _waitingForResponse = false;  // ✅ Burada sıfırla
       });
       
       // Sonraki soruya geç
       await Future.delayed(const Duration(milliseconds: 1500));
       if (!mounted) return;
-      await _loadQuestion(_currentRound + 1);
+      
+      final nextRound = _currentRound;  // ✅ currentRound zaten +1 oldu
+      if (nextRound < _session!.totalRounds) {
+        await _loadQuestion(nextRound);
+      } else {
+        _navigateToResult();
+      }
+      
     } else {
-      // WebSocket modunda, backend broadcast yapacak
-      // Sadece bekleme durumunu sıfırla
+      // WebSocket modunda, backend otomatik broadcast yapacak
+      debugPrint('🔌 WebSocket mode: waiting for backend broadcast');
+      
+      // Cevap sonucunu bekle (backend'den gelecek)
+      // newQuestion eventi gelince otomatik yüklenecek
       setState(() {
         _waitingForResponse = false;
       });
@@ -595,78 +606,134 @@ Future<void> _submitAnswer({int? selectedIndex, bool isPass = false}) async {
   }
 
   bool _shouldShowOptions() {
-    if (_currentQuestion == null || _waitingForResponse) return false;
-    
-    // Sıra bende mi?
-    final isMyTurn = _currentQuestion!.askerId != _myUserId;
-    
-    return isMyTurn;
+    if (_currentQuestion == null) {
+    debugPrint('❌ No options: _currentQuestion is null');
+    return false;
   }
+  
+  if (_waitingForResponse) {
+    debugPrint('❌ No options: waiting for response');
+    return false;
+  }
+  
+  if (_session == null) {
+    debugPrint('❌ No options: _session is null');
+    return false;
+  }
+  
+  if (_myUserId == null) {
+    debugPrint('❌ No options: _myUserId is null');
+    return false;
+  }
+  
+  // Round bazlı sıra kontrolü
+  final isPlayer1 = _myUserId == _session!.player1Id;
+  
+  // Çift round (0,2,4,6) -> Player1 sorar, Player2 cevaplar
+  // Tek round (1,3,5,7) -> Player2 sorar, Player1 cevaplar
+  final shouldAnswer = (_currentRound % 2 == 0) ? !isPlayer1 : isPlayer1;
+  
+  debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━');
+  debugPrint('🎯 OPTIONS CHECK:');
+  debugPrint('   Current Round: $_currentRound');
+  debugPrint('   My User ID: $_myUserId');
+  debugPrint('   Player1 ID: ${_session!.player1Id}');
+  debugPrint('   Player2 ID: ${_session!.player2Id}');
+  debugPrint('   Am I Player1?: $isPlayer1');
+  debugPrint('   Should Answer?: $shouldAnswer');
+  debugPrint('   Question exists: ${_currentQuestion != null}');
+  debugPrint('   Waiting: $_waitingForResponse');
+  debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━');
+  
+  return shouldAnswer;
+}
 
   Widget _buildOptionsArea() {
+  // 🔥 DEBUG: Seçenekleri kontrol et
+  debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━');
+  debugPrint('📋 OPTIONS AREA:');
+  debugPrint('   Question: ${_currentQuestion?.questionText}');
+  debugPrint('   Options count: ${_currentQuestion?.options.length}');
+  debugPrint('   Options: ${_currentQuestion?.options}');
+  debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━');
+  
+  // Seçenekler boşsa hata göster
+  if (_currentQuestion == null || _currentQuestion!.options.isEmpty) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Cevabını seç:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          
-          // Seçenekler
-          ..._currentQuestion!.options.asMap().entries.map((entry) {
-            final index = entry.key;
-            final option = entry.value;
-            
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ElevatedButton(
-                onPressed: () => _submitAnswer(selectedIndex: index),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF075E54),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  option,
-                  style: const TextStyle(fontSize: 15),
-                  textAlign: TextAlign.left,
-                ),
-              ),
-            );
-          }).toList(),
-          
-          // Pas geç butonu
-          TextButton.icon(
-            onPressed: () => _submitAnswer(isPass: true),
-            icon: const Icon(Icons.skip_next),
-            label: const Text('Pas Geç'),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[700],
-            ),
-          ),
-        ],
+      color: Colors.red[100],
+      child: const Text(
+        '❌ Seçenekler yüklenemedi!',
+        style: TextStyle(color: Colors.red),
+        textAlign: TextAlign.center,
       ),
     );
   }
+  
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 8,
+          offset: const Offset(0, -2),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Cevabını seç:',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        
+        // Seçenekler
+        ..._currentQuestion!.options.asMap().entries.map((entry) {
+          final index = entry.key;
+          final option = entry.value;
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: ElevatedButton(
+              onPressed: () => _submitAnswer(selectedIndex: index),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF075E54),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                option,
+                style: const TextStyle(fontSize: 15),
+                textAlign: TextAlign.left,
+              ),
+            ),
+          );
+        }).toList(),
+        
+        // Pas geç butonu
+        TextButton.icon(
+          onPressed: () => _submitAnswer(isPass: true),
+          icon: const Icon(Icons.skip_next),
+          label: const Text('Pas Geç'),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.grey[700],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 
   Widget _buildWaitingIndicator() {
     return Container(

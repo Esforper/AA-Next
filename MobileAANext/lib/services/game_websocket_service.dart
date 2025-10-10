@@ -132,20 +132,28 @@ class GameWebSocketService {
     }
   }
 
-  /// Mesaj geldiğinde
-  void _onMessage(dynamic message) {
-    try {
-      final data = jsonDecode(message as String) as Map<String, dynamic>;
-      final wsMessage = GameWebSocketMessage.fromJson(data);
-
-      debugPrint('📨 WebSocket message: ${wsMessage.type}');
-
-      // Stream'e ekle
-      _messageController?.add(wsMessage);
-    } catch (e) {
-      debugPrint('❌ WebSocket message parse error: $e');
+/// Mesaj geldiğinde
+void _onMessage(dynamic message) {
+  try {
+    final messageStr = message as String;
+    
+    // 🔥 FIX: "pong" mesajını atla
+    if (messageStr == "pong") {
+      debugPrint('💓 Pong received');
+      return;
     }
+    
+    final data = jsonDecode(messageStr) as Map<String, dynamic>;
+    final wsMessage = GameWebSocketMessage.fromJson(data);
+
+    debugPrint('📨 WebSocket message: ${wsMessage.type}');
+
+    // Stream'e ekle
+    _messageController?.add(wsMessage);
+  } catch (e) {
+    debugPrint('❌ WebSocket message parse error: $e');
   }
+}
 
   /// Hata olduğunda
   void _onError(dynamic error) {
