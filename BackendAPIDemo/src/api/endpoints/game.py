@@ -7,10 +7,11 @@ from fastapi import APIRouter, Header, HTTPException, WebSocket, WebSocketDiscon
 from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
-
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from ...models.user_viewed_news import user_viewed_news_storage
 from ...services.reels_analytics import reels_analytics
 from ...services.game_service import game_service
+from ..utils.auth_utils import get_current_user_id
 
 router = APIRouter(prefix="/api/game", tags=["game"])
 
@@ -106,7 +107,7 @@ class GameResultResponse(BaseModel):
 @router.post("/matchmaking/start", response_model=MatchmakingResponse)
 async def start_matchmaking(
     request: MatchmakingRequest,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Eşleşme aramaya başla ve HEMEN oyun oluştur
@@ -185,7 +186,7 @@ async def start_matchmaking(
 @router.get("/session/{game_id}", response_model=GameStatusResponse)
 async def get_game_status(
     game_id: str,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Oyun durumunu getir
@@ -222,7 +223,7 @@ async def get_game_status(
 @router.post("/session/{game_id}/start")
 async def start_game_session(
     game_id: str,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Oyunu başlat (her iki oyuncu hazır olunca)
@@ -259,7 +260,7 @@ async def start_game_session(
 async def get_question(
     game_id: str,
     round_number: int,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Belirli bir round'un sorusunu getir
@@ -313,7 +314,7 @@ async def answer_question(
     game_id: str,
     round_number: int,
     request: AnswerQuestionRequest,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Soruya cevap ver
@@ -383,7 +384,7 @@ async def answer_question(
 @router.get("/session/{game_id}/result")
 async def get_game_result(
     game_id: str,
-    user_id: str = Header(..., alias="X-User-ID")
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Oyun sonucunu getir
@@ -445,7 +446,7 @@ async def get_game_result(
 
 @router.get("/check-eligibility")
 async def check_game_eligibility(
-    user_id: str = Header(..., alias="X-User-ID"),
+    user_id: str = Depends(get_current_user_id),
     days: int = 6,
     min_reels: int = 8
 ):

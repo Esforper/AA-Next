@@ -35,44 +35,40 @@ class GameService {
   }
 
   // ============ MATCHMAKING ============
-
-  /// Oyun uygunluğunu kontrol et
+/// Oyun uygunluğunu kontrol et
 Future<GameEligibility> checkEligibility({
-    int days = 6,
-    int minReels = 8,
-  }) async {
-    try {
-      final userId = await _getUserId(); // 🔥 UPDATED
-      
-      final uri = Uri.parse('$_baseUrl/api/game/check-eligibility')
-          .replace(queryParameters: {
-        'days': days.toString(),
-        'min_reels': minReels.toString(),
-      });
+  int days = 6,
+  int minReels = 8,
+}) async {
+  try {
+    final token = await _authService.getToken(); // 🔥 Token al
+    
+    final uri = Uri.parse('$_baseUrl/api/game/check-eligibility')
+        .replace(queryParameters: {
+      'days': days.toString(),
+      'min_reels': minReels.toString(),
+    });
 
-      debugPrint('🔗 GET $uri');
+    debugPrint('🔗 GET $uri');
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
-      ).timeout(_timeoutDuration);
+    final response = await http.get(
+      uri,
+headers: await _getHeaders(),
+    ).timeout(_timeoutDuration);
 
-      debugPrint('📡 Eligibility Response: ${response.statusCode}');
+    debugPrint('📡 Eligibility Response: ${response.statusCode}');
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return GameEligibility.fromJson(data);
-      } else {
-        throw Exception('Failed to check eligibility');
-      }
-    } catch (e) {
-      debugPrint('❌ Check eligibility error: $e');
-      rethrow;
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return GameEligibility.fromJson(data);
+    } else {
+      throw Exception('Failed to check eligibility');
     }
+  } catch (e) {
+    debugPrint('❌ Check eligibility error: $e');
+    rethrow;
   }
+}
 
   /// Matchmaking başlat - Rakip ara
   Future<MatchmakingResponse> startMatchmaking({
@@ -88,10 +84,7 @@ Future<GameEligibility> checkEligibility({
 
       final response = await http.post(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
         body: jsonEncode({
           'days': days,
           'min_common_reels': minCommonReels,
@@ -123,10 +116,7 @@ Future<GameEligibility> checkEligibility({
 
       await http.post(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       debugPrint('✅ Matchmaking cancelled');
@@ -147,10 +137,7 @@ Future<GameEligibility> checkEligibility({
 
       final response = await http.get(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       debugPrint('📡 Game Status Response: ${response.statusCode}');
@@ -179,10 +166,7 @@ Future<GameEligibility> checkEligibility({
 
       final response = await http.post(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       debugPrint('📡 Start Game Response: ${response.statusCode}');
@@ -211,10 +195,7 @@ Future<GameEligibility> checkEligibility({
 
       final response = await http.get(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       debugPrint('📡 Question Response: ${response.statusCode}');
@@ -250,10 +231,7 @@ Future<GameEligibility> checkEligibility({
 
       final response = await http.post(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
         body: jsonEncode({
           'selected_index': selectedIndex,
           'is_pass': isPass,
@@ -285,10 +263,7 @@ Future<GameEligibility> checkEligibility({
 
       final response = await http.get(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       debugPrint('📡 Game Result Response: ${response.statusCode}');
@@ -315,10 +290,7 @@ Future<GameEligibility> checkEligibility({
 
       await http.post(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+        headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       debugPrint('✅ Left game');
@@ -344,10 +316,7 @@ Future<GameEligibility> checkEligibility({
 
       final response = await http.get(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       if (response.statusCode == 200) {
@@ -372,10 +341,7 @@ Future<GameEligibility> checkEligibility({
 
       final response = await http.get(
         uri,
-        headers: {
-          'X-User-ID': userId, // 🔥 UPDATED
-          'Content-Type': 'application/json',
-        },
+headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       if (response.statusCode == 200) {
@@ -388,4 +354,23 @@ Future<GameEligibility> checkEligibility({
       return {'success': false, 'total_views': 0, 'views': []};
     }
   }
+
+
+
+  /// Header'ları oluştur (Authorization + Content-Type)
+Future<Map<String, String>> _getHeaders() async {
+  final headers = <String, String>{
+    'Content-Type': 'application/json',
+  };
+
+  // Token'ı al ve Authorization header'ına ekle
+  final token = await _authService.getToken();
+  if (token != null && !token.isExpired) {
+    headers['Authorization'] = 'Bearer ${token.accessToken}';
+  }
+
+  return headers;
 }
+}
+
+
