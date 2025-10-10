@@ -1,10 +1,8 @@
-# ================================
-# src/api/__init__.py - API Setup
-# ================================
+# backend/src/api/__init__.py
 
 """
 FastAPI app factory ve router management
-Basit ve genişletilebilir yapı
+Modüler ve genişletilebilir yapı
 """
 
 from fastapi import FastAPI, Request
@@ -16,6 +14,7 @@ import time
 
 from ..config import settings
 
+
 def create_app() -> FastAPI:
     """
     FastAPI app oluştur ve yapılandır
@@ -24,8 +23,8 @@ def create_app() -> FastAPI:
     
     app = FastAPI(
         title="AA Universal API",
-        description="News, TTS ve daha fazlası için universal API",
-        version="1.0.0",
+        description="News, TTS, Reels ve daha fazlası için universal API",
+        version="2.0.0",
         docs_url="/docs",
         redoc_url="/redoc"
     )
@@ -36,7 +35,7 @@ def create_app() -> FastAPI:
     # Static file serving
     _setup_static_files(app)
     
-    # Core endpoints (her zaman dahil)
+    # Core endpoints
     _register_core_routes(app)
     
     # Router'ları dahil et
@@ -47,10 +46,11 @@ def create_app() -> FastAPI:
     
     return app
 
+
 def _setup_middleware(app: FastAPI):
     """Middleware'leri yapılandır"""
     
-    # CORS - development için açık, production'da kısıtla
+    # CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.debug else ["http://localhost:3000"],
@@ -66,53 +66,46 @@ def _setup_middleware(app: FastAPI):
         response = await call_next(request)
         process_time = time.time() - start_time
         
-        # Sadece debug modunda log
         if settings.debug:
             print(f"🌐 {request.method} {request.url.path} - {response.status_code} - {process_time:.3f}s")
         
         return response
 
+
 def _setup_static_files(app: FastAPI):
     """Static file serving setup"""
     
-    # ✅ Audio dosyaları için path
+    # Audio dosyaları için path
     audio_path = Path(settings.storage_base_path) / "reels_data" / "audio"
     audio_path.mkdir(parents=True, exist_ok=True)
     
     print(f"📁 Audio files serving from: {audio_path.absolute()}")
-    print(f"   Exists: {audio_path.exists()}")
     
-    # ✅ Dosya sayısını kontrol et
-    if audio_path.exists():
-        mp3_files = list(audio_path.glob("*.mp3"))
-        print(f"   MP3 files found: {len(mp3_files)}")
-        if mp3_files:
-            print(f"   First file: {mp3_files[0].name}")
-    
-    # ✅ Static mount
+    # Static mount
     try:
         app.mount("/audio", StaticFiles(directory=str(audio_path)), name="audio")
         print("✅ Audio static files mounted successfully!")
     except Exception as e:
         print(f"❌ Failed to mount audio files: {e}")
-        
-        
+
 
 def _register_core_routes(app: FastAPI):
-    """Core system routes (health, info vb.)"""
+    """Core system routes"""
     
     @app.get("/")
     async def root():
         """API ana bilgileri"""
         return {
             "success": True,
-            "message": "AA Universal API",
-            "version": "1.0.0",
+            "message": "AA Universal API v2.0",
+            "version": "2.0.0",
             "endpoints": {
                 "docs": "/docs",
                 "health": "/health",
+                "auth": "/api/auth/",
                 "news": "/api/news/",
                 "tts": "/api/tts/",
+                "reels": "/api/reels/",
                 "audio": "/audio/",
                 "system": "/api/system/"
             }
@@ -126,27 +119,20 @@ def _register_core_routes(app: FastAPI):
             "status": "healthy",
             "timestamp": time.time(),
             "services": {
+                "auth": True,
                 "news": True,
                 "tts": True,
-                "storage": True,
-                "websocket": settings.websocket_enabled
+                "reels": True,
+                "storage": True
             }
         }
-# src/api/__init__.py dosyasının _register_routers fonksiyonunu güncelle
+
 
 def _register_routers(app: FastAPI):
     """
     Router'ları dahil et
-    Yeni sistem eklemek için buraya yeni import ekle
+    Modüler reels yapısı ile
     """
-    
-    # 🆕 OYUN ROUTER'I EKLE (EN ÜSTTE)
-    try:
-        from .endpoints.game import router as game_router
-        app.include_router(game_router)
-        print("✅ Game router registered")
-    except ImportError as e:
-        print(f"⚠️  Game router import failed: {e}")
     
     # Auth router
     try:
@@ -154,82 +140,84 @@ def _register_routers(app: FastAPI):
         app.include_router(auth_router)
         print("✅ Auth router registered")
     except ImportError as e:
-        print(f"⚠️  Auth router import failed: {e}")
+        print(f"⚠️ Auth router import failed: {e}")
     
-    # Reels router (asıl sistem)
-    try:
-        from .endpoints.reels import router as reels_router
-        app.include_router(reels_router)
-        print("✅ Reels router registered")
-    except ImportError as e:
-        print(f"⚠️  Reels router import failed: {e}")
-    
-    # Reels mockup (test için)
-    try:
-        from .endpoints.reels_mockup import router as reels_mockup_router
-        app.include_router(reels_mockup_router)
-        print("✅ Reels Mockup router registered")
-    except ImportError as e:
-        print(f"⚠️  Reels Mockup router import failed: {e}")
-    
-    # Core routers - her zaman dahil
+    # News router
     try:
         from .endpoints.news import router as news_router
         app.include_router(news_router)
         print("✅ News router registered")
     except ImportError as e:
-        print(f"⚠️  News router import failed: {e}")
+        print(f"⚠️ News router import failed: {e}")
     
+    # TTS router
     try:
         from .endpoints.tts import router as tts_router
         app.include_router(tts_router)
         print("✅ TTS router registered")
     except ImportError as e:
-        print(f"⚠️  TTS router import failed: {e}")
+        print(f"⚠️ TTS router import failed: {e}")
     
+    # System router
     try:
         from .endpoints.system import router as system_router
         app.include_router(system_router)
         print("✅ System router registered")
     except ImportError as e:
-        print(f"⚠️  System router import failed: {e}")
+        print(f"⚠️ System router import failed: {e}")
     
-    # Optional routers - config'e göre dahil et
-    if settings.websocket_enabled:
-        try:
-            from .endpoints.websocket import router as websocket_router
-            app.include_router(websocket_router)
-            print("✅ WebSocket router registered")
-        except ImportError:
-            print("⚠️  WebSocket router not available")
+    # ============ REELS MODÜLER ROUTERS ============
+    
+    # Reels Tracking
+    try:
+        from .endpoints.reels_tracking import router as reels_tracking_router
+        app.include_router(reels_tracking_router)
+        print("✅ Reels Tracking router registered")
+    except ImportError as e:
+        print(f"⚠️ Reels Tracking router import failed: {e}")
+    
+    # Reels Feed
+    try:
+        from .endpoints.reels_feed import router as reels_feed_router
+        app.include_router(reels_feed_router)
+        print("✅ Reels Feed router registered")
+    except ImportError as e:
+        print(f"⚠️ Reels Feed router import failed: {e}")
+    
+    # Reels User
+    try:
+        from .endpoints.reels_user import router as reels_user_router
+        app.include_router(reels_user_router)
+        print("✅ Reels User router registered")
+    except ImportError as e:
+        print(f"⚠️ Reels User router import failed: {e}")
+    
+    # Reels Analytics
+    try:
+        from .endpoints.reels_analytics import router as reels_analytics_router
+        app.include_router(reels_analytics_router)
+        print("✅ Reels Analytics router registered")
+    except ImportError as e:
+        print(f"⚠️ Reels Analytics router import failed: {e}")
+    
+    # Reels Management
+    try:
+        from .endpoints.reels_management import router as reels_management_router
+        app.include_router(reels_management_router)
+        print("✅ Reels Management router registered")
+    except ImportError as e:
+        print(f"⚠️ Reels Management router import failed: {e}")
+    
+    # ============ OPTIONAL ROUTERS ============
+    
+    # Game router
+    try:
+        from .endpoints.game import router as game_router
+        app.include_router(game_router)
+        print("✅ Game router registered")
+    except ImportError as e:
+        print(f"⚠️ Game router import failed: {e}")
 
-    
-    
-    # Optional routers - config'e göre dahil et
-    if settings.websocket_enabled:
-        try:
-            from .endpoints.websocket import router as websocket_router
-            app.include_router(websocket_router)
-            print("✅ WebSocket router registered")
-        except ImportError:
-            print("⚠️  WebSocket router not available")
-    
-    # Gelecekte eklenecek sistemler için:
-    # if settings.game_enabled:
-    #     try:
-    #         from .endpoints.game import router as game_router
-    #         app.include_router(game_router)
-    #         print("✅ Game router registered")
-    #     except ImportError:
-    #         print("⚠️  Game router not available")
-    #
-    # if settings.ai_chat_enabled:
-    #     try:
-    #         from .endpoints.chat import router as chat_router
-    #         app.include_router(chat_router)
-    #         print("✅ Chat router registered")
-    #     except ImportError:
-    #         print("⚠️  Chat router not available")
 
 def _setup_error_handlers(app: FastAPI):
     """Global error handler'ları setup et"""
@@ -262,15 +250,18 @@ def _setup_error_handlers(app: FastAPI):
                 "message": "Endpoint not found",
                 "path": str(request.url.path),
                 "available_endpoints": [
-                    "/docs", "/health", "/api/news/", "/api/tts/", "/api/system/"
+                    "/docs", "/health", "/api/auth/", "/api/news/", 
+                    "/api/tts/", "/api/reels/", "/api/system/"
                 ]
             }
         )
+
 
 # Convenience functions
 def get_app() -> FastAPI:
     """App instance'ını al (testing için)"""
     return create_app()
+
 
 # Export
 __all__ = ["create_app", "get_app"]
