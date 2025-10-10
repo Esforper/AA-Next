@@ -130,15 +130,17 @@ headers: await _getHeaders(),
   }
 
 
-  /// Matchmaking iptal et
+   /// Matchmaking iptal et (GÜNCELLEME - zaten vardı ama endpoint değişti)
+  @override
   Future<void> cancelMatchmaking() async {
     try {
-      final userId = await _getUserId(); // 🔥 UPDATED
       final uri = Uri.parse('$_baseUrl/api/game/matchmaking/cancel');
+
+      debugPrint('🔗 POST $uri');
 
       await http.post(
         uri,
-headers: await _getHeaders(),
+        headers: await _getHeaders(),
       ).timeout(_timeoutDuration);
 
       debugPrint('✅ Matchmaking cancelled');
@@ -393,6 +395,73 @@ Future<Map<String, String>> _getHeaders() async {
 
   return headers;
 }
+
+  Future<MatchmakingResponse> joinMatchmakingQueue({
+    int days = 6,
+    int minCommonReels = 8,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/game/matchmaking/join');
+
+      debugPrint('🔗 POST $uri');
+      debugPrint('📤 Body: days=$days, min_common_reels=$minCommonReels');
+
+      final response = await http.post(
+        uri,
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'days': days,
+          'min_common_reels': minCommonReels,
+        }),
+      ).timeout(_timeoutDuration);
+
+      debugPrint('📡 Join Queue Response: ${response.statusCode}');
+      debugPrint('📥 Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return MatchmakingResponse.fromJson(data);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Queue join failed');
+      }
+    } catch (e) {
+      debugPrint('❌ Join queue error: $e');
+      rethrow;
+    }
+  }
+
+  /// Matchmaking durumunu kontrol et (polling için)
+  Future<Map<String, dynamic>> checkMatchmakingStatus() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/game/matchmaking/status');
+
+      debugPrint('🔗 GET $uri');
+
+      final response = await http.get(
+        uri,
+        headers: await _getHeaders(),
+      ).timeout(_timeoutDuration);
+
+      debugPrint('📡 Status Response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        throw Exception('Failed to check status');
+      }
+    } catch (e) {
+      debugPrint('❌ Check status error: $e');
+      rethrow;
+    }
+  }
+
+
+
+
+
+
 }
 
 

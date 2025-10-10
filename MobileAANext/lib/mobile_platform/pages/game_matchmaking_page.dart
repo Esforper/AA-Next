@@ -16,6 +16,9 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
   late AnimationController _controller;
   String _statusText = "Rakip aranıyor...";
   Timer? _statusTimer;
+  Timer? _pollingTimer;  // 🔥 YENİ: Polling timer
+  int _elapsedSeconds = 0;  // 🔥 YENİ: Geçen süre
+  bool _isSearching = true;  // 🔥 YENİ: Arama durumu
 
   @override
   void initState() {
@@ -26,9 +29,132 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     )..repeat();
 
     _startStatusUpdates();
-    _findMatch();
+    _startMatchmaking();
   }
   
+  // 🔥 YENİ FONKSİYON: Matchmaking'i başlat
+  Future<void> _startMatchmaking() async {
+    try {
+      print('🎮 Starting matchmaking...');
+      
+      // 1. Queue'ya katıl
+      final response = await _gameService.joinMatchmakingQueue();
+      
+      if (!mounted) return;
+      
+      print('📡 Queue response: matched=${response.matched}, success=${response.success}');
+      
+      if (response.matched) {
+        // ✅ Hemen eşleşme bulundu!
+        print('✅ Immediate match found!');
+        _navigateToGame(response.gameId!);
+      } else if (response.success) {
+        // ⏳ Queue'ya eklendi, polling başlat
+        print('⏳ Added to queue, starting polling...');
+        _startPolling();
+      } else {
+        // ❌ Hata
+        print('❌ Error: ${response.message}');
+        _showError(response.message);
+      }
+    } catch (e) {
+      print('❌ Matchmaking start error: $e');
+      if (mounted) {
+        _showError('Eşleşme başlatılamadı: $e');
+      }
+    }
+  }
+
+    // 🔥 YENİ FONKSİYON: Polling başlat (her 3 saniyede kontrol)
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (!mounted || !_isSearching) {
+        timer.cancel();
+        return;
+      }
+      
+      _elapsedSeconds += 3;
+      print('⏱️ Polling... elapsed: $_elapsedSeconds seconds');
+      
+      // 60 saniye timeout
+      if (_elapsedSeconds >= 60) {
+        timer.cancel();
+        print('⏱️ Timeout reached!');
+        if (mounted) {
+          await _gameService.cancelMatchmaking();
+          _showError('Rakip bulunamadı. Lütfen daha fazla haber izleyin.');
+        }
+        return;
+      }
+      
+      try {
+        // Backend'den durum kontrol et
+        final status = await _gameService.checkMatchmakingStatus();
+        
+        if (!mounted) return;
+        
+        print('📊 Status check: matched=${status['matched']}, in_queue=${status['in_queue']}');
+        
+        if (status['matched'] == true) {
+          // ✅ Eşleşme bulundu!
+          timer.cancel();
+          print('🎉 Match found! Game ID: ${status['game_id']}');
+          _navigateToGame(status['game_id']);
+        }
+        // Eşleşme yoksa devam et (polling devam eder)
+        
+      } catch (e) {
+        print('❌ Polling error: $e');
+        // Hata olsa da polling devam eder
+      }
+    });
+  }
+
+  // 🔥 YENİ FONKSİYON: Oyun ekranına git
+  void _navigateToGame(String gameId) {
+    if (!mounted) return;
+    _isSearching = false;
+    _pollingTimer?.cancel();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GamePlayPage(gameId: gameId),
+      ),
+    );
+  }
+
+
+  // 🔥 YENİ FONKSİYON: Hata göster ve geri dön
+  void _showError(String message) {
+    if (!mounted) return;
+    _isSearching = false;
+    _pollingTimer?.cancel();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+    Navigator.pop(context);
+  }
+
+  // 🔥 GÜNCELLENEN FONKSİYON: Aramayı iptal et
+  Future<void> _cancelSearch() async {
+    print('🛑 Cancelling search...');
+    _isSearching = false;
+    _pollingTimer?.cancel();
+    
+    try {
+      await _gameService.cancelMatchmaking();
+    } catch (e) {
+      print('❌ Cancel error: $e');
+    }
+    
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+
+
+
   void _startStatusUpdates() {
     const statuses = [
       "Rakip aranıyor...",
@@ -77,27 +203,21 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     }
   }
 
-  Future<void> _cancelSearch() async {
-    // TODO: game_service'e cancelMatchmaking API çağrısı eklenecek
-    // await _gameService.cancelMatchmaking(); 
-    if (mounted) {
-      Navigator.pop(context);
-    }
-  }
   
   @override
   void dispose() {
     _controller.dispose();
     _statusTimer?.cancel();
+    _pollingTimer?.cancel();
+    _isSearching = false;
     super.dispose();
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: WillPopScope(
         onWillPop: () async {
-          // Geri tuşuna basıldığında aramayı iptal et
           await _cancelSearch();
           return true;
         },
@@ -117,10 +237,11 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
               Text(
                 _statusText,
                 style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               const Text(
-                'Bu işlem birkaç saniye sürebilir.',
+                'Bu işlem 60 saniye sürebilir.',
                 style: TextStyle(color: Colors.grey),
               ),
               const SizedBox(height: 60),

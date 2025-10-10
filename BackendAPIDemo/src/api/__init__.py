@@ -4,6 +4,8 @@
 FastAPI app factory ve router management
 Modüler ve genişletilebilir yapı
 """
+from contextlib import asynccontextmanager
+import asyncio
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +16,29 @@ import time
 
 from ..config import settings
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler (startup & shutdown)
+    FastAPI modern approach
+    """
+    # STARTUP
+    print("🚀 Application starting up...")
+    
+    # Matchmaking queue cleanup task'ını başlat
+    from ..services.matchmaking_queue import cleanup_task
+    cleanup_task_instance = asyncio.create_task(cleanup_task())
+    print("✅ Matchmaking cleanup task started")
+    
+    yield  # Uygulama çalışıyor
+    
+    # SHUTDOWN
+    print("👋 Application shutting down...")
+    cleanup_task_instance.cancel()
+    try:
+        await cleanup_task_instance
+    except asyncio.CancelledError:
+        pass
 
 def create_app() -> FastAPI:
     """
@@ -26,7 +51,8 @@ def create_app() -> FastAPI:
         description="News, TTS, Reels ve daha fazlası için universal API",
         version="2.0.0",
         docs_url="/docs",
-        redoc_url="/redoc"
+        redoc_url="/redoc",
+        lifespan=lifespan
     )
     
     # Middleware'leri ekle
@@ -70,6 +96,7 @@ def _setup_middleware(app: FastAPI):
             print(f"🌐 {request.method} {request.url.path} - {response.status_code} - {process_time:.3f}s")
         
         return response
+
 
 
 def _setup_static_files(app: FastAPI):

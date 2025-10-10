@@ -12,7 +12,7 @@ from ...models.user_viewed_news import user_viewed_news_storage
 from ...services.reels_analytics import reels_analytics
 from ...services.game_service import game_service
 from ..utils.auth_utils import get_current_user_id
-
+from ...services.matchmaking_queue import matchmaking_queue
 router = APIRouter(prefix="/api/game", tags=["game"])
 
 
@@ -512,3 +512,164 @@ async def debug_active_games():
             "success": False,
             "error": str(e)
         }
+        
+        
+# ============ YENİ ENDPOINT: QUEUE'YA KATIL ============
+@router.post("/matchmaking/join", response_model=MatchmakingResponse)
+async def join_matchmaking_queue(
+    request: MatchmakingRequest,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Matchmaking queue'ya katıl ve BEKLE
+    Eşleşme varsa hemen döner, yoksa queue'ya ekler
+    """
+    try:
+        # 1. Uygunluk kontrolü
+        user_views = user_viewed_news_storage.get_user_views(
+            user_id=user_id,
+            days=request.days
+        )
+        
+        if len(user_views) < request.min_common_reels:
+            return MatchmakingResponse(
+                success=False,
+                matched=False,
+                message=f"Son {request.days} günde en az {request.min_common_reels} haber izlemelisiniz."
+            )
+        
+        # 2. Matchable kullanıcıları bul
+        matchable_users = user_viewed_news_storage.find_matchable_users(
+            current_user_id=user_id,
+            days=request.days,
+            min_common_reels=request.min_common_reels
+        )
+        
+        # 3. Queue'da bekleyen var mı kontrol et
+        opponent_id = matchmaking_queue.find_match(user_id, matchable_users)
+        
+        if opponent_id:
+            # ✅ Eşleşme bulundu! Oyun oluştur
+            matchmaking_queue.remove_from_queue(opponent_id)
+            
+            game_session = await game_service.create_game_session(
+                player1_id=user_id,
+                player2_id=opponent_id,
+                days=request.days,
+                question_count=8
+            )
+            
+            return MatchmakingResponse(
+                success=True,
+                matched=True,
+                opponent_id=opponent_id,
+                game_id=game_session.game_id,
+                common_reels_count=len(game_session.questions),
+                message="Rakip bulundu!"
+            )
+        
+        else:
+            # ❌ Eşleşme yok, queue'ya ekle
+            added = matchmaking_queue.add_to_queue(
+                user_id=user_id,
+                days=request.days,
+                min_common_reels=request.min_common_reels,
+                common_reels_count=len(user_views)
+            )
+            
+            return MatchmakingResponse(
+                success=True,
+                matched=False,
+                estimated_wait_time_seconds=60,
+                message="Rakip aranıyor..." if added else "Zaten aramada"
+            )
+        
+    except Exception as e:
+        print(f"❌ Matchmaking join error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ YENİ ENDPOINT: QUEUE DURUMU ============
+@router.get("/matchmaking/status")
+async def get_matchmaking_status(
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Kullanıcının queue durumunu kontrol et
+    Mobile polling için kullanılır
+    """
+    try:
+        queue_info = matchmaking_queue.get_queue_info(user_id)
+        
+        if not queue_info:
+            return {
+                "success": True,
+                "in_queue": False,
+                "message": "Queue'da değilsiniz"
+            }
+        
+        # Queue'dayken matchable kontrol et
+        user_views = user_viewed_news_storage.get_user_views(
+            user_id=user_id,
+            days=6
+        )
+        
+        matchable_users = user_viewed_news_storage.find_matchable_users(
+            current_user_id=user_id,
+            days=6,
+            min_common_reels=8
+        )
+        
+        # Eşleşme var mı?
+        opponent_id = matchmaking_queue.find_match(user_id, matchable_users)
+        
+        if opponent_id:
+            # Eşleşme bulundu! Oyun oluştur
+            matchmaking_queue.remove_from_queue(user_id)
+            matchmaking_queue.remove_from_queue(opponent_id)
+            
+            game_session = await game_service.create_game_session(
+                player1_id=user_id,
+                player2_id=opponent_id,
+                days=6,
+                question_count=8
+            )
+            
+            return {
+                "success": True,
+                "matched": True,
+                "game_id": game_session.game_id,
+                "opponent_id": opponent_id,
+                "message": "Rakip bulundu!"
+            }
+        
+        return {
+            "success": True,
+            "in_queue": True,
+            "matched": False,
+            **queue_info
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ YENİ ENDPOINT: QUEUE'DAN ÇIKIŞ ============
+@router.post("/matchmaking/cancel")
+async def cancel_matchmaking(
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Matchmaking'i iptal et, queue'dan çık
+    """
+    try:
+        removed = matchmaking_queue.remove_from_queue(user_id)
+        
+        return {
+            "success": True,
+            "removed": removed,
+            "message": "İptal edildi" if removed else "Zaten queue'da değildiniz"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
