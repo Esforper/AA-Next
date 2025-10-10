@@ -8,7 +8,7 @@ import 'app_theme.dart';
 class WebTheme {
   static ThemeData get theme => AppTheme.theme.copyWith(
     // Web için daha geniş padding'ler
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: AppRadius.large),
       color: Colors.white,

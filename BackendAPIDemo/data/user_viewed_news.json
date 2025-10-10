@@ -1,0 +1,66 @@
+{
+  "views": {
+    "49db2df2-28d5-4441-9577-4acd0900653a": [
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3707229",
+        "news_title": "Gebze-Çayırova-Birlik OSB Hafif Raylı Sistem Hattı 1. Aşaması'nı Ulaştırma ve Altyapı Bakanlığı üstlendi",
+        "news_url": "https://www.aa.com.tr/tr/ekonomi/gebze-cayirova-birlik-osb-hafif-rayli-sistem-hatti-1-asamasini-ulastirma-ve-altyapi-bakanligi-ustlendi/3707229",
+        "category": "Ekonomi",
+        "keywords": [
+          "Cumhurbaşkanı kararı",
+          "Resmi Gazete",
+          "Ulaştırma ve Altyapı Bakanlığı",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-10 23:06:17.859657",
+        "duration_ms": 3866,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.1
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3707253",
+        "news_title": "Şişli'de inşaat alanındaki vinç öğrenci yurduna devrildi",
+        "news_url": "https://www.aa.com.tr/tr/gundem/sislide-insaat-alanindaki-vinc-ogrenci-yurduna-devrildi-/3707253",
+        "category": "Gündem",
+        "keywords": [
+          "İnşaat",
+          "vinç",
+          "vinç devrilmesi",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-10 23:09:44.447165",
+        "duration_ms": 189012,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.6
+      }
+    ]
+  },
+  "stats": {
+    "49db2df2-28d5-4441-9577-4acd0900653a": {
+      "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+      "total_views": 2,
+      "completed_views": 0,
+      "total_duration_ms": 192878,
+      "favorite_categories": {
+        "Ekonomi": 1,
+        "Gündem": 1
+      },
+      "last_viewed_at": "2025-10-10 23:09:44.447165",
+      "recent_keywords": [
+        "Cumhurbaşkanı kararı",
+        "Resmi Gazete",
+        "Ulaştırma ve Altyapı Bakanlığı",
+        "Anadolu Ajansı",
+        "İnşaat",
+        "vinç",
+        "vinç devrilmesi",
+        "Anadolu Ajansı"
+      ]
+    }
+  },
+  "last_updated": "2025-10-10T23:09:44.447317"
+}
