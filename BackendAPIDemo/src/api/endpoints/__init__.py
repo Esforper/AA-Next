@@ -66,6 +66,15 @@ except ImportError as e:
     print(f"⚠️ Reels User router import failed: {e}")
     reels_user_router = None
 
+# Gamification router
+try:
+    from .gamification import router as gamification_router
+    print("✅ Gamification router imported")
+except ImportError as e:
+    print(f"⚠️ Gamification router import failed: {e}")
+    gamification_router = None
+
+
 # Reels Analytics (analytics, overview, system/status)
 try:
     from .reels_analytics import router as reels_analytics_router
@@ -124,7 +133,7 @@ AVAILABLE_ROUTERS = {
     "reels_user": reels_user_router,
     "reels_analytics": reels_analytics_router,
     "reels_management": reels_management_router,
-    
+    "gamification": gamification_router,
     # Optional
     "game": game_router,
     "websocket": websocket_router,
@@ -170,7 +179,7 @@ __all__ = [
     "reels_user_router",
     "reels_analytics_router",
     "reels_management_router",
-    
+    "gamification_router",
     # Optional routers
     "game_router",
     "websocket_router",

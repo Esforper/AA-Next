@@ -45,30 +45,35 @@ class GamificationProvider extends ChangeNotifier {
   
   // XP eklerken backend'e de gönder
   Future<void> addXP(int amount, String source) async {
-    // 1. Local state güncelle
-    _state = _state.addXP(amount, source);
-    
-    // 2. Backend'e sync (opsiyonel)
-    final userId = await _getUserId();
-    if (userId != null) {
-      await _syncToBackend(userId, amount, source);
-    }
-    
-    notifyListeners();
+  // 1. Local state güncelle
+  _state = _state.addXP(amount, source);
+  
+  // 2. Storage'a kaydet
+  await _saveToStorage();
+  
+  // 3. Backend'e sync (opsiyonel - hata olsa bile devam eder)
+  final userId = await _getUserId();
+  if (userId != null) {
+    _syncToBackend(userId, amount, source); // await yok - fire and forget
   }
+  
+  notifyListeners();
+}
 
-    Future<void> _syncToBackend(String userId, int xp, String source) async {
-    try {
-      // Backend API çağrısı
-      await GamificationApiService().addXP(
-        userId: userId,
-        xpAmount: xp,
-        source: source,
-      );
-    } catch (e) {
-      debugPrint('⚠️ Backend sync failed: $e');
-      // Hata olsa bile local state güncel
-    }
+    void _syncToBackend(String userId, int xp, String source) {
+    GamificationApiService().addXP(
+      userId: userId,  // ✅ Hala var (backend user_id bekliyor)
+      xpAmount: xp,
+      source: source,
+    ).then((response) {
+      if (response['success'] == true) {
+        debugPrint('✅ Backend sync success');
+      } else {
+        debugPrint('⚠️ Backend sync failed: ${response['message']}');
+      }
+    }).catchError((error) {
+      debugPrint('❌ Backend sync error: $error');
+    });
   }
   
   /// Reels izlendi (3+ saniye)
@@ -109,6 +114,133 @@ class GamificationProvider extends ChangeNotifier {
     return true;
   }
   
+// ============ NODE MANAGEMENT ============
+  
+  /// Node kontrolü - Oyun için yeterli node var mı?
+  bool hasAvailableNodes({int requiredNodes = 1}) {
+    final hasNodes = _state.currentNode >= requiredNodes;
+    
+    debugPrint('🎮 [Node Check] Current: ${_state.currentNode}, Required: $requiredNodes → $hasNodes');
+    
+    return hasNodes;
+  }
+  
+  /// Node harca (oyuna giriş için)
+  Future<bool> spendNodes(int amount, {String reason = 'game_entry'}) async {
+    // 1. Local kontrolü
+    if (_state.currentNode < amount) {
+      debugPrint('❌ [Spend Node] Insufficient nodes: ${_state.currentNode} < $amount');
+      return false;
+    }
+    
+    debugPrint('💸 [Spend Node] Spending $amount node(s) for $reason');
+    debugPrint('   Before: Level ${_state.currentLevel}, Node ${_state.currentNode}');
+    
+    // 2. Backend'e sync
+    final userId = await _getUserId();
+    if (userId != null) {
+      try {
+        final response = await GamificationApiService().spendNodes(
+          userId: userId,
+          amount: amount,
+          reason: reason,
+        );
+        
+        if (response['success'] != true) {
+          debugPrint('⚠️ [Spend Node] Backend failed: ${response['message']}');
+          return false;
+        }
+        
+        debugPrint('✅ [Spend Node] Backend confirmed');
+      } catch (e) {
+        debugPrint('❌ [Spend Node] Backend error: $e');
+        // Backend hatası olsa bile devam et (local güncelleyeceğiz)
+      }
+    }
+    
+    // 3. Local state güncelle (1 node = 100 XP düş)
+    final xpToRemove = amount * 100;
+    final newTotalXP = _state.totalXP - xpToRemove;
+    
+    if (newTotalXP < 0) {
+      debugPrint('❌ [Spend Node] Would result in negative XP');
+      return false;
+    }
+    
+    // 4. Yeni level/node hesapla
+    final newState = _recalculateFromTotalXP(newTotalXP);
+    
+    _state = newState.copyWith(
+      totalXP: newTotalXP,
+    );
+    
+    debugPrint('   After: Level ${_state.currentLevel}, Node ${_state.currentNode}');
+    
+    // 5. Storage'a kaydet
+    await _saveToStorage();
+    notifyListeners();
+    
+    return true;
+  }
+  
+  /// Node ekle (oyun ödülü)
+  Future<void> addNodes(int amount, {String source = 'game_reward'}) async {
+    debugPrint('🎁 [Add Node] Adding $amount node(s) from $source');
+    debugPrint('   Before: Level ${_state.currentLevel}, Node ${_state.currentNode}');
+    
+    // 1 node = 100 XP
+    final xpAmount = amount * 100;
+    
+    // XP ekle (mevcut addXP metodunu kullan)
+    await addXP(xpAmount, source);
+    
+    debugPrint('   After: Level ${_state.currentLevel}, Node ${_state.currentNode}');
+  }
+  
+  /// Total XP'den state hesapla (helper metod)
+  GamificationState _recalculateFromTotalXP(int totalXP) {
+    int remainingXP = totalXP;
+    int level = 1;
+    int node = 0;
+    int currentXP = 0;
+    
+    while (remainingXP >= 100) {
+      // Bir node tamamlandı
+      remainingXP -= 100;
+      node++;
+      
+      // Bu level'de kaç node var?
+      final nodesInLevel = _getNodesForLevel(level);
+      
+      // Level tamamlandı mı?
+      if (node >= nodesInLevel) {
+        level++;
+        node = 0;
+      }
+    }
+    
+    currentXP = remainingXP;
+    final nodesInLevel = _getNodesForLevel(level);
+    
+    return _state.copyWith(
+      currentLevel: level,
+      currentNode: node,
+      nodesInLevel: nodesInLevel,
+      currentXP: currentXP,
+      totalXP: totalXP,
+    );
+  }
+  
+  /// Level'e göre node sayısı
+  int _getNodesForLevel(int level) {
+    if (level <= 5) return 2;
+    if (level <= 10) return 4;
+    if (level <= 15) return 6;
+    return 8;
+  }
+
+
+
   // ============ EMOJI/SHARE KONTROLÜ ============
   
   /// Reels'e emoji atılmış mı?

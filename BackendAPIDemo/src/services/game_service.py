@@ -533,9 +533,20 @@ class GameService:
         session.current_round += 1
         
         # Oyun bitti mi?
+        # Oyun bitti mi?
         if session.current_round >= session.total_rounds:
             session.status = "finished"
             session.finished_at = datetime.now()
+            
+            # ============ NODE ÖDÜLÜ HESAPLA (YENİ) ============
+            print(f"🏁 [Game Finished] {game_id}")
+            print(f"   Player1 ({session.player1_id[:8]}): {session.player1_score} points")
+            print(f"   Player2 ({session.player2_id[:8]}): {session.player2_score} points")
+            
+            # Her oyuncu için node ödülü hesapla ve uygula
+            self._apply_node_rewards(game_id, session)
+            
+            # Oyunu kaydet
             self._save_finished_game(session)
         
         # 🔥 FIX: current_score ekle!
@@ -601,6 +612,85 @@ class GameService:
             ]
         }
 
+
+
+    def _calculate_node_reward(self, session: GameSession, player_id: str) -> int:
+            """
+            Oyuncu için node ödülünü hesapla
+            
+            Kurallar:
+                4/4 doğru = +3 node
+                3/4 doğru = +2 node
+                2/4 doğru = 0 node
+                0-1 doğru = -1 node
+            """
+            # Oyuncunun doğru cevap sayısını hesapla
+            correct_count = 0
+            
+            for round_data in session.round_history:
+                if round_data["player_id"] == player_id:
+                    if round_data["is_correct"] and not round_data["is_pass"]:
+                        correct_count += 1
+            
+            # Node ödülünü hesapla
+            if correct_count == 4:
+                reward = 3
+            elif correct_count == 3:
+                reward = 2
+            elif correct_count == 2:
+                reward = 0
+            else:  # 0 veya 1
+                reward = -1
+            
+            print(f"🎯 [Node Reward] Player {player_id[:8]}: {correct_count}/4 correct → {reward:+d} nodes")
+            
+            return reward
+        
+    def _apply_node_rewards(self, game_id: str, session: GameSession):
+        """Her iki oyuncuya node ödülünü uygula"""
+        from .gamification_service import gamification_service
+        
+        try:
+            # Player 1
+            player1_reward = self._calculate_node_reward(session, session.player1_id)
+            if player1_reward > 0:
+                gamification_service.add_nodes(
+                    user_id=session.player1_id,
+                    amount=player1_reward,
+                    source="game_win"
+                )
+                print(f"   ✅ Player1 gained {player1_reward} nodes")
+            elif player1_reward < 0:
+                gamification_service.spend_nodes(
+                    user_id=session.player1_id,
+                    amount=abs(player1_reward),
+                    reason="game_loss"
+                )
+                print(f"   ❌ Player1 lost {abs(player1_reward)} node(s)")
+            else:
+                print(f"   ➖ Player1 no node change")
+            
+            # Player 2
+            player2_reward = self._calculate_node_reward(session, session.player2_id)
+            if player2_reward > 0:
+                gamification_service.add_nodes(
+                    user_id=session.player2_id,
+                    amount=player2_reward,
+                    source="game_win"
+                )
+                print(f"   ✅ Player2 gained {player2_reward} nodes")
+            elif player2_reward < 0:
+                gamification_service.spend_nodes(
+                    user_id=session.player2_id,
+                    amount=abs(player2_reward),
+                    reason="game_loss"
+                )
+                print(f"   ❌ Player2 lost {abs(player2_reward)} node(s)")
+            else:
+                print(f"   ➖ Player2 no node change")
+                
+        except Exception as e:
+            print(f"⚠️ [Node Reward] Error applying rewards: {e}")
 
 
 
@@ -724,6 +814,51 @@ class GameService:
         except Exception as e:
             print(f"❌ Error loading game detail: {e}")
             return None
+
+
+
+    def _calculate_node_reward(self, game_id: str, player_id: str) -> int:
+            """
+            Oyuncu için node ödülünü hesapla
+            
+            Args:
+                game_id: Oyun ID
+                player_id: Oyuncu ID
+                
+            Returns:
+                Node ödülü (-1, 0, 2, 3)
+                
+            Kurallar:
+                4/4 doğru = +3 node
+                3/4 doğru = +2 node
+                2/4 doğru = 0 node
+                0-1 doğru = -1 node
+            """
+            session = self.active_games.get(game_id)
+            if not session:
+                return 0
+            
+            # Oyuncunun doğru cevap sayısını hesapla
+            correct_count = 0
+            
+            for round_data in session.round_history:
+                if round_data["player_id"] == player_id:
+                    if round_data["is_correct"] and not round_data["is_pass"]:
+                        correct_count += 1
+            
+            # Node ödülünü hesapla
+            if correct_count == 4:
+                reward = 3
+            elif correct_count == 3:
+                reward = 2
+            elif correct_count == 2:
+                reward = 0
+            else:  # 0 veya 1
+                reward = -1
+            
+            print(f"🎯 [Node Reward] Player {player_id[:8]}: {correct_count}/4 correct → {reward:+d} nodes")
+            
+            return reward
 
 
 

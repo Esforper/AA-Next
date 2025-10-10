@@ -93,12 +93,23 @@ headers: await _getHeaders(),
 }
 
   /// Matchmaking başlat - Rakip ara
+/// Matchmaking başlat - Rakip ara
   Future<MatchmakingResponse> startMatchmaking({
     int days = 6,
     int minCommonReels = 8,
   }) async {
     try {
-      final userId = await _getUserId(); // 🔥 UPDATED
+      // ============ NODE KONTROLÜ (YENİ) ============
+      
+      // 1. Provider'dan node kontrolü yap
+      // Not: Bu metodu çağıran yer provider'a erişebilir
+      // Burada sadece backend'e istek atacağız, backend zaten kontrol edecek
+      
+      debugPrint('🎮 [Game Service] Starting matchmaking...');
+      debugPrint('   Backend will check node eligibility');
+      
+      // ============ NODE KONTROLÜ BİTTİ ============
+      
       final uri = Uri.parse('$_baseUrl/api/game/matchmaking/start');
 
       debugPrint('🔗 POST $uri');
@@ -106,7 +117,7 @@ headers: await _getHeaders(),
 
       final response = await http.post(
         uri,
-headers: await _getHeaders(),
+        headers: await _getHeaders(),
         body: jsonEncode({
           'days': days,
           'min_common_reels': minCommonReels,
@@ -123,6 +134,7 @@ headers: await _getHeaders(),
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Matchmaking failed');
       }
+      
     } catch (e) {
       debugPrint('❌ Matchmaking error: $e');
       rethrow;

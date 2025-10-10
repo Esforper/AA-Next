@@ -128,6 +128,7 @@ def _register_core_routes(app: FastAPI):
             "version": "2.0.0",
             "endpoints": {
                 "docs": "/docs",
+                "gamification": "/api/gamification/",
                 "health": "/health",
                 "auth": "/api/auth/",
                 "news": "/api/news/",
@@ -147,6 +148,7 @@ def _register_core_routes(app: FastAPI):
             "timestamp": time.time(),
             "services": {
                 "auth": True,
+                "gamification": True,
                 "news": True,
                 "tts": True,
                 "reels": True,
@@ -244,6 +246,14 @@ def _register_routers(app: FastAPI):
         print("✅ Game router registered")
     except ImportError as e:
         print(f"⚠️ Game router import failed: {e}")
+
+
+    try:
+        from .endpoints.gamification import router as gamification_router
+        app.include_router(gamification_router)
+        print("✅ Gamification router registered")
+    except ImportError as e:
+        print(f"⚠️ Gamification router import failed: {e}")
 
 
 def _setup_error_handlers(app: FastAPI):

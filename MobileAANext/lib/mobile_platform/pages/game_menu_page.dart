@@ -11,6 +11,8 @@ import 'package:flutter/foundation.dart' show kIsWeb; // 🆕
 import 'game_play_page.dart'; // 🆕
 import '../../services/auth_service.dart'; // 🆕
 import 'dart:io' show Platform; // 🆕
+import 'package:provider/provider.dart';
+import '../../providers/gamification_provider.dart';
 
 class GameMenuPage extends StatefulWidget {
   const GameMenuPage({Key? key}) : super(key: key);
@@ -37,6 +39,64 @@ class _GameMenuPageState extends State<GameMenuPage> {
       MaterialPageRoute(builder: (context) => const GameMatchmakingPage()),
     );
   }
+
+void _startGame() async {
+    final gamificationProvider = context.read<GamificationProvider>();
+    
+    // 1. Node kontrolü
+    if (!gamificationProvider.hasAvailableNodes(requiredNodes: 1)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Oyun oynamak için en az 1 node gerekli!\n'
+            'Mevcut: ${gamificationProvider.currentNode} node\n'
+            'Daha fazla haber izleyerek node kazanabilirsin.',
+          ),
+          backgroundColor: Colors.red[700],
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+    
+    // 2. Kullanıcıya bilgi ver
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🎮 Oyun Başlat'),
+        content: Text(
+          'Oyuna başlamak için 1 node harcanacak.\n\n'
+          'Mevcut node: ${gamificationProvider.currentNode}\n'
+          'Oyun sonunda performansına göre node kazanabilirsin:\n'
+          '• 4/4 doğru: +3 node\n'
+          '• 3/4 doğru: +2 node\n'
+          '• 2/4 doğru: 0 node\n'
+          '• 0-1 doğru: -1 node',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Başlat'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm != true) return;
+    
+    // 3. Matchmaking'e git
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const GameMatchmakingPage(),
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +133,9 @@ class _GameMenuPageState extends State<GameMenuPage> {
       ),
     );
   }
+
+
+
 Widget _buildContent(GameEligibility eligibility) {
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -212,5 +275,7 @@ void _playWithBot() async {
     );
   }
 }
+
+
 
 }

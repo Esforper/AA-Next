@@ -156,7 +156,49 @@ async def start_matchmaking(
             )
         
         # 3. İlk uygun kullanıcıyı seç
+# 3. İlk uygun kullanıcıyı seç
         opponent_id = matchable_users[0]
+        
+        # ============ NODE KONTROLÜ (YENİ) ============
+        
+        from ...services.gamification_service import gamification_service
+        
+        # 3.5. User'ın en az 1 node'u var mı kontrol et
+        has_nodes = gamification_service.has_available_nodes(user_id, required_nodes=1)
+        
+        if not has_nodes:
+            # Node yoksa oyun oluşturamazz
+            current_level = (await gamification_service.get_level_data(user_id))["current_level"]
+            current_node = (await gamification_service.get_level_data(user_id))["current_node"]
+            
+            print(f"❌ [Matchmaking] User {user_id[:8]} has insufficient nodes")
+            print(f"   Current: Level {current_level}, Node {current_node}")
+            
+            return MatchmakingResponse(
+                success=False,
+                matched=False,
+                message=f"Oyun oynamak için en az 1 node gerekli. Mevcut: {current_node} node"
+            )
+        
+        # 3.6. Node harca (oyuna giriş ücreti)
+        node_spent = gamification_service.spend_nodes(
+            user_id=user_id,
+            amount=1,
+            reason="game_entry"
+        )
+        
+        if not node_spent:
+            # Harcama başarısız (race condition)
+            print(f"⚠️ [Matchmaking] Failed to spend node for user {user_id[:8]}")
+            return MatchmakingResponse(
+                success=False,
+                matched=False,
+                message="Node harcama hatası. Lütfen tekrar deneyin."
+            )
+        
+        print(f"💸 [Matchmaking] User {user_id[:8]} spent 1 node for game entry")
+        
+        # ============ NODE KONTROLÜ BİTTİ ============
         
         # 4. OYUN OLUŞTUR! (AI senaryo üretimi burada olacak)
         try:
@@ -485,6 +527,7 @@ async def get_game_result(
             winner_id = None
         
         # Bahsedilen haberler
+# Bahsedilen haberler
         news_discussed = [
             {
                 "reel_id": q.reel_id,
@@ -494,6 +537,13 @@ async def get_game_result(
             for q in session.questions
         ]
         
+        # ============ NODE ÖDÜLÜ HESAPLA (YENİ) ============
+        
+        # Session'dan node ödülünü hesapla
+        my_node_reward = game_service._calculate_node_reward(session, user_id)
+        
+        print(f"🎁 [Game Result] User {user_id[:8]} node reward: {my_node_reward:+d}")
+        
         return {
             "success": True,
             "game_id": game_id,
@@ -502,6 +552,7 @@ async def get_game_result(
             "my_score": my_score,
             "opponent_score": opponent_score,
             "total_xp_earned": my_score,  # Tüm skorlar XP
+            "node_reward": my_node_reward,  # 🆕 EKLENDI
             "news_discussed": news_discussed
         }
         

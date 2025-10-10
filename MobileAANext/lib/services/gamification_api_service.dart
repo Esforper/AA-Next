@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'auth_service.dart';
 
 /// Gamification API Service
 /// Backend API ile gerçek iletişim kuran servis
@@ -18,15 +19,24 @@ class GamificationApiService {
   // Base URL
   late final String _baseUrl;
   
-  // Headers
-  Map<String, String> _getHeaders({String? userId}) {
+  // Auth service
+  final AuthService _authService = AuthService();
+  // ============ HEADERS (UPDATED) ============
+  
+  /// Headers oluştur - JWT Token ile
+  Future<Map<String, String>> _getHeaders() async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
     
-    if (userId != null) {
-      headers['X-User-ID'] = userId;
+    // Token'ı al ve Authorization header'ına ekle
+    final token = await _authService.getToken();
+    if (token != null && !token.isExpired) {
+      headers['Authorization'] = 'Bearer ${token.accessToken}';
+      debugPrint('✅ [Gamification API] Token added to header');
+    } else {
+      debugPrint('⚠️ [Gamification API] No valid token found');
     }
     
     return headers;
@@ -35,7 +45,7 @@ class GamificationApiService {
   // Initialize
   void init() {
     _baseUrl = dotenv.env['API_URL'] ?? 'http://localhost:8000';
-    debugPrint('🎮 [API] Initialized with base URL: $_baseUrl');
+    debugPrint('🎮 [Gamification API] Initialized with base URL: $_baseUrl');
   }
 
   // ============ XP ENDPOINTS ============
@@ -52,7 +62,6 @@ class GamificationApiService {
       final uri = Uri.parse('$_baseUrl/api/gamification/add-xp');
       
       final body = {
-        'user_id': userId,
         'xp_amount': xpAmount,
         'source': source,
         if (metadata != null) 'metadata': metadata,
@@ -63,7 +72,7 @@ class GamificationApiService {
 
       final response = await http.post(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
         body: jsonEncode(body),
       );
 
@@ -72,6 +81,7 @@ class GamificationApiService {
       return _handleError(e);
     }
   }
+
 
   // ============ LEVEL ENDPOINTS ============
 
@@ -87,7 +97,7 @@ class GamificationApiService {
 
       final response = await http.get(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
       );
 
       return _handleResponse(response);
@@ -95,7 +105,6 @@ class GamificationApiService {
       return _handleError(e);
     }
   }
-
   // ============ STATS ENDPOINTS ============
 
   /// Kullanıcı istatistiklerini al
@@ -110,7 +119,7 @@ class GamificationApiService {
 
       final response = await http.get(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
       );
 
       return _handleResponse(response);
@@ -131,7 +140,7 @@ class GamificationApiService {
 
       final response = await http.get(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
       );
 
       return _handleResponse(response);
@@ -154,7 +163,7 @@ class GamificationApiService {
 
       final response = await http.post(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
       );
 
       return _handleResponse(response);
@@ -168,14 +177,14 @@ class GamificationApiService {
   /// Leaderboard al
   /// GET /api/gamification/leaderboard
   Future<Map<String, dynamic>> getLeaderboard({
-    int limit = 50,
-    String period = 'all_time',
+    String timeframe = 'all_time',
+    int limit = 100,
   }) async {
     try {
       final uri = Uri.parse('$_baseUrl/api/gamification/leaderboard').replace(
         queryParameters: {
+          'timeframe': timeframe,
           'limit': limit.toString(),
-          'period': period,
         },
       );
       
@@ -183,7 +192,7 @@ class GamificationApiService {
 
       final response = await http.get(
         uri,
-        headers: _getHeaders(),
+        headers: await _getHeaders(),
       );
 
       return _handleResponse(response);
@@ -204,7 +213,7 @@ class GamificationApiService {
 
       final response = await http.get(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
       );
 
       return _handleResponse(response);
@@ -227,7 +236,7 @@ class GamificationApiService {
 
       final response = await http.get(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
       );
 
       return _handleResponse(response);
@@ -246,7 +255,6 @@ class GamificationApiService {
       final uri = Uri.parse('$_baseUrl/api/gamification/unlock-achievement');
       
       final body = {
-        'user_id': userId,
         'achievement_id': achievementId,
       };
 
@@ -255,7 +263,7 @@ class GamificationApiService {
 
       final response = await http.post(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
         body: jsonEncode(body),
       );
 
@@ -264,6 +272,97 @@ class GamificationApiService {
       return _handleError(e);
     }
   }
+
+
+// ============ NODE MANAGEMENT ============
+
+  /// Node kontrolü - Yeterli node var mı?
+  /// GET /api/gamification/check-node-eligibility/{user_id}
+  Future<Map<String, dynamic>> checkNodeEligibility({
+    required String userId,
+    int requiredNodes = 1,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/gamification/check-node-eligibility/$userId')
+          .replace(queryParameters: {
+        'required_nodes': requiredNodes.toString(),
+      });
+
+      debugPrint('🎮 [API] GET $uri');
+
+      final response = await http.get(
+        uri,
+        headers: await _getHeaders(),
+      );
+
+      return _handleResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  /// Node harca (oyuna giriş için)
+  /// POST /api/gamification/spend-nodes
+  Future<Map<String, dynamic>> spendNodes({
+    required String userId,
+    required int amount,
+    String reason = 'game_entry',
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/gamification/spend-nodes');
+
+      final body = {
+        'amount': amount,
+        'reason': reason,
+      };
+
+      debugPrint('🎮 [API] POST $uri');
+      debugPrint('📦 Body: $body');
+
+      final response = await http.post(
+        uri,
+        headers: await _getHeaders(),
+        body: jsonEncode(body),
+      );
+
+      return _handleResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  /// Node ekle (oyun ödülü)
+  /// POST /api/gamification/add-nodes
+  Future<Map<String, dynamic>> addNodesReward({
+    required String userId,
+    required int amount,
+    String source = 'game_reward',
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/gamification/add-nodes');
+
+      final body = {
+        'amount': amount,
+        'source': source,
+      };
+
+      debugPrint('🎮 [API] POST $uri');
+      debugPrint('📦 Body: $body');
+
+      final response = await http.post(
+        uri,
+        headers: await _getHeaders(),
+        body: jsonEncode(body),
+      );
+
+      return _handleResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+
+
 
   // ============ SYNC ============
 
@@ -276,19 +375,13 @@ class GamificationApiService {
     try {
       final uri = Uri.parse('$_baseUrl/api/gamification/sync');
       
-      final body = {
-        'user_id': userId,
-        'local_state': localState,
-        'timestamp': DateTime.now().toIso8601String(),
-      };
-
       debugPrint('🎮 [API] POST $uri');
-      debugPrint('📦 Syncing state for user: $userId');
+      debugPrint('📦 Local state: $localState');
 
       final response = await http.post(
         uri,
-        headers: _getHeaders(userId: userId),
-        body: jsonEncode(body),
+        headers: await _getHeaders(),
+        body: jsonEncode(localState),
       );
 
       return _handleResponse(response);
@@ -321,7 +414,7 @@ class GamificationApiService {
 
       final response = await http.post(
         uri,
-        headers: _getHeaders(userId: userId),
+        headers: await _getHeaders(),
         body: jsonEncode(body),
       );
 
@@ -336,30 +429,36 @@ class GamificationApiService {
   /// Response handler
   Map<String, dynamic> _handleResponse(http.Response response) {
     debugPrint('📡 Response status: ${response.statusCode}');
-    
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      debugPrint('✅ Success: ${data['message'] ?? 'OK'}');
-      return data;
+    debugPrint('📥 Response body: ${response.body}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else if (response.statusCode == 401) {
+      return {
+        'success': false,
+        'message': 'Authentication failed - Invalid token',
+      };
+    } else if (response.statusCode == 404) {
+      return {
+        'success': false,
+        'message': 'Endpoint not found',
+      };
     } else {
-      debugPrint('❌ Error: ${response.statusCode} - ${response.body}');
       return {
         'success': false,
         'message': 'API error: ${response.statusCode}',
-        'error': response.body,
       };
     }
   }
 
-  /// Error handler
   Map<String, dynamic> _handleError(dynamic error) {
-    debugPrint('❌ [API] Error: $error');
+    debugPrint('❌ [Gamification API] Error: $error');
     return {
       'success': false,
       'message': 'Request failed: $error',
-      'error': error.toString(),
     };
   }
+
 
   /// Health check
   Future<bool> healthCheck() async {
