@@ -34,7 +34,19 @@ class MatchmakingResponse(BaseModel):
     estimated_wait_time_seconds: Optional[int] = None
     message: str = ""
 
-
+class MatchmakingStatusResponse(BaseModel):
+    """Matchmaking durumu (polling için)"""
+    success: bool
+    in_queue: bool
+    matched: bool
+    game_id: Optional[str] = None
+    opponent_id: Optional[str] = None
+    wait_time_seconds: int = 0
+    queue_position: int = 0
+    estimated_wait: int = 0
+    message: str = ""
+    
+    
 class GameCreatedResponse(BaseModel):
     """Oyun oluşturuldu response"""
     success: bool
@@ -550,7 +562,7 @@ async def join_matchmaking_queue(
         
         if opponent_id:
             # ✅ Eşleşme bulundu! Oyun oluştur
-            matchmaking_queue.remove_from_queue(opponent_id)
+            # matchmaking_queue.remove_from_queue(opponent_id)
             
             game_session = await game_service.create_game_session(
                 player1_id=user_id,
@@ -589,68 +601,85 @@ async def join_matchmaking_queue(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============ YENİ ENDPOINT: QUEUE DURUMU ============
-@router.get("/matchmaking/status")
+@router.get("/matchmaking/status", response_model=MatchmakingStatusResponse)
 async def get_matchmaking_status(
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Kullanıcının queue durumunu kontrol et
-    Mobile polling için kullanılır
+    Matchmaking durumunu kontrol et (polling için)
+    
+    Mobile her 2 saniyede bir bu endpoint'i çağırır
     """
     try:
+        # Temizlik yap (expired entries)
+        matchmaking_queue.cleanup_expired()
+        
+        # Kullanıcı kuyrukta mı?
         queue_info = matchmaking_queue.get_queue_info(user_id)
         
         if not queue_info:
-            return {
-                "success": True,
-                "in_queue": False,
-                "message": "Queue'da değilsiniz"
-            }
+            # Kuyrukta değil
+            return MatchmakingStatusResponse(
+                success=True,
+                in_queue=False,
+                matched=False,
+                message="Kuyrukta değilsiniz."
+            )
         
-        # Queue'dayken matchable kontrol et
-        user_views = user_viewed_news_storage.get_user_views(
-            user_id=user_id,
-            days=6
-        )
-        
+        # Kuyruktaki kullanıcı için eşleşme ara
+        user_views = user_viewed_news_storage.get_user_views(user_id, days=6)
         matchable_users = user_viewed_news_storage.find_matchable_users(
             current_user_id=user_id,
             days=6,
             min_common_reels=8
         )
         
-        # Eşleşme var mı?
         opponent_id = matchmaking_queue.find_match(user_id, matchable_users)
         
         if opponent_id:
-            # Eşleşme bulundu! Oyun oluştur
-            matchmaking_queue.remove_from_queue(user_id)
-            matchmaking_queue.remove_from_queue(opponent_id)
-            
-            game_session = await game_service.create_game_session(
-                player1_id=user_id,
-                player2_id=opponent_id,
-                days=6,
-                question_count=8
-            )
-            
-            return {
-                "success": True,
-                "matched": True,
-                "game_id": game_session.game_id,
-                "opponent_id": opponent_id,
-                "message": "Rakip bulundu!"
-            }
+            # 🎯 EŞLEŞME BULUNDU!
+            try:
+                game_session = await game_service.create_game_session(
+                    player1_id=user_id,
+                    player2_id=opponent_id,
+                    days=6,
+                    question_count=8
+                )
+                
+                print(f"✅ Game created via polling: {game_session.game_id}")
+                
+                return MatchmakingStatusResponse(
+                    success=True,
+                    in_queue=False,
+                    matched=True,
+                    game_id=game_session.game_id,
+                    opponent_id=opponent_id,
+                    message="Rakip bulundu!"
+                )
+                
+            except Exception as e:
+                print(f"❌ Game creation failed: {e}")
+                matchmaking_queue.remove_from_queue(user_id)
+                return MatchmakingStatusResponse(
+                    success=False,
+                    in_queue=False,
+                    matched=False,
+                    message=f"Hata: {str(e)}"
+                )
         
-        return {
-            "success": True,
-            "in_queue": True,
-            "matched": False,
-            **queue_info
-        }
+        # Hala kuyruktayız
+        return MatchmakingStatusResponse(
+            success=True,
+            in_queue=True,
+            matched=False,
+            wait_time_seconds=queue_info["wait_time_seconds"],
+            queue_position=queue_info["queue_position"],
+            estimated_wait=queue_info["remaining_time_seconds"],
+            message="Rakip aranıyor..."
+        )
         
     except Exception as e:
+        print(f"❌ Status check error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

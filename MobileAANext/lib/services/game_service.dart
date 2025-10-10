@@ -130,6 +130,76 @@ headers: await _getHeaders(),
   }
 
 
+// game_service.dart içine eklenecek (startMatchmaking fonksiyonundan SONRA)
+
+/// 🆕 Matchmaking queue'ya katıl
+Future<MatchmakingResponse> joinMatchmaking({
+  int days = 6,
+  int minCommonReels = 8,
+}) async {
+  try {
+    final uri = Uri.parse('$_baseUrl/api/game/matchmaking/join');
+
+    debugPrint('🔗 POST $uri');
+    debugPrint('📤 Body: days=$days, min_common_reels=$minCommonReels');
+
+    final response = await http.post(
+      uri,
+      headers: await _getHeaders(),
+      body: jsonEncode({
+        'days': days,
+        'min_common_reels': minCommonReels,
+      }),
+    ).timeout(_timeoutDuration);
+
+    debugPrint('📡 Join Matchmaking Response: ${response.statusCode}');
+    debugPrint('📥 Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return MatchmakingResponse.fromJson(data);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Join matchmaking failed');
+    }
+  } catch (e) {
+    debugPrint('❌ Join matchmaking error: $e');
+    rethrow;
+  }
+}
+
+
+/// 🆕 Matchmaking durumunu kontrol et (polling için)
+Future<MatchmakingStatusResponse> getMatchmakingStatus() async {
+  try {
+    final uri = Uri.parse('$_baseUrl/api/game/matchmaking/status');
+
+    debugPrint('🔗 GET $uri');
+
+    final response = await http.get(
+      uri,
+      headers: await _getHeaders(),
+    ).timeout(_timeoutDuration);
+
+    debugPrint('📡 Matchmaking Status: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return MatchmakingStatusResponse.fromJson(data);
+    } else {
+      throw Exception('Failed to get matchmaking status');
+    }
+  } catch (e) {
+    debugPrint('❌ Get matchmaking status error: $e');
+    rethrow;
+  }
+}
+
+
+
+
+
+
    /// Matchmaking iptal et (GÜNCELLEME - zaten vardı ama endpoint değişti)
   @override
   Future<void> cancelMatchmaking() async {

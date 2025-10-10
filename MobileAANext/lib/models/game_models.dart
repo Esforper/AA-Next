@@ -261,4 +261,51 @@ class GameEligibility {
       message: json['message'] ?? '',
     );
   }
+
+
+}
+
+
+
+
+
+  // Bu class'ı MatchmakingResponse'dan SONRA ekle:
+
+/// Matchmaking durumu - Polling için
+class MatchmakingStatusResponse {
+  final bool success;
+  final bool inQueue;
+  final bool matched;
+  final String? gameId;
+  final String? opponentId;
+  final int waitTimeSeconds;
+  final int queuePosition;
+  final int estimatedWait;
+  final String message;
+
+  MatchmakingStatusResponse({
+    required this.success,
+    required this.inQueue,
+    required this.matched,
+    this.gameId,
+    this.opponentId,
+    required this.waitTimeSeconds,
+    required this.queuePosition,
+    required this.estimatedWait,
+    required this.message,
+  });
+
+  factory MatchmakingStatusResponse.fromJson(Map<String, dynamic> json) {
+    return MatchmakingStatusResponse(
+      success: json['success'] ?? false,
+      inQueue: json['in_queue'] ?? false,
+      matched: json['matched'] ?? false,
+      gameId: json['game_id'],
+      opponentId: json['opponent_id'],
+      waitTimeSeconds: json['wait_time_seconds'] ?? 0,
+      queuePosition: json['queue_position'] ?? 0,
+      estimatedWait: json['estimated_wait'] ?? 0,
+      message: json['message'] ?? '',
+    );
+  }
 }

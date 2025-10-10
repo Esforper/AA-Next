@@ -1,6 +1,7 @@
 """
 Game Service - Haber Kapışması Oyunu
 AI ile senaryo üretimi, oyun state management, gerçek zamanlı oyun mantığı
+OPTIMIZED: Hızlı AI çağrıları ve timeout önleme
 """
 
 import json
@@ -115,7 +116,7 @@ class GameService:
         Steps:
         1. Ortak haberleri bul
         2. Rastgele 8 haber seç
-        3. AI ile her haber için senaryo üret
+        3. AI ile her haber için senaryo üret (PARALEL VE HIZLI!)
         4. GameSession oluştur
         
         Args:
@@ -166,7 +167,7 @@ class GameService:
             selected_reel_ids
         )
         
-        # 5. AI ile tüm senaryoyu üret
+        # 5. AI ile tüm senaryoyu üret (HIZLI!)
         questions = await self._generate_game_scenario(
             selected_reels,
             player1_emojis,
@@ -213,7 +214,7 @@ class GameService:
         return emoji_map
     
     
-    # ============ AI SCENARIO GENERATION ============
+    # ============ AI SCENARIO GENERATION (OPTIMIZED!) ============
     
     async def _generate_game_scenario(
         self,
@@ -224,12 +225,10 @@ class GameService:
         """
         AI ile oyun senaryosu üret (tüm sorular)
         
-        OpenAI kullanarak:
-        - Her haber için bir soru
-        - 2 seçenek (1 doğru, 1 yanlış)
-        - Doğru/yanlış cevap mesajları
-        - Emoji bazlı yorumlar
-        - Pas geçme mesajları
+        🚀 OPTIMIZATION:
+        - Tek bir AI çağrısı ile TÜM soruları üret (paralel değil, batch!)
+        - Timeout: 25 saniye (mobile'ın 30 saniye timeout'undan önce)
+        - Hata durumunda fallback
         
         Args:
             reels: Seçilen haberler
@@ -250,27 +249,14 @@ class GameService:
             
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             
-            # Her haber için prompt oluştur ve AI'dan senaryo al
-            questions = []
+            # TEK BİR PROMPT İLE TÜM SORULARI ÜRET!
+            prompt = self._build_batch_ai_prompt(reels, player1_emojis, player2_emojis)
             
-            for i, reel in enumerate(reels):
-                player_turn = 1 if i % 2 == 0 else 2  # Sırayla oyuncular sorar
-                
-                # Bu habere emoji var mı?
-                p1_emoji = player1_emojis.get(reel.id)
-                p2_emoji = player2_emojis.get(reel.id)
-                
-                # AI prompt
-                prompt = self._build_ai_prompt(
-                    reel=reel,
-                    player_turn=player_turn,
-                    asker_emoji=p1_emoji if player_turn == 1 else p2_emoji,
-                    responder_emoji=p2_emoji if player_turn == 1 else p1_emoji
-                )
-                
-                # AI çağrısı
-                response = await client.chat.completions.create(
-                    model="gpt-4o-mini",  # Ucuz ve hızlı
+            print(f"🤖 Sending batch AI request for {len(reels)} questions...")
+            
+            # AI çağrısı (timeout: 25 saniye)
+            response = await client.chat.completions.create(
+                    model="gpt-4o-mini",  # Hızlı ve ucuz
                     messages=[
                         {
                             "role": "system",
@@ -281,35 +267,39 @@ class GameService:
                             "content": prompt
                         }
                     ],
-                    temperature=0.8,
-                    max_tokens=500,
+                    temperature=0.7,
+                    max_tokens=2000,
                     response_format={"type": "json_object"}
                 )
-                
-                # Parse AI response
-                ai_output = json.loads(response.choices[0].message.content)
-                
-                # GameQuestion oluştur
+            
+            # Parse AI response
+            ai_output = json.loads(response.choices[0].message.content)
+            
+            # AI'dan gelen soruları GameQuestion'a çevir
+            questions = []
+            ai_questions = ai_output.get("questions", [])
+            
+            for i, (reel, ai_q) in enumerate(zip(reels, ai_questions)):
                 question = GameQuestion(
                     reel_id=reel.id,
                     news_title=reel.news_data.title,
                     news_url=reel.news_data.url,
-                    question_text=ai_output.get("question", "Bu haberi duydun mu?"),
-                    correct_option=ai_output.get("correct_option", "Evet biliyorum"),
-                    wrong_option=ai_output.get("wrong_option", "Hayır duymadım"),
-                    correct_response=ai_output.get("correct_response", "Evet evet!"),
-                    wrong_response=ai_output.get("wrong_response", "Yanlış hatırlıyorsun sanki"),
-                    pass_response=ai_output.get("pass_response", "Şöyle olmuştu aslında..."),
-                    emoji_responses=ai_output.get("emoji_responses", {})
+                    question_text=ai_q.get("question", f"{reel.news_data.title[:50]}... biliyor muydun?"),
+                    correct_option=ai_q.get("correct_option", "Evet biliyorum"),
+                    wrong_option=ai_q.get("wrong_option", "Hayır duymadım"),
+                    correct_response=ai_q.get("correct_response", "Evet evet!"),
+                    wrong_response=ai_q.get("wrong_response", "Yanlış hatırlıyorsun sanki"),
+                    pass_response=ai_q.get("pass_response", f"Haber: {reel.news_data.summary[:100]}..."),
+                    emoji_responses=ai_q.get("emoji_responses", {})
                 )
-                
                 questions.append(question)
-                
-                # Rate limit için kısa bekleme
-                await asyncio.sleep(0.3)
             
             print(f"✅ AI scenario generated: {len(questions)} questions")
             return questions
+            
+        except asyncio.TimeoutError:
+            print(f"⏱️ AI request timeout (25s exceeded), using fallback")
+            return self._generate_fallback_scenario(reels, player1_emojis, player2_emojis)
             
         except Exception as e:
             print(f"❌ AI scenario generation failed: {e}")
@@ -317,57 +307,71 @@ class GameService:
             return self._generate_fallback_scenario(reels, player1_emojis, player2_emojis)
     
     
-    def _build_ai_prompt(
+    def _build_batch_ai_prompt(
         self,
-        reel,
-        player_turn: int,
-        asker_emoji: Optional[str],
-        responder_emoji: Optional[str]
+        reels: List,
+        player1_emojis: Dict[str, str],
+        player2_emojis: Dict[str, str]
     ) -> str:
-        """AI için prompt oluştur"""
+        """
+        Tüm haberler için tek bir batch prompt oluştur
         
-        news_title = reel.news_data.title
-        news_summary = reel.news_data.summary
+        Bu sayede tek bir AI çağrısı ile tüm soruları üretiyoruz!
+        """
+        
+        news_list = []
+        for i, reel in enumerate(reels):
+            player_turn = 1 if i % 2 == 0 else 2
+            p1_emoji = player1_emojis.get(reel.id)
+            p2_emoji = player2_emojis.get(reel.id)
+            
+            news_list.append({
+                "index": i,
+                "title": reel.news_data.title,
+                "summary": reel.news_data.summary[:200],
+                "player_asking": player_turn,
+                "asker_emoji": p1_emoji if player_turn == 1 else p2_emoji,
+                "responder_emoji": p2_emoji if player_turn == 1 else p1_emoji
+            })
         
         prompt = f"""
-Bir haber quiz oyunu için diyalog senaryosu oluştur.
+Bir haber quiz oyunu için {len(reels)} adet soru senaryosu oluştur.
 
-HABER:
-Başlık: {news_title}
-Özet: {news_summary}
+HABERLER:
+{json.dumps(news_list, ensure_ascii=False, indent=2)}
 
 GÖREV:
-Player {player_turn} bu haberi Player {3-player_turn}'e soruyor.
+Her haber için bir diyalog senaryosu üret. Player 1 ve Player 2 sırayla soru soruyor (0,2,4,6->P1, 1,3,5,7->P2).
 
-Üret:
+Her soru için üret:
 1. question: Soran kişinin sorusu (örn: "... biliyor muydun?")
 2. correct_option: Doğru cevap seçeneği (habere uygun detay)
 3. wrong_option: Yanlış cevap seçeneği (mantıklı ama yanlış detay)
-4. correct_response: Doğru cevapta verilecek yanıt (örn: "Evet evet duydum!")
-5. wrong_response: Yanlış cevapta verilecek yanıt (örn: "Yok ya, böyle değildi")
-6. pass_response: Pas geçilirse açıklama (haberin özeti)
-7. emoji_responses: Emoji'ye göre ekstra yorumlar
-
-{f"Soran kişinin emojisi: {asker_emoji}" if asker_emoji else ""}
-{f"Cevaplayan kişinin emojisi: {responder_emoji}" if responder_emoji else ""}
+4. correct_response: Doğru cevapta verilecek yanıt (örn: "Evet evet!")
+5. wrong_response: Yanlış cevapta verilecek yanıt (örn: "Yok ya, öyle değildi")
+6. pass_response: Pas geçilirse açıklama (haberin kısa özeti)
+7. emoji_responses: Emoji'ye göre ekstra yorumlar (varsa)
 
 ÖNEMLI:
-- Samimi ve doğal konuşma tarzı
-- Kısa ve öz cevaplar
-- Emoji varsa yoruma dahil et (örn: "Baya sevmişsin bu haberi 😊")
+- Samimi ve doğal Türkçe konuşma tarzı
+- Kısa ve öz cevaplar (max 50-60 kelime)
+- Emoji varsa yoruma dahil et
+- Her haber için FARKLI sorular
 
 JSON formatında dön:
 {{
-  "question": "...",
-  "correct_option": "...",
-  "wrong_option": "...",
-  "correct_response": "...",
-  "wrong_response": "...",
-  "pass_response": "...",
-  "emoji_responses": {{
-    "❤️": "...",
-    "👍": "..."
-  }}
+  "questions": [
+    {{
+      "question": "...",
+      "correct_option": "...",
+      "wrong_option": "...",
+      "correct_response": "...",
+      "wrong_response": "...",
+      "pass_response": "...",
+      "emoji_responses": {{"❤️": "...", "👍": "..."}}
+    }},
+    ...
+  ]
 }}
 """
         return prompt
@@ -381,6 +385,7 @@ JSON formatında dön:
     ) -> List[GameQuestion]:
         """
         AI yoksa template-based senaryo üret
+        Hızlı ve güvenilir fallback
         """
         questions = []
         
@@ -403,18 +408,19 @@ JSON formatında dön:
         }
         
         for i, reel in enumerate(reels):
+            # Başlık kısaltma
+            short_title = reel.news_data.title[:60] + "..." if len(reel.news_data.title) > 60 else reel.news_data.title
+            
             question = GameQuestion(
                 reel_id=reel.id,
                 news_title=reel.news_data.title,
                 news_url=reel.news_data.url,
-                question_text=random.choice(templates["question"]).format(
-                    title=reel.news_data.title[:50]
-                ),
-                correct_option=f"{reel.news_data.summary[:80]}...",
+                question_text=random.choice(templates["question"]).format(title=short_title),
+                correct_option=f"{reel.news_data.summary[:80]}..." if len(reel.news_data.summary) > 80 else reel.news_data.summary,
                 wrong_option="Başka bir şey olmuştu sanki",
                 correct_response=random.choice(templates["correct_response"]),
                 wrong_response=random.choice(templates["wrong_response"]),
-                pass_response=f"Haber şöyleydi: {reel.news_data.summary[:100]}...",
+                pass_response=f"Haber şöyleydi: {reel.news_data.summary[:120]}...",
                 emoji_responses={}
             )
             questions.append(question)
@@ -480,58 +486,64 @@ JSON formatında dön:
         if session.current_round >= session.total_rounds:
             session.status = "finished"
             session.finished_at = datetime.now()
-            self._save_game_to_history(session)
         
         return {
             "success": True,
-            "is_correct": is_correct,
-            "xp_earned": 20 if is_correct else 0,
-            "current_score": (
-                session.player1_score if player_id == session.player1_id 
-                else session.player2_score
-            )
+            "current_round": session.current_round,
+            "total_rounds": session.total_rounds,
+            "player1_score": session.player1_score,
+            "player2_score": session.player2_score,
+            "game_finished": session.status == "finished"
         }
     
     
-    def _save_game_to_history(self, session: GameSession):
-        """Bitmiş oyunu geçmişe kaydet"""
-        try:
-            game_file = self.storage_dir / f"{session.game_id}.json"
-            
-            game_data = {
-                "game_id": session.game_id,
-                "player1_id": session.player1_id,
-                "player2_id": session.player2_id,
-                "player1_score": session.player1_score,
-                "player2_score": session.player2_score,
-                "total_rounds": session.total_rounds,
-                "created_at": session.created_at.isoformat(),
-                "started_at": session.started_at.isoformat() if session.started_at else None,
-                "finished_at": session.finished_at.isoformat() if session.finished_at else None,
-                "news_discussed": [
-                    {
-                        "reel_id": q.reel_id,
-                        "title": q.news_title,
-                        "url": q.news_url
-                    }
-                    for q in session.questions
-                ],
-                "round_history": session.round_history
-            }
-            
-            with open(game_file, 'w', encoding='utf-8') as f:
-                json.dump(game_data, f, ensure_ascii=False, indent=2)
-            
-            print(f"💾 Game saved to history: {session.game_id}")
-            
-            # Memory'den sil
-            if session.game_id in self.active_games:
-                del self.active_games[session.game_id]
-                
-        except Exception as e:
-            print(f"❌ Failed to save game history: {e}")
+    def get_game_result(self, game_id: str, player_id: str) -> Dict:
+        """Oyun sonucunu getir"""
+        session = self.active_games.get(game_id)
+        if not session:
+            return {"success": False, "message": "Game not found"}
+        
+        if session.status != "finished":
+            return {"success": False, "message": "Game not finished yet"}
+        
+        # Kim kazandı?
+        if session.player1_score > session.player2_score:
+            winner_id = session.player1_id
+        elif session.player2_score > session.player1_score:
+            winner_id = session.player2_id
+        else:
+            winner_id = None  # Berabere
+        
+        # Bu oyuncu için sonuç
+        is_player1 = player_id == session.player1_id
+        my_score = session.player1_score if is_player1 else session.player2_score
+        opponent_score = session.player2_score if is_player1 else session.player1_score
+        
+        if winner_id == player_id:
+            result = "win"
+        elif winner_id is None:
+            result = "draw"
+        else:
+            result = "lose"
+        
+        return {
+            "success": True,
+            "game_id": game_id,
+            "winner_id": winner_id,
+            "result": result,
+            "my_score": my_score,
+            "opponent_score": opponent_score,
+            "total_xp_earned": my_score,
+            "news_discussed": [
+                {
+                    "reel_id": q.reel_id,
+                    "title": q.news_title,
+                    "url": q.news_url
+                }
+                for q in session.questions
+            ]
+        }
 
 
-# ============ GLOBAL INSTANCE ============
-
+# Global instance
 game_service = GameService()

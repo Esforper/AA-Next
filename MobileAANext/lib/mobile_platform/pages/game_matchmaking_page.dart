@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/game_models.dart';
 import '../../services/game_service.dart';
-import 'game_play_page.dart'; // Dosya yolu projenize göre güncellenecek
+import 'game_play_page.dart';
 
 class GameMatchmakingPage extends StatefulWidget {
   const GameMatchmakingPage({Key? key}) : super(key: key);
@@ -16,9 +16,9 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
   late AnimationController _controller;
   String _statusText = "Rakip aranıyor...";
   Timer? _statusTimer;
-  Timer? _pollingTimer;  // 🔥 YENİ: Polling timer
-  int _elapsedSeconds = 0;  // 🔥 YENİ: Geçen süre
-  bool _isSearching = true;  // 🔥 YENİ: Arama durumu
+  Timer? _pollingTimer;
+  int _elapsedSeconds = 0;
+  bool _isSearching = true;
 
   @override
   void initState() {
@@ -32,13 +32,13 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     _startMatchmaking();
   }
   
-  // 🔥 YENİ FONKSİYON: Matchmaking'i başlat
+  // Matchmaking'i başlat
   Future<void> _startMatchmaking() async {
     try {
       print('🎮 Starting matchmaking...');
       
       // 1. Queue'ya katıl
-      final response = await _gameService.joinMatchmakingQueue();
+      final response = await _gameService.joinMatchmaking(); // ✅ DOĞRU FONKSİYON
       
       if (!mounted) return;
       
@@ -65,7 +65,7 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     }
   }
 
-    // 🔥 YENİ FONKSİYON: Polling başlat (her 3 saniyede kontrol)
+  // Polling başlat (her 3 saniyede kontrol)
   void _startPolling() {
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       if (!mounted || !_isSearching) {
@@ -89,17 +89,17 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
       
       try {
         // Backend'den durum kontrol et
-        final status = await _gameService.checkMatchmakingStatus();
+        final status = await _gameService.getMatchmakingStatus(); // ✅ DOĞRU FONKSİYON
         
         if (!mounted) return;
         
-        print('📊 Status check: matched=${status['matched']}, in_queue=${status['in_queue']}');
+        print('📊 Status check: matched=${status.matched}, in_queue=${status.inQueue}');
         
-        if (status['matched'] == true) {
+        if (status.matched) { // ✅ DOĞRU PROPERTY
           // ✅ Eşleşme bulundu!
           timer.cancel();
-          print('🎉 Match found! Game ID: ${status['game_id']}');
-          _navigateToGame(status['game_id']);
+          print('🎉 Match found! Game ID: ${status.gameId}');
+          _navigateToGame(status.gameId!); // ✅ DOĞRU PROPERTY
         }
         // Eşleşme yoksa devam et (polling devam eder)
         
@@ -110,7 +110,7 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     });
   }
 
-  // 🔥 YENİ FONKSİYON: Oyun ekranına git
+  // Oyun ekranına git
   void _navigateToGame(String gameId) {
     if (!mounted) return;
     _isSearching = false;
@@ -123,8 +123,7 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     );
   }
 
-
-  // 🔥 YENİ FONKSİYON: Hata göster ve geri dön
+  // Hata göster ve geri dön
   void _showError(String message) {
     if (!mounted) return;
     _isSearching = false;
@@ -135,7 +134,7 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     Navigator.pop(context);
   }
 
-  // 🔥 GÜNCELLENEN FONKSİYON: Aramayı iptal et
+  // Aramayı iptal et
   Future<void> _cancelSearch() async {
     print('🛑 Cancelling search...');
     _isSearching = false;
@@ -151,9 +150,6 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
       Navigator.pop(context);
     }
   }
-
-
-
 
   void _startStatusUpdates() {
     const statuses = [
@@ -175,34 +171,8 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     });
   }
 
-  Future<void> _findMatch() async {
-    try {
-      final response = await _gameService.startMatchmaking();
-      if (mounted && response.matched) {
-        // Eşleşme bulundu! Oyun ekranına yönlendir.
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => GamePlayPage(gameId: response.gameId!),
-          ),
-        );
-      } else if (mounted) {
-        // Eşleşme bulunamadı veya bir sorun oldu.
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message)),
-        );
-        Navigator.pop(context); // Menüye geri dön
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Eşleşme sırasında bir hata oluştu: $e')),
-        );
-        Navigator.pop(context); // Menüye geri dön
-      }
-    }
-  }
-
+  // ❌ GEREKSİZ - SİLİNDİ
+  // Future<void> _findMatch() async { ... }
   
   @override
   void dispose() {
@@ -213,7 +183,7 @@ class _GameMatchmakingPageState extends State<GameMatchmakingPage> with TickerPr
     super.dispose();
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: WillPopScope(
