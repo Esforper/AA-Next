@@ -478,7 +478,7 @@ class GameService:
         player_id: str,
         round_index: int,
         is_correct: bool,
-        is_pass: bool = False  # 🆕 YENİ PARAMETRE
+        is_pass: bool = False
     ) -> Dict:
         """
         Soruya cevap ver ve skoru güncelle
@@ -490,10 +490,10 @@ class GameService:
         if not session:
             return {"success": False, "message": "Game not found"}
         
-        # 🆕 Pas geçilmediyse skor güncelle
+        # 🔥 Pas geçilmediyse skor güncelle
         if not is_pass and is_correct:
             if player_id == session.player1_id:
-                session.player1_score += 20  # 20 XP per correct
+                session.player1_score += 20
             else:
                 session.player2_score += 20
         
@@ -502,7 +502,7 @@ class GameService:
             "round": round_index,
             "player_id": player_id,
             "is_correct": is_correct,
-            "is_pass": is_pass,  # 🆕 Pas bilgisi
+            "is_pass": is_pass,
             "timestamp": datetime.now().isoformat()
         })
         
@@ -513,8 +513,11 @@ class GameService:
         if session.current_round >= session.total_rounds:
             session.status = "finished"
             session.finished_at = datetime.now()
-            # 🆕 Bitmiş oyunu kaydet
             self._save_finished_game(session)
+        
+        # 🔥 FIX: current_score ekle!
+        current_score = (session.player1_score if player_id == session.player1_id 
+                        else session.player2_score)
         
         return {
             "success": True,
@@ -522,6 +525,7 @@ class GameService:
             "total_rounds": session.total_rounds,
             "player1_score": session.player1_score,
             "player2_score": session.player2_score,
+            "current_score": current_score,  # ✅ EKLENDI!
             "game_finished": session.status == "finished",
             "xp_earned": 20 if (not is_pass and is_correct) else 0
         }
