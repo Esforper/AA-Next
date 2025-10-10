@@ -18,13 +18,13 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/web_theme.dart';
 import 'core/utils/platform_utils.dart';
 
-// Pages & Views (Mevcut)
-import 'pages/splash_page.dart';
-import 'pages/reels_feed_page.dart';
-import 'pages/login_page.dart';
-import 'pages/game_menu_page.dart';
-import 'views/home_view.dart';
-import 'views/profile_view.dart';
+// Mobile Platform Pages & Views (Doğru path'ler)
+import 'mobile_platform/pages/splash_page.dart';
+import 'mobile_platform/pages/reels_feed_page.dart';
+import 'mobile_platform/pages/login_page.dart';
+import 'mobile_platform/pages/game_menu_page.dart';
+import 'mobile_platform/views/home_view.dart';
+import 'mobile_platform/views/profile_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
