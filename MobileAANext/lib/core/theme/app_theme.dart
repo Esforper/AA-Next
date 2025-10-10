@@ -24,7 +24,7 @@ class AppTheme {
       foregroundColor: AppColors.textPrimary,
     ),
     
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: AppRadius.medium),
       color: Colors.white,
