@@ -1,3 +1,4 @@
+// lib/shared/widgets/read_handle.dart
 import 'package:flutter/material.dart';
 
 /// 4 yön: Yukarı, Sağ, Aşağı, Sol
@@ -31,6 +32,9 @@ class _ReadHandleState extends State<ReadHandle>
   late final AnimationController _expandAnim;
   late final Animation<double> _expandScale;
 
+  // ✅ AA Kurumsal Rengi
+  static const Color aaBlue = Color(0xFF003D82);
+
   @override
   void initState() {
     super.initState();
@@ -63,8 +67,6 @@ class _ReadHandleState extends State<ReadHandle>
     )..addListener(() {
       if (mounted) setState(() {});
     });
-    
-    debugPrint('[ReadHandle] Animasyonlar initialize edildi');
   }
 
   @override
@@ -122,12 +124,9 @@ class _ReadHandleState extends State<ReadHandle>
     final trackH = widget.trackSize.height;
     final pos = _anim.isAnimating ? _spring.value : _offset;
 
-    debugPrint('[ReadHandle] Build - isPressed: $_isPressed, expandValue: ${_expandScale.value}');
-
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onPanStart: (_) {
-        debugPrint('[ReadHandle] PAN START');
         setState(() => _isPressed = true);
         _expandAnim.forward();
       },
@@ -136,7 +135,6 @@ class _ReadHandleState extends State<ReadHandle>
         setState(() => _offset = next);
       },
       onPanEnd: (_) {
-        debugPrint('[ReadHandle] PAN END');
         setState(() => _isPressed = false);
         final action = _detectDirection();
         widget.onAction(action);
@@ -144,7 +142,6 @@ class _ReadHandleState extends State<ReadHandle>
         _expandAnim.reverse();
       },
       onPanCancel: () {
-        debugPrint('[ReadHandle] PAN CANCEL');
         setState(() => _isPressed = false);
         _animateBack();
         _expandAnim.reverse();
@@ -155,12 +152,11 @@ class _ReadHandleState extends State<ReadHandle>
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // DIŞ DAİRE (Animasyonlu açılır/kapanır)
+            // ✅ DIŞ KARE (Daha karesel, AA mavi)
             AnimatedBuilder(
               animation: _expandScale,
               builder: (context, child) {
                 final scale = _expandScale.value;
-                debugPrint('[ReadHandle] AnimatedBuilder scale: $scale');
                 
                 if (scale == 0.0) return const SizedBox.shrink();
                 
@@ -172,50 +168,50 @@ class _ReadHandleState extends State<ReadHandle>
                       width: trackW,
                       height: trackH,
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        shape: BoxShape.circle,
-                        boxShadow: const [
+                        color: aaBlue.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(24), // ✅ Karesel
+                        boxShadow: [
                           BoxShadow(
-                            blurRadius: 8,
-                            color: Colors.black38,
-                            offset: Offset(0, 3),
+                            blurRadius: 12,
+                            color: aaBlue.withOpacity(0.4),
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          // 4 Yön İkonları
+                          // 4 Yön İkonları (Beyaz)
                           Positioned(
                             top: 16,
                             child: Icon(
                               Icons.arrow_upward,
-                              color: Colors.white70,
-                              size: 20,
+                              color: Colors.white,
+                              size: 22,
                             ),
                           ),
                           Positioned(
                             right: 16,
                             child: Icon(
                               Icons.emoji_emotions_outlined,
-                              color: Colors.white70,
-                              size: 20,
+                              color: Colors.white,
+                              size: 22,
                             ),
                           ),
                           Positioned(
                             bottom: 16,
                             child: Icon(
                               Icons.share_outlined,
-                              color: Colors.white70,
-                              size: 20,
+                              color: Colors.white,
+                              size: 22,
                             ),
                           ),
                           Positioned(
                             left: 16,
                             child: Icon(
                               Icons.bookmark_outline,
-                              color: Colors.white70,
-                              size: 20,
+                              color: Colors.white,
+                              size: 22,
                             ),
                           ),
                         ],
@@ -226,28 +222,32 @@ class _ReadHandleState extends State<ReadHandle>
               },
             ),
 
-            // ÇEKIRDEK (Beyaz yuvarlak - her zaman görünür)
+            // ✅ ÇEKIRDEK (AA Logosu - Karesel)
             Transform.translate(
               offset: pos,
               child: Container(
                 width: widget.knobSize,
                 height: widget.knobSize,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+                  color: aaBlue,
+                  borderRadius: BorderRadius.circular(12), // ✅ Karesel
                   boxShadow: [
                     BoxShadow(
-                      blurRadius: _isPressed ? 8 : 4,
-                      color: Colors.black26,
-                      offset: const Offset(0, 2),
+                      blurRadius: _isPressed ? 12 : 6,
+                      color: Colors.black.withOpacity(0.3),
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
                 alignment: Alignment.center,
-                child: Icon(
-                  Icons.drag_indicator,
-                  color: Colors.black87,
-                  size: 24,
+                child: Text(
+                  'AA',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
                 ),
               ),
             ),

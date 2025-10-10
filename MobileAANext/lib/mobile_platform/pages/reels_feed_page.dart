@@ -16,6 +16,7 @@ import '../../shared/widgets/gamification/reels_xp_overlay.dart';
 import '../../shared/widgets/gamification/floating_xp.dart';
 import '../../shared/widgets/subtitle_widget.dart';
 import '../../services/reel_tracker_service.dart';
+import '../../core/constants/emoji_constants.dart';
 class ReelsFeedPage extends StatefulWidget {
   const ReelsFeedPage({super.key});
 
@@ -323,106 +324,90 @@ void _onSaveTapped(Reel reel) {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<ReelsProvider>();
+@override
+Widget build(BuildContext context) {
+  final provider = context.watch<ReelsProvider>();
 
-    if (provider.status == FeedStatus.initial) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final p = context.read<ReelsProvider>();
-        if (p.status == FeedStatus.initial) {
-          p.loadReels();
-        }
-      });
-    }
-
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('Reels', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _subtitlesEnabled ? Icons.closed_caption : Icons.closed_caption_disabled,
-              color: Colors.white,
-            ),
-            onPressed: () => setState(() => _subtitlesEnabled = !_subtitlesEnabled),
-            tooltip: _subtitlesEnabled ? 'Alt yazıları gizle' : 'Alt yazıları göster',
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          _buildBody(context, provider),
-
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(child: ReelsXPOverlay()),
-          ),
-
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: ReadHandle(
-                threshold: 35,
-                onAction: (action) {
-                  final currentReel = provider.current;
-                  if (currentReel == null) return;
-                  
-                  switch (action) {
-                    case HandleAction.up:
-                      // Detay okuma
-                      debugPrint('[Handle] UP - Article Detail');
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => ArticleReaderSheet(
-                          articleId: currentReel.id,
-                          title: currentReel.title,
-                          body: currentReel.fullContent.join('\n\n'),
-                          imageUrls: currentReel.imageUrls,
-                          category: currentReel.category,
-                          publishedDate: _formatDate(currentReel.publishedAt),
-                          onClose: () => Navigator.pop(context),
-                        ),
-                      );
-                      break;
-                    
-                    case HandleAction.right:
-                      // Emoji panel aç
-                      debugPrint('[Handle] RIGHT - Emoji Panel');
-                      _openEmojis(context, currentReel);  // ✅ Mevcut fonksiyonu kullan
-                      break;
-                    
-                    case HandleAction.down:
-                      // Paylaş
-                      debugPrint('[Handle] DOWN - Share');
-                      _onShareTapped(currentReel);  // ✅ YENİ HANDLER
-                      break;
-                    
-                    case HandleAction.left:
-                      // Kaydet
-                      debugPrint('[Handle] LEFT - Save');
-                      _onSaveTapped(currentReel);  // ✅ YENİ HANDLER
-                      break;
-                    
-                    case HandleAction.none:
-                      break;
-                  }
-                },
-              )
-            ),
-          ),
-        ],
-      ),
-    );
+  if (provider.status == FeedStatus.initial) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final p = context.read<ReelsProvider>();
+      if (p.status == FeedStatus.initial) {
+        p.loadReels();
+      }
+    });
   }
+
+  return Scaffold(
+    backgroundColor: const Color(0xFF003D82),
+    extendBodyBehindAppBar: true,
+    appBar: AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // AA Logosu
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Text(
+              'AA',
+              style: TextStyle(
+                color: Color(0xFF003D82),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Başlık
+          const Text(
+            'Reels',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(
+            _subtitlesEnabled ? Icons.closed_caption : Icons.closed_caption_disabled,
+            color: Colors.white,
+          ),
+          onPressed: () => setState(() => _subtitlesEnabled = !_subtitlesEnabled),
+          tooltip: _subtitlesEnabled ? 'Alt yazıları gizle' : 'Alt yazıları göster',
+        ),
+      ],
+    ),
+    // ✅ BODY EKLENDİ!
+    body: Stack(
+      children: [
+        _buildBody(context, provider),
+
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(child: ReelsXPOverlay()),
+        ),
+      ],
+    ),
+  );
+}
 
 // reels_feed_page.dart içine ekle
 String _formatDate(DateTime date) {
@@ -526,109 +511,233 @@ String _formatDate(DateTime date) {
   }
 
   // ✅ ESKİ TASARIM KORUNDU
-  Widget _buildReelItem(Reel reel) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // ✅ ESKİ: Görsel (top: 0, bottom: 160)
-        Positioned.fill(
-          top: 0,
-          bottom: 160,
-          child: Center(
-            child: AspectRatio(
-              aspectRatio: 4 / 3,
-              child: ClipRect(
-                child: SizedBox.expand(
-                  child: ImageCarousel(urls: reel.imageUrls),
-                ),
-              ),
+Widget _buildReelItem(Reel reel) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      // ✅ ARKA PLAN - AA Mavi
+      Positioned.fill(
+        child: Container(
+          color: const Color(0xFF003D82),
+        ),
+      ),
+
+      // ✅ GÖRSEL - Daha büyük, karesel, aşağı doğru genişledi
+      Positioned.fill(
+        top: 90,
+        bottom: 200, // 240 → 200 (daha aşağı)
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: 4 / 3, // 16:9 → 4:3 (daha karesel)
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: ImageCarousel(urls: reel.imageUrls),
             ),
           ),
         ),
+      ),
 
-        // ✅ ESKİ: Alt yazı (bottom: 240)
-        if (_subtitlesEnabled && reel.subtitles != null && reel.subtitles!.isNotEmpty)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 240,
-            child: Consumer<AudioService>(
-              builder: (context, audioService, _) {
-                return SubtitleWidget(
-                  subtitles: reel.subtitles!,
-                  currentPosition: audioService.position,
-                  isVisible: _subtitlesEnabled,
+      // ✅ BAŞLIK VE METABİLGİLER
+      Positioned(
+        left: 16,
+        right: 16,
+        bottom: 140, // 180 → 140
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Başlık
+              Text(
+                reel.title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                  height: 1.35,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Kategori ve Tarih
+              Row(
+                children: [
+                  // Kategori
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF003D82).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF003D82),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          reel.category.toUpperCase(),
+                          style: const TextStyle(
+                            color: Color(0xFF003D82),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 12),
+                  
+                  // Tarih
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 14,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDate(reel.publishedAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+
+      // ✅ ALTYAZI
+      if (_subtitlesEnabled && reel.subtitles != null && reel.subtitles!.isNotEmpty)
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 100, // 130 → 100
+          child: Consumer<AudioService>(
+            builder: (context, audioService, _) {
+              if (!audioService.isPlaying && audioService.position.inSeconds == 0) {
+                return const SizedBox.shrink();
+              }
+              
+              return SubtitleWidget(
+                subtitles: reel.subtitles!,
+                currentPosition: audioService.position,
+                isVisible: _subtitlesEnabled,
+              );
+            },
+          ),
+        ),
+
+      // ✅ READ HANDLE - ÇOK AŞAĞI (navigation'a çok yakın)
+      Positioned(
+        bottom: 30, // 100 → 30 🔥
+        left: 0,
+        right: 0,
+        child: Center(
+          child: ReadHandle(
+            threshold: 35,
+            onAction: (action) {
+              final currentReel = reel;
+              
+              switch (action) {
+                case HandleAction.up:
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => ArticleReaderSheet(
+                      articleId: currentReel.id,
+                      title: currentReel.title,
+                      body: currentReel.fullContent.join('\n\n'),
+                      imageUrls: currentReel.imageUrls,
+                      category: currentReel.category,
+                      publishedDate: _formatDate(currentReel.publishedAt),
+                      onClose: () => Navigator.pop(context),
+                    ),
+                  );
+                  break;
+                
+                case HandleAction.right:
+                  setState(() => _showEmojis = true);
+                  break;
+                
+                case HandleAction.down:
+                  _onShareTapped(currentReel);
+                  break;
+                
+                case HandleAction.left:
+                  _onSaveTapped(currentReel);
+                  break;
+                
+                case HandleAction.none:
+                  break;
+              }
+            },
+          ),
+        ),
+      ),
+
+      // ✅ Emoji Panel
+      if (_showEmojis)
+        Positioned(
+          bottom: 100, // 180 → 100
+          left: 0,
+          right: 0,
+          child: Center(
+            child: EmojiPanel(
+              publicEmojis: EmojiConstants.publicEmojis,
+              premiumEmojis: EmojiConstants.premiumEmojis,
+              onPick: (emoji) {
+                _onEmojiSelected(emoji, reel);
+                setState(() => _showEmojis = false);
+              },
+              onTapPremium: () {
+                setState(() => _showEmojis = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Premium emojiler şimdilik kilitli.'),
+                    duration: Duration(seconds: 2),
+                  ),
                 );
               },
             ),
           ),
-
-        // ✅ ESKİ: Başlık ve özet (bottom: 10)
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 10,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [
-                  Colors.black.withOpacity(0.8),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ✅ ESKİ: Sarı kutu başlık
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    reel.title,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 120),
-                // ✅ ESKİ: Özet
-                Text(
-                  reel.summary,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    height: 1.4,
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.95),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
-      ],
-    );
-  }
+    ],
+  );
+}
 
   void _openArticle(BuildContext context, Reel reel) {
     showModalBottomSheet(
@@ -815,17 +924,6 @@ class _ReelView extends StatelessWidget {
                       color: Colors.black87,
                       height: 1.2,
                     ),
-                  ),
-                ),
-                const SizedBox(height: 120),
-                Text(
-                  reel.summary,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    height: 1.4,
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.95),
                   ),
                 ),
               ],

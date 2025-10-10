@@ -278,7 +278,30 @@ class GameService:
             
             # Parse AI response
             ai_output = json.loads(response.choices[0].message.content)
-            print("AI sonuç üretti")
+            # 🔥 AI RESPONSE DETAYLI YAZDIRMA
+            print("=" * 80)
+            print("🤖 AI RESPONSE:")
+            print("=" * 80)
+
+            print(f"📄 Raw AI Output ({len(ai_output)} chars):")
+            print(ai_output)
+            print("=" * 80)
+
+            # Parse AI response
+            ai_output = json.loads(ai_output)
+
+            # 🔥 PARSE EDİLMİŞ ÇIKTI
+            print(f"✅ Parsed {len(ai_output.get('questions', []))} questions:")
+            for i, q in enumerate(ai_output.get('questions', [])):
+                print(f"\n📋 QUESTION {i}:")
+                print(f"   Q: {q.get('question', 'N/A')[:80]}...")
+                print(f"   ✓ Correct: {q.get('correct_option', 'N/A')[:50]}...")
+                print(f"   ✗ Wrong: {q.get('wrong_option', 'N/A')[:50]}...")
+                print(f"   💬 Response: {q.get('correct_response', 'N/A')}")
+                if q.get('emoji_comment'):
+                    print(f"   😊 Emoji: {q.get('emoji_comment')}")
+
+            print("=" * 80)
             
             # AI'dan gelen soruları GameQuestion'a çevir
             questions = []
@@ -338,67 +361,67 @@ class GameService:
             news_list.append({
                 "index": i,
                 "title": reel.news_data.title,
-                "summary": reel.news_data.summary[:300],  # Daha uzun özet
+                "summary": reel.news_data.summary[:300],
                 "player_asking": player_turn,
                 "asker_emoji": asker_emoji,
-                "responder_emoji": responder_emoji
+                "responder_emoji": responder_emoji  # 🔥 BU KULLANILACAK
             })
         
-        prompt = f"""Sen bir haber quiz oyunu için doğal WhatsApp tarzı sohbet diyalogları üreten bir asistansın.
+        prompt = f"""Sen bir haber quiz oyunu için SABİT FORMATTA cevaplar üreten bir asistansın.
 
-    İKİ OYUNCU VAR:
-    - Player 1 (Soru sıraları: 0, 2, 4, 6)
-    - Player 2 (Soru sıraları: 1, 3, 5, 7)
+        İKİ OYUNCU VAR:
+        - Player 1 (Soru sıraları: 0, 2, 4, 6)
+        - Player 2 (Soru sıraları: 1, 3, 5, 7)
 
-    HABERLER ({len(reels)} adet):
-    {json.dumps(news_list, ensure_ascii=False, indent=2)}
+        HABERLER ({len(reels)} adet):
+        {json.dumps(news_list, ensure_ascii=False, indent=2)}
 
-    GÖREV:
-    Her haber için WhatsApp tarzı doğal bir diyalog senaryosu oluştur.
+        GÖREV:
+        Her haber için SABİT FORMATTA diyalog senaryosu oluştur.
 
-    SORU FORMATI:
-    Player soruyor: "[Haber başlığı] haberini duydun mu?" veya benzeri doğal bir soru
+        🔥 ÖNEMLİ KURALLAR:
 
-    CEVAP SEÇENEKLERİ (2 adet):
-    1. DOĞRU seçenek: Haberin gerçek bir detayı (40-60 kelime, somut bilgi)
-    2. YANLIŞ seçenek: Mantıklı ama yanlış bir detay (40-60 kelime, gerçekçi görünmeli)
+        1. SORU FORMATI (DEĞİŞMEZ):
+        "[Haber başlığı] haberini duydun mu?"
 
-    CEVAP MESAJLARI:
-    - correct_response: Doğru cevap verildiğinde (5-15 kelime, samimi onay)
-    - wrong_response: Yanlış cevap verildiğinde (10-20 kelime, kibarca düzelt)
-    - pass_response: Pas geçildiğinde (30-50 kelime, haberi özetle)
+        2. CEVAP SEÇENEKLERİ:
+        - DOĞRU seçenek: "Evet evet, [haberin gerçek bir detayı 40-60 kelime]"
+        - YANLIŞ seçenek: "Hayır hayır, [mantıklı ama yanlış detay 40-60 kelime]"
 
-    EMOJİ YORUMLARı:
-    Eğer cevaplayan kişinin emoji'si varsa (responder_emoji), doğru cevap durumunda emoji'ye uygun bir yorum ekle:
-    - ❤️ → "Ben de çok beğenmiştim bu haberi!"
-    - 😢 → "Gerçekten üzücüydü"
-    - 👍 → "Aynen, çok iyi gelişme"
-    - 😮 → "Ben de çok şaşırmıştım"
-    - 😡 → "Gerçekten sinir bozucuydu"
+        3. DOĞRU CEVAP MESAJI (SABİT):
+        "Evet evet, doğru bildin!"
 
-    ÖNEMLI KURALLAR:
-    1. Samimi, doğal Türkçe konuşma tarzı kullan
-    2. Her haber için FARKLI sorular oluştur
-    3. Seçenekler somut, spesifik detaylar içermeli
-    4. Emoji varsa mutlaka yoruma dahil et
-    5. Kısa ve öz cevaplar (WhatsApp tarzı)
+        4. YANLIŞ CEVAP MESAJI (DOĞRUYU SÖYLE):
+        "Yok ya, yanlış hatırlıyorsun sanki. Doğrusu şöyleydi: [haberin gerçek özeti 30-50 kelime]"
 
-    JSON formatında dön:
-    {{
-    "questions": [
+        5. PAS GEÇ MESAJI:
+        "Haber şöyleydi: [haberin özeti 30-50 kelime]"
+
+        6. EMOJİ YORUMU (SADECE responder_emoji VARSA):
+        - ❤️ → "Ben de çok beğenmiştim bu haberi!"
+        - 😢 → "Gerçekten üzücüydü"
+        - 👍 → "Aynen, çok iyi gelişme"
+        - 😮 → "Ben de çok şaşırmıştım"
+        - 😡 → "Gerçekten sinir bozucuydu"
+        - 🔥 → "Çok heyecan vericiydi!"
+        - Emoji yoksa: emoji_comment alanı null olmalı
+
+        JSON formatında dön:
         {{
-        "question": "...",
-        "correct_option": "...",
-        "wrong_option": "...",
-        "correct_response": "...",
-        "wrong_response": "...",
-        "pass_response": "...",
-        "emoji_comment": "..." // Sadece emoji varsa
-        }},
-        ...
-    ]
-    }}
-    """
+        "questions": [
+            {{
+            "question": "[Haber başlığı] haberini duydun mu?",
+            "correct_option": "Evet evet, [gerçek detay]",
+            "wrong_option": "Hayır hayır, [yanlış detay]",
+            "correct_response": "Evet evet, doğru bildin!",
+            "wrong_response": "Yok ya, yanlış hatırlıyorsun sanki. Doğrusu şöyleydi: [gerçek özet]",
+            "pass_response": "Haber şöyleydi: [özet]",
+            "emoji_comment": "Ben de çok beğenmiştim bu haberi!"
+            }},
+            ...
+        ]
+        }}
+        """
         return prompt
     
     

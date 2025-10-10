@@ -144,52 +144,58 @@ void _handleWebSocketMessage(GameWebSocketMessage message) {
       debugPrint('✅ Connected to game room');
       break;
       
-    case GameWebSocketEventType.opponentAnswered:
-      // Rakip cevap verdi
-      final responseMessage = message.data['response_message'] as String?;
-      final emojiComment = message.data['emoji_comment'] as String?;
+  case GameWebSocketEventType.opponentAnswered:
+    // Rakip cevap verdi
+    final responseMessage = message.data['response_message'] as String?;
+    final emojiComment = message.data['emoji_comment'] as String?;
+    final isCorrect = message.data['is_correct'] as bool?;  // 🔥 EKLENDI
+    
+    debugPrint('🎮 Opponent answered: $responseMessage (correct: $isCorrect)');
+    
+    if (responseMessage != null) {
+      _addChatBubble(
+        isFromMe: false,
+        text: responseMessage,
+        isCorrect: isCorrect,  // 🔥 EKLENDI
+      );
       
-      if (responseMessage != null) {
-        _addChatBubble(
-          isFromMe: false,
-          text: responseMessage,
-        );
-        
-        if (emojiComment != null && emojiComment.isNotEmpty) {
-          Future.delayed(const Duration(milliseconds: 500), () {
-            _addChatBubble(
-              isFromMe: false,
-              text: emojiComment,
-              hasEmoji: true,
-            );
-          });
-        }
-      }
-      break;
-      
-    case GameWebSocketEventType.scoreUpdate:
-      // Skor güncellendi
-      final p1Score = message.data['player1_score'] as int?;
-      final p2Score = message.data['player2_score'] as int?;
-      final currentRound = message.data['current_round'] as int?;
-      
-      if (p1Score != null && p2Score != null && _session != null) {
-        setState(() {
-          _session = GameSession(
-            success: _session!.success,
-            gameId: _session!.gameId,
-            status: _session!.status,
-            player1Id: _session!.player1Id,
-            player2Id: _session!.player2Id,
-            player1Score: p1Score,
-            player2Score: p2Score,
-            currentRound: currentRound ?? _session!.currentRound,
-            totalRounds: _session!.totalRounds,
-            createdAt: _session!.createdAt,
+      if (emojiComment != null && emojiComment.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (!mounted) return;
+          _addChatBubble(
+            isFromMe: false,
+            text: emojiComment,
+            hasEmoji: true,
           );
         });
       }
-      break;
+    }
+    _scrollToBottom();
+    break;
+        
+      case GameWebSocketEventType.scoreUpdate:
+        // Skor güncellendi
+        final p1Score = message.data['player1_score'] as int?;
+        final p2Score = message.data['player2_score'] as int?;
+        final currentRound = message.data['current_round'] as int?;
+        
+        if (p1Score != null && p2Score != null && _session != null) {
+          setState(() {
+            _session = GameSession(
+              success: _session!.success,
+              gameId: _session!.gameId,
+              status: _session!.status,
+              player1Id: _session!.player1Id,
+              player2Id: _session!.player2Id,
+              player1Score: p1Score,
+              player2Score: p2Score,
+              currentRound: currentRound ?? _session!.currentRound,
+              totalRounds: _session!.totalRounds,
+              createdAt: _session!.createdAt,
+            );
+          });
+        }
+        break;
       
     case GameWebSocketEventType.newQuestion:
       // Yeni soru geldi

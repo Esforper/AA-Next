@@ -1,15 +1,13 @@
-// lib/widgets/gamification/level_chain_display.dart
+// lib/shared/widgets/gamification/level_chain_display.dart
+// Profesyonel UI/UX tasarımlı düğüm sistemi
 
 import 'package:flutter/material.dart';
 
-/// Level Chain Display Widget
-/// Düğüm şeklinde level gösterimi
-/// Her düğüm = 100 XP
 class LevelChainDisplay extends StatelessWidget {
   final int currentLevel;
   final int currentNode;
   final int totalNodes;
-  final int currentXP; // Mevcut düğümdeki XP (0-100)
+  final int currentXP;
   final bool compact;
 
   const LevelChainDisplay({
@@ -29,30 +27,48 @@ class LevelChainDisplay extends StatelessWidget {
     return _buildFull(context);
   }
 
-  // ============ COMPACT VERSION ============
-  // Reels üstünde kullanılıyor (artık overlay var ama yedek)
-  
   Widget _buildCompact() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.6),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFFCD34D),
+            const Color(0xFFFBBF24),
+          ],
+        ),
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFBBF24).withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            '⚡',
-            style: TextStyle(fontSize: 14),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.bolt,
+              size: 16,
+              color: Colors.white,
+            ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           Text(
-            'Lv $currentLevel',
+            'Level $currentLevel',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -60,29 +76,31 @@ class LevelChainDisplay extends StatelessWidget {
     );
   }
 
-  // ============ FULL VERSION ============
-  // Ana sayfa ve profil sayfasında kullanılıyor
-  
   Widget _buildFull(BuildContext context) {
     final levelProgress = totalNodes > 0 ? currentNode / totalNodes : 0.0;
     final nodeProgress = currentXP / 100;
     
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            Colors.amber[50]!,
-            Colors.orange[50]!,
+            const Color(0xFFFFFBEB), // amber-50
+            const Color(0xFFFEF3C7), // amber-100
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.amber[200]!, width: 2),
+        border: Border.all(
+          color: const Color(0xFFFCD34D), // amber-300
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.amber.withOpacity(0.2),
-            blurRadius: 12,
-            spreadRadius: 2,
+            color: const Color(0xFFFBBF24).withOpacity(0.2),
+            blurRadius: 16,
+            spreadRadius: 0,
             offset: const Offset(0, 4),
           ),
         ],
@@ -90,250 +108,286 @@ class LevelChainDisplay extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Level info
+          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.amber[400]!, Colors.orange[500]!],
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFFFCD34D), // amber-300
+                          Color(0xFFFBBF24), // amber-400
+                        ],
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.amber.withOpacity(0.4),
-                          blurRadius: 8,
-                          spreadRadius: 1,
+                          color: const Color(0xFFFBBF24).withOpacity(0.5),
+                          blurRadius: 12,
+                          spreadRadius: 0,
                         ),
                       ],
                     ),
-                    child: const Text(
-                      '⚡',
-                      style: TextStyle(fontSize: 24),
+                    child: const Icon(
+                      Icons.bolt,
+                      color: Colors.white,
+                      size: 28,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 16),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Level $currentLevel',
-                        style: TextStyle(
-                          fontSize: 22,
+                        style: const TextStyle(
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Colors.orange[900],
+                          color: Color(0xFF92400E), // amber-900
+                          letterSpacing: -0.5,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '$currentNode / $totalNodes düğüm',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey[600],
+                          color: Color(0xFF78716C), // stone-500
                         ),
                       ),
                     ],
                   ),
                 ],
               ),
-              
-              // Progress percentage
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
+                  horizontal: 16,
+                  vertical: 10,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber[300]!, width: 2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFFFCD34D),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Text(
                   '${(levelProgress * 100).toInt()}%',
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: const TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange[700],
+                    color: Color(0xFFB45309), // amber-700
+                    letterSpacing: -0.5,
                   ),
                 ),
               ),
             ],
           ),
           
+          const SizedBox(height: 24),
+          
+          // Düğüm zinciri
+          _buildChainRow(nodeProgress),
+          
           const SizedBox(height: 20),
           
-          // Chain visualization
-          _buildChainRow(nodeProgress),
+          // Progress bar
+          _buildProgressBar(levelProgress),
           
           const SizedBox(height: 16),
           
-          // Progress bar
-          _buildLevelProgressBar(levelProgress),
-          
-          const SizedBox(height: 12),
-          
-          // Info text
+          // Info
           _buildInfoText(),
         ],
       ),
     );
   }
-  
-  // ============ CHAIN GÖRSEL ============
-  
+
   Widget _buildChainRow(double nodeProgress) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (int i = 0; i < totalNodes; i++) ...[
-          _buildChainNode(i, nodeProgress),
-          
-          // Connector (son node'dan sonra gösterme)
-          if (i < totalNodes - 1) _buildConnector(i),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (int i = 0; i < totalNodes; i++) ...[
+            _buildNode(i, nodeProgress),
+            if (i < totalNodes - 1) _buildConnector(i),
+          ],
         ],
-      ],
+      ),
     );
   }
-  
-  // Tek bir düğüm
-  Widget _buildChainNode(int index, double nodeProgress) {
+
+  Widget _buildNode(int index, double nodeProgress) {
     final isCompleted = index < currentNode;
     final isCurrent = index == currentNode;
+    final isLocked = index > currentNode;
     
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: 36,
-      height: 36,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOutCubic,
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: isCompleted || isCurrent
-            ? LinearGradient(
-                colors: [Colors.amber[400]!, Colors.orange[500]!],
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFCD34D), // amber-300
+                  Color(0xFFFBBF24), // amber-400
+                  Color(0xFFF59E0B), // amber-500
+                ],
               )
             : null,
-        color: isCompleted || isCurrent ? null : Colors.grey[300],
+        color: isLocked ? const Color(0xFFE7E5E4) : null, // stone-200
         border: Border.all(
-          color: isCurrent ? Colors.orange[700]! : Colors.transparent,
+          color: isCurrent 
+              ? const Color(0xFFB45309) // amber-700
+              : Colors.transparent,
           width: 3,
         ),
         boxShadow: isCompleted || isCurrent
             ? [
                 BoxShadow(
-                  color: Colors.amber.withOpacity(0.5),
-                  blurRadius: 10,
+                  color: const Color(0xFFFBBF24).withOpacity(0.4),
+                  blurRadius: 12,
                   spreadRadius: 2,
+                  offset: const Offset(0, 4),
                 ),
               ]
             : null,
       ),
       child: Stack(
+        alignment: Alignment.center,
         children: [
-          // Completed check
+          // Completed
           if (isCompleted)
-            const Center(
-              child: Icon(
-                Icons.check,
-                size: 20,
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
                 color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                size: 28,
+                color: Color(0xFFF59E0B),
               ),
             ),
           
-          // Current node progress
+          // Current with progress
           if (isCurrent)
-            Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  value: nodeProgress,
-                  strokeWidth: 3,
-                  backgroundColor: Colors.white.withOpacity(0.3),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(
+                    value: nodeProgress,
+                    strokeWidth: 4,
+                    backgroundColor: Colors.white.withOpacity(0.3),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeCap: StrokeCap.round,
+                  ),
                 ),
-              ),
+                Text(
+                  '${(nodeProgress * 100).toInt()}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           
-          // Empty node
-          if (!isCompleted && !isCurrent)
-            Center(
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey[400],
-                ),
-              ),
+          // Locked
+          if (isLocked)
+            Icon(
+              Icons.lock_outline_rounded,
+              size: 24,
+              color: Colors.grey[400],
             ),
         ],
       ),
     );
   }
-  
-  // Bağlantı çizgisi
+
   Widget _buildConnector(int index) {
     final isCompleted = index < currentNode;
     
     return Container(
-      width: 16,
+      width: 32,
       height: 4,
-      margin: const EdgeInsets.symmetric(vertical: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         gradient: isCompleted
-            ? LinearGradient(
-                colors: [Colors.amber[400]!, Colors.orange[500]!],
+            ? const LinearGradient(
+                colors: [
+                  Color(0xFFFCD34D),
+                  Color(0xFFFBBF24),
+                ],
               )
             : null,
-        color: isCompleted ? null : Colors.grey[300],
+        color: isCompleted ? null : const Color(0xFFE7E5E4),
         borderRadius: BorderRadius.circular(2),
       ),
     );
   }
-  
-  // ============ LEVEL PROGRESS BAR ============
-  
-  Widget _buildLevelProgressBar(double progress) {
+
+  Widget _buildProgressBar(double progress) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Level İlerlemesi',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
+            color: Color(0xFF78716C),
+            letterSpacing: 0.3,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Container(
-          height: 10,
+          height: 12,
           decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(5),
+            color: const Color(0xFFF5F5F4), // stone-100
+            borderRadius: BorderRadius.circular(6),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(6),
             child: Stack(
               children: [
-                // Progress fill
                 FractionallySizedBox(
                   widthFactor: progress,
                   child: Container(
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.amber[400]!, Colors.orange[500]!],
+                        colors: [
+                          Color(0xFFFCD34D),
+                          Color(0xFFFBBF24),
+                          Color(0xFFF59E0B),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                
-                // Shine effect
                 FractionallySizedBox(
                   widthFactor: progress,
                   child: Container(
@@ -342,7 +396,7 @@ class LevelChainDisplay extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.white.withOpacity(0.4),
+                          Colors.white.withOpacity(0.5),
                           Colors.transparent,
                         ],
                       ),
@@ -356,33 +410,64 @@ class LevelChainDisplay extends StatelessWidget {
       ],
     );
   }
-  
-  // ============ INFO TEXT ============
-  
+
   Widget _buildInfoText() {
     final remainingNodes = totalNodes - currentNode;
     final remainingXP = (remainingNodes * 100) - currentXP;
     
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Sonraki level: $remainingNodes düğüm',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Sonraki Level',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF78716C),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$remainingNodes düğüm',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF92400E),
+                ),
+              ),
+            ],
           ),
-        ),
-        Text(
-          '$remainingXP XP kaldı',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Colors.orange[700],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFFFCD34D),
+                  Color(0xFFFBBF24),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '$remainingXP XP',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
