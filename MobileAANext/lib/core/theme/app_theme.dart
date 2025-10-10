@@ -20,8 +20,9 @@ class AppTheme {
     appBarTheme: const AppBarTheme(
       elevation: 0,
       centerTitle: false,
-      backgroundColor: Colors.white,
-      foregroundColor: AppColors.textPrimary,
+      backgroundColor: AppColors.primary, // AA Mavi
+      foregroundColor: Colors.white,
+      iconTheme: IconThemeData(color: Colors.white),
     ),
     
     cardTheme: CardThemeData(

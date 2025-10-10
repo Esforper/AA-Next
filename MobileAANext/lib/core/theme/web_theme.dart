@@ -12,11 +12,11 @@ class WebTheme {
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: AppRadius.large),
       color: Colors.white,
-      shadowColor: Colors.black.withOpacity(0.05),
+      shadowColor: Colors.black.withValues(alpha: 0.05),
     ),
     
     // Web için hover effect'leri
-    hoverColor: AppColors.primary.withOpacity(0.05),
+    hoverColor: AppColors.primary.withValues(alpha: 0.05),
     
     // Web için daha büyük butonlar
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -30,8 +30,8 @@ class WebTheme {
     
     // Web için scrollbar görünümü
     scrollbarTheme: ScrollbarThemeData(
-      thumbColor: MaterialStateProperty.all(AppColors.textTertiary.withOpacity(0.3)),
-      thickness: MaterialStateProperty.all(8),
+      thumbColor: WidgetStateProperty.all(AppColors.textTertiary.withValues(alpha: 0.3)),
+      thickness: WidgetStateProperty.all(8),
       radius: const Radius.circular(4),
     ),
   );

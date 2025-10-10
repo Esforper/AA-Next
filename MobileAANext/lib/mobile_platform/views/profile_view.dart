@@ -3,10 +3,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/utils/platform_utils.dart';
 import '../../providers/gamification_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../shared/widgets/gamification/level_chain_display.dart';
 import '../../shared/widgets/gamification/streak_display.dart';
+import '../../shared/widgets/gamification/daily_progress_card.dart';
 import '../pages/login_page.dart';
 import 'saved_reels_view.dart';
 
@@ -136,94 +138,125 @@ class ProfileView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // DÜZELTİLMİŞ KOD (DOĞRU)
-                    // DÜZELTİLMİŞ KOD (DOĞRU)
-                    Consumer<GamificationProvider>(
-                      builder: (context, provider, _) {
-                        return LevelChainDisplay(
-                          currentLevel: provider.currentLevel,
-                          currentNode: provider.currentNode,          // DOĞRU: Doğrudan provider'dan
-                          totalNodes: provider.state.nodesInLevel,    // DOĞRU: State içindeki doğru isim
-                          currentXP: provider.currentXP,              // DOĞRU: Doğrudan provider'dan
-                        );
-                      },
-                    ),
-                  const SizedBox(height: 24),
-
-                  // Streak Display
+                  // Level ve Streak Display - Responsive
                   Consumer<GamificationProvider>(
                     builder: (context, provider, _) {
-                      return StreakDisplay(
-                        streakDays: provider.currentStreak,
-                        percentile: provider.state.streakPercentile,
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Today's Stats
-                  _buildSectionHeader('📊', 'Bugünün İstatistikleri'),
-
-                  const SizedBox(height: 12),
-
-                  Consumer<GamificationProvider>(
-                    builder: (context, provider, _) {
-                      return Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
+                      final screenSize = PlatformUtils.getScreenSize(context);
+                      final isDesktopOrTablet = screenSize == ScreenSize.desktop || 
+                                               screenSize == ScreenSize.tablet;
+                      
+                      // Web/Tablet: Yan yana (mobil web hariç)
+                      if (isDesktopOrTablet && PlatformUtils.isWeb) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildStatRow(
-                              '🎯',
-                              'Bugün İzlenen',
-                              '${provider.state.reelsWatchedToday} haber',
+                            // Level Display
+                            Expanded(
+                              child: LevelChainDisplay(
+                                currentLevel: provider.currentLevel,
+                                currentNode: provider.currentNode,
+                                totalNodes: provider.state.nodesInLevel,
+                                currentXP: provider.currentXP,
+                              ),
                             ),
-                            const Divider(height: 24),
-                            _buildStatRow(
-                              '💬',
-                              'Bugün Emoji',
-                              '${provider.state.emojisGivenToday} adet',
-                            ),
-                            const Divider(height: 24),
-                            _buildStatRow(
-                              '📖',
-                              'Detay Okunan',
-                              '${provider.state.detailsReadToday} haber',
-                            ),
-                            const Divider(height: 24),
-                            _buildStatRow(
-                              '⭐',
-                              'Toplam XP',
-                              '${provider.state.totalXP} puan',
-                            ),
-                            const Divider(height: 24),
-                            _buildStatRow(
-                              '🏆',
-                              'Günlük Hedef',
-                              provider.dailyGoalCompleted
-                                  ? 'Tamamlandı! ✅'
-                                  : '${provider.state.xpEarnedToday}/${provider.dailyXPGoal}',
+                            const SizedBox(width: 16),
+                            // Streak Display
+                            Expanded(
+                              child: StreakDisplay(
+                                streakDays: provider.currentStreak,
+                                percentile: provider.state.streakPercentile,
+                              ),
                             ),
                           ],
-                        ),
+                        );
+                      }
+                      
+                      // Mobil veya mobil web: Alt alta
+                      return Column(
+                        children: [
+                          LevelChainDisplay(
+                            currentLevel: provider.currentLevel,
+                            currentNode: provider.currentNode,
+                            totalNodes: provider.state.nodesInLevel,
+                            currentXP: provider.currentXP,
+                          ),
+                          const SizedBox(height: 24),
+                          StreakDisplay(
+                            streakDays: provider.currentStreak,
+                            percentile: provider.state.streakPercentile,
+                          ),
+                        ],
                       );
                     },
                   ),
 
                   const SizedBox(height: 24),
 
-                  // Achievements Section
+                  // 🆕 YENİ: Günlük İlerleme + Bugünün İstatistikleri (Yan yana)
+                  Consumer<GamificationProvider>(
+                    builder: (context, provider, _) {
+                      final screenSize = PlatformUtils.getScreenSize(context);
+                      final isDesktopOrTablet = screenSize == ScreenSize.desktop || 
+                                               screenSize == ScreenSize.tablet;
+                      
+                      // Web/PC: Yan yana
+                      if (isDesktopOrTablet && PlatformUtils.isWeb) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Sol: Günlük İlerleme
+                            Expanded(
+                              flex: 1,
+                              child: DailyProgressCard(
+                                currentXP: provider.state.xpEarnedToday,
+                                goalXP: provider.dailyXPGoal,
+                                streakDays: provider.currentStreak,
+                                percentile: provider.state.streakPercentile,
+                                goalCompleted: provider.dailyGoalCompleted,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            // Sağ: Bugünün İstatistikleri
+                            Expanded(
+                              flex: 1,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSectionHeader('📊', 'Bugünün İstatistikleri'),
+                                  const SizedBox(height: 12),
+                                  _buildTodayStatsCard(provider),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      
+                      // Mobil: Alt alta
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Günlük İlerleme
+                          DailyProgressCard(
+                            currentXP: provider.state.xpEarnedToday,
+                            goalXP: provider.dailyXPGoal,
+                            streakDays: provider.currentStreak,
+                            percentile: provider.state.streakPercentile,
+                            goalCompleted: provider.dailyGoalCompleted,
+                          ),
+                          const SizedBox(height: 24),
+                          // Bugünün İstatistikleri
+                          _buildSectionHeader('📊', 'Bugünün İstatistikleri'),
+                          const SizedBox(height: 12),
+                          _buildTodayStatsCard(provider),
+                        ],
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Başarımlar Section
                   _buildSectionHeader('🏆', 'Başarımlar'),
 
                   const SizedBox(height: 12),
@@ -387,6 +420,59 @@ class ProfileView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  // 🆕 YENİ: Bugünün istatistikleri kartı
+  Widget _buildTodayStatsCard(GamificationProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildStatRow(
+            '🎯',
+            'Bugün İzlenen',
+            '${provider.state.reelsWatchedToday} haber',
+          ),
+          const Divider(height: 24),
+          _buildStatRow(
+            '💬',
+            'Bugün Emoji',
+            '${provider.state.emojisGivenToday} adet',
+          ),
+          const Divider(height: 24),
+          _buildStatRow(
+            '📖',
+            'Detay Okunan',
+            '${provider.state.detailsReadToday} haber',
+          ),
+          const Divider(height: 24),
+          _buildStatRow(
+            '⭐',
+            'Toplam XP',
+            '${provider.state.totalXP} puan',
+          ),
+          const Divider(height: 24),
+          _buildStatRow(
+            '🏆',
+            'Günlük Hedef',
+            provider.dailyGoalCompleted
+                ? 'Tamamlandı! ✅'
+                : '${provider.state.xpEarnedToday}/${provider.dailyXPGoal}',
+          ),
+        ],
+      ),
     );
   }
 

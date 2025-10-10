@@ -36,20 +36,175 @@
         "completed": false,
         "emoji_reaction": null,
         "engagement_score": 0.6
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3706473",
+        "news_title": "Kocaeli'de karaya oturan gemiden sızıntı olmadan 35 metreküp yakıt tahliye edildi",
+        "news_url": "https://www.aa.com.tr/tr/guncel/kocaelide-karaya-oturan-gemiden-sizinti-olmadan-35-metrekup-yakit-tahliye-edildi/3706473",
+        "category": "Ekonomi",
+        "keywords": [
+          "kurtarma",
+          "RAPID",
+          "Ulaştırma ve Altyapı Bakanlığı",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-10 23:10:44.473838",
+        "duration_ms": 56075,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.6
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3707393",
+        "news_title": "Kocaeli'de iş kazasında 2 kişi öldü",
+        "news_url": "https://www.aa.com.tr/tr/gundem/kocaelide-is-kazasinda-2-kisi-oldu/3707393",
+        "category": "Gündem",
+        "keywords": [
+          "fabrika",
+          "GEBKİM",
+          "patlama",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-10 23:11:52.828853",
+        "duration_ms": 63984,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.6
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3708023",
+        "news_title": "Yozgat'ta 75 yaşındaki gönüllü, tarihi caminin temizliğini yapıyor",
+        "news_url": "https://www.aa.com.tr/tr/yasam/yozgatta-75-yasindaki-gonullu-tarihi-caminin-temizligini-yapiyor/3708023",
+        "category": "Yaşam",
+        "keywords": [
+          "ahşap yapılı cami",
+          "Bekir Badat",
+          "Camiler ve Din Görevlileri Haftası",
+          "tavan  süslemeleri",
+          "Tokmak Hasan Paşa Camisi",
+          "Yozgat",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-10 23:50:51.408724",
+        "duration_ms": 128035,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.6
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3708328",
+        "news_title": "La Liga'da Bask takımları, bu haftaki maçlarında Filistin'e büyük destek verdi",
+        "news_url": "https://www.aa.com.tr/tr/spor/la-ligada-bask-takimlari-bu-haftaki-maclarinda-filistine-buyuk-destek-verdi/3708328",
+        "category": "Spor",
+        "keywords": [
+          "Alaves",
+          "Athletic Bilbao",
+          "İspanya'dan İsrail'e tepkiler",
+          "La Liga'dan Filistin'e destek",
+          "Osasuna",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-10 23:50:57.240990",
+        "duration_ms": 5364,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.2
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3706639",
+        "news_title": "AK Parti Sözcüsü Çelik'ten CHP'nin yeni yasama yılı açılışına katılmamasına tepki",
+        "news_url": "https://www.aa.com.tr/tr/politika/ak-parti-sozcusu-celikten-chpnin-yeni-yasama-yili-acilisina-katilmamasina-tepki/3706639",
+        "category": "Politika",
+        "keywords": [
+          "AK Parti Genel Başkan Yardımcısı ve Parti Sözcüsü Ömer Çelik",
+          "CHP",
+          "TBMM'nin 28. Dönem 4. Yasama Yılı",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-10 23:51:32.504647",
+        "duration_ms": 15583,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.4
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3707957",
+        "news_title": "Geleneksel karakterleri canlandıran imamlar çocuklara milli ve manevi değerleri tiyatroyla anlatıyor",
+        "news_url": "https://www.aa.com.tr/tr/yasam/geleneksel-karakterleri-canlandiran-imamlar-cocuklara-milli-ve-manevi-degerleri-tiyatroyla-anlatiyor/3707957",
+        "category": "Yaşam",
+        "keywords": [
+          "geleneksel karakterler",
+          "imam",
+          "milli ve manevi değerler",
+          "tiyatro oyunu",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-10 23:51:38.909593",
+        "duration_ms": 4614,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.1
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3704094",
+        "news_title": "MHP Genel Başkanı Bahçeli: Gazi Meclis protesto alanı değildir",
+        "news_url": "https://www.aa.com.tr/tr/politika/mhp-genel-baskani-bahceli-gazi-meclis-protesto-alani-degildir/3704094",
+        "category": "Politika",
+        "keywords": [
+          "28. Dönem TBMM'nin 4. Yasama Yılı",
+          "CHP",
+          "MHP Genel Başkanı Devlet Bahçeli",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-11 00:05:17.215403",
+        "duration_ms": 5059,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.2
+      },
+      {
+        "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
+        "reel_id": "reel_3705295",
+        "news_title": "Anne sütü bebeği hastalıklara karşı yaşam boyu koruyor",
+        "news_url": "https://www.aa.com.tr/tr/saglik/anne-sutu-bebegi-hastaliklara-karsi-yasam-boyu-koruyor/3705295",
+        "category": "Sağlık",
+        "keywords": [
+          "anne",
+          "Anne sütü",
+          "Bebek",
+          "emzirmek",
+          "Anadolu Ajansı"
+        ],
+        "viewed_at": "2025-10-11 00:05:29.069558",
+        "duration_ms": 3603,
+        "completed": false,
+        "emoji_reaction": null,
+        "engagement_score": 0.1
       }
     ]
   },
   "stats": {
     "49db2df2-28d5-4441-9577-4acd0900653a": {
       "user_id": "49db2df2-28d5-4441-9577-4acd0900653a",
-      "total_views": 2,
+      "total_views": 10,
       "completed_views": 0,
-      "total_duration_ms": 192878,
+      "total_duration_ms": 475195,
       "favorite_categories": {
-        "Ekonomi": 1,
-        "Gündem": 1
+        "Ekonomi": 2,
+        "Gündem": 2,
+        "Yaşam": 2,
+        "Spor": 1,
+        "Politika": 2,
+        "Sağlık": 1
       },
-      "last_viewed_at": "2025-10-10 23:09:44.447165",
+      "last_viewed_at": "2025-10-11 00:05:29.069558",
       "recent_keywords": [
         "Cumhurbaşkanı kararı",
         "Resmi Gazete",
@@ -58,9 +213,48 @@
         "İnşaat",
         "vinç",
         "vinç devrilmesi",
+        "Anadolu Ajansı",
+        "kurtarma",
+        "RAPID",
+        "Ulaştırma ve Altyapı Bakanlığı",
+        "Anadolu Ajansı",
+        "fabrika",
+        "GEBKİM",
+        "patlama",
+        "Anadolu Ajansı",
+        "ahşap yapılı cami",
+        "Bekir Badat",
+        "Camiler ve Din Görevlileri Haftası",
+        "tavan  süslemeleri",
+        "Tokmak Hasan Paşa Camisi",
+        "Yozgat",
+        "Anadolu Ajansı",
+        "Alaves",
+        "Athletic Bilbao",
+        "İspanya'dan İsrail'e tepkiler",
+        "La Liga'dan Filistin'e destek",
+        "Osasuna",
+        "Anadolu Ajansı",
+        "AK Parti Genel Başkan Yardımcısı ve Parti Sözcüsü Ömer Çelik",
+        "CHP",
+        "TBMM'nin 28. Dönem 4. Yasama Yılı",
+        "Anadolu Ajansı",
+        "geleneksel karakterler",
+        "imam",
+        "milli ve manevi değerler",
+        "tiyatro oyunu",
+        "Anadolu Ajansı",
+        "28. Dönem TBMM'nin 4. Yasama Yılı",
+        "CHP",
+        "MHP Genel Başkanı Devlet Bahçeli",
+        "Anadolu Ajansı",
+        "anne",
+        "Anne sütü",
+        "Bebek",
+        "emzirmek",
         "Anadolu Ajansı"
       ]
     }
   },
-  "last_updated": "2025-10-10T23:09:44.447317"
+  "last_updated": "2025-10-11T00:05:29.069864"
 }

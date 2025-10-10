@@ -3,47 +3,47 @@
 
 import 'package:flutter/material.dart';
 
-/// Renk paleti
+/// Renk paleti - AA Sitesi renkleri
 class AppColors {
-  // Primary colors
-  static const primary = Color(0xFF4F46E5); // Indigo
-  static const primaryDark = Color(0xFF4338CA);
-  static const primaryLight = Color(0xFF818CF8);
+  // Primary colors - AA Mavi
+  static const primary = Color(0xFF0078D2); // AA Mavi
+  static const primaryDark = Color(0xFF006BB8);
+  static const primaryLight = Color(0xFF3D94DC);
   
-  // Secondary colors
-  static const secondary = Color(0xFF06B6D4); // Cyan
-  static const secondaryDark = Color(0xFF0891B2);
-  static const secondaryLight = Color(0xFF67E8F9);
+  // Secondary colors - Koyu gri/mavi
+  static const secondary = Color(0xFF36495A); // Koyu gri/mavi
+  static const secondaryDark = Color(0xFF2A3844);
+  static const secondaryLight = Color(0xFF4A5D70);
   
-  // Accent colors
-  static const accent = Color(0xFFF59E0B); // Amber
-  static const accentDark = Color(0xFFD97706);
-  static const accentLight = Color(0xFFFBBF24);
+  // Accent colors - Koyu kırmızı vurgu
+  static const accent = Color(0xFFC30019); // AA Kırmızı
+  static const accentDark = Color(0xFFA00015);
+  static const accentLight = Color(0xFFD43347);
   
   // Gamification colors
   static const xpGold = Color(0xFFFBBF24);
-  static const streakFire = Color(0xFFEF4444);
-  static const levelPurple = Color(0xFF9333EA);
+  static const streakFire = Color(0xFFC30019); // AA Kırmızı streak için
+  static const levelPurple = Color(0xFF0078D2); // AA Mavi level için
   
   // Neutral colors
-  static const background = Color(0xFFF9FAFB);
-  static const surface = Colors.white;
-  static const surfaceVariant = Color(0xFFF3F4F6);
+  static const background = Color(0xFFFFFFFF); // Beyaz arka plan
+  static const surface = Color(0xFFFFFFFF); // Beyaz yüzey
+  static const surfaceVariant = Color(0xFF9DA6AB); // Açık gri
   
   // Text colors
-  static const textPrimary = Color(0xFF111827);
-  static const textSecondary = Color(0xFF6B7280);
-  static const textTertiary = Color(0xFF9CA3AF);
+  static const textPrimary = Color(0xFF131313); // Siyah/koyu ton
+  static const textSecondary = Color(0xFF36495A); // Koyu gri/mavi
+  static const textTertiary = Color(0xFF9DA6AB); // Açık gri
   
   // Status colors
   static const success = Color(0xFF10B981);
-  static const error = Color(0xFFEF4444);
+  static const error = Color(0xFFC30019); // AA Kırmızı hata için
   static const warning = Color(0xFFF59E0B);
-  static const info = Color(0xFF3B82F6);
+  static const info = Color(0xFF0078D2); // AA Mavi bilgi için
   
   // Borders
-  static const border = Color(0xFFE5E7EB);
-  static const borderDark = Color(0xFFD1D5DB);
+  static const border = Color(0xFF9DA6AB); // Açık gri
+  static const borderDark = Color(0xFF36495A); // Koyu gri/mavi
   
   // Gradients
   static const primaryGradient = LinearGradient(

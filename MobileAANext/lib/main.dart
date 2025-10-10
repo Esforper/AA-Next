@@ -16,6 +16,7 @@ import 'services/audio_service.dart';
 // Core (Yeni eklenenler)
 import 'core/theme/app_theme.dart';
 import 'core/theme/web_theme.dart';
+import 'core/constants/app_constants.dart';
 import 'core/utils/platform_utils.dart';
 
 // Mobile Platform Pages & Views (Doğru path'ler)
@@ -103,12 +104,54 @@ class _MainNavigatorState extends State<MainNavigator> {
 
   @override
   Widget build(BuildContext context) {
+    // Web (PC/tablet) için üstte butonlar, altta nav yok
+    final screenSize = PlatformUtils.getScreenSize(context);
+    final bool isWebWide = PlatformUtils.isWeb && (screenSize == ScreenSize.desktop || screenSize == ScreenSize.tablet);
+
     return Scaffold(
+      appBar: isWebWide
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              centerTitle: true,
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _TopNavButton(
+                    label: 'Ana Sayfa',
+                    icon: Icons.home_outlined,
+                    selected: _currentIndex == 0,
+                    onTap: () => setState(() => _currentIndex = 0),
+                  ),
+                  const SizedBox(width: 8),
+                  _TopNavButton(
+                    label: 'Reels',
+                    icon: Icons.play_circle_outline,
+                    selected: _currentIndex == 1,
+                    onTap: () => setState(() => _currentIndex = 1),
+                  ),
+                  const SizedBox(width: 8),
+                  _TopNavButton(
+                    label: 'Oyunlar',
+                    icon: Icons.sports_esports_outlined,
+                    selected: _currentIndex == 2,
+                    onTap: () => setState(() => _currentIndex = 2),
+                  ),
+                  const SizedBox(width: 8),
+                  _TopNavButton(
+                    label: 'Profil',
+                    icon: Icons.person_outline,
+                    selected: _currentIndex == 3,
+                    onTap: () => setState(() => _currentIndex = 3),
+                  ),
+                ],
+              ),
+            )
+          : null,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: isWebWide ? null : Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
@@ -126,9 +169,9 @@ class _MainNavigatorState extends State<MainNavigator> {
             });
           },
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: Colors.indigo[600],
-          unselectedItemColor: Colors.grey[400],
+          backgroundColor: AppColors.surface,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: AppColors.textTertiary,
           selectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 12,
@@ -158,6 +201,43 @@ class _MainNavigatorState extends State<MainNavigator> {
               label: 'Profil',
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopNavButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TopNavButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? Colors.white : Colors.white.withValues(alpha: 0.8);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: TextButton.icon(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          foregroundColor: color,
+          overlayColor: Colors.white.withValues(alpha: 0.1),
+        ),
+        icon: Icon(icon, color: color, size: 20),
+        label: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
         ),
       ),
     );
