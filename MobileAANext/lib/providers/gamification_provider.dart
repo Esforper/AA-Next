@@ -358,7 +358,7 @@ GamificationState _recalculateFromTotalXP(int totalXP) {
         _state = GamificationState.fromJson(stateJson);
       } else {
         // İlk açılış - mock data
-        _state = GamificationState.mock();
+        _state = const GamificationState();
       }
       
       // Emoji tracking yükle

@@ -1,62 +1,57 @@
 // lib/models/gamification_state.dart
+// Gamification State - Immutable state yönetimi
+// ✅ NODE ARTIŞ SORUNU DÜZELTİLDİ
 
 import 'package:flutter/foundation.dart';
 
-/// Gamification State Model
-/// XP & Level sistemi - Her düğüm 100 XP
+@immutable
 class GamificationState {
-  // XP & Level
-  final int currentXP;           // Mevcut düğümdeki XP (0-100)
-  final int dailyXPGoal;         // Günlük hedef (300 XP)
-  final int totalXP;             // Tüm zamanlar toplam XP
-  final int currentLevel;        // Seviye (1-100)
-  final int currentNode;         // Mevcut düğüm pozisyonu (0-based)
-  final int nodesInLevel;        // Bu seviyedeki toplam düğüm sayısı
+  // ============ CORE LEVEL/NODE DATA ============
+  final int totalXP;        // Toplam kazanılan XP
+  final int currentLevel;   // Mevcut level (0'dan başlar)
+  final int currentNode;    // Level içindeki node (0'dan başlar)
+  final int currentXP;      // Düğüm içindeki XP (0-99)
+  final int nodesInLevel;   // Bu level'deki toplam node sayısı
   
-  // Streak
-  final int currentStreak;       // Güncel streak (gün)
+  // ============ DAILY PROGRESS ============
+  final int xpEarnedToday;
+  final int dailyXPGoal;
+  final bool dailyGoalCompleted;
+  
+  // ============ STREAK ============
+  final int currentStreak;
+  final int longestStreak;
   final DateTime? lastActivityDate;
-  final int streakPercentile;    // Kullanıcıların %X'inden iyi
   
-  // Daily Progress
+  // ============ DAILY ACTIVITY COUNTS ============
   final int reelsWatchedToday;
   final int emojisGivenToday;
   final int detailsReadToday;
   final int sharesGivenToday;
-  final int xpEarnedToday;
-  final bool dailyGoalCompleted;
-  
+
   const GamificationState({
-    this.currentXP = 0,
-    this.dailyXPGoal = 300,
     this.totalXP = 0,
     this.currentLevel = 0,
     this.currentNode = 0,
+    this.currentXP = 0,
     this.nodesInLevel = 2,
+    this.xpEarnedToday = 0,
+    this.dailyXPGoal = 300,
+    this.dailyGoalCompleted = false,
     this.currentStreak = 0,
+    this.longestStreak = 0,
     this.lastActivityDate,
-    this.streakPercentile = 0,
     this.reelsWatchedToday = 0,
     this.emojisGivenToday = 0,
     this.detailsReadToday = 0,
     this.sharesGivenToday = 0,
-    this.xpEarnedToday = 0,
-    this.dailyGoalCompleted = false,
   });
-  
+
   // ============ COMPUTED PROPERTIES ============
   
-  /// Günlük progress yüzdesi (0.0 - 1.0)
-  double get dailyProgress => 
-    (xpEarnedToday / dailyXPGoal).clamp(0.0, 1.0);
-  
-  /// Düğüm progress yüzdesi (0.0 - 1.0)
-  double get nodeProgress => 
-    (currentXP / 100).clamp(0.0, 1.0);
-  
-  /// Level progress yüzdesi (0.0 - 1.0)
-  double get levelProgress => 
-    nodesInLevel > 0 ? (currentNode / nodesInLevel).clamp(0.0, 1.0) : 0.0;
+  /// Level ilerleme yüzdesi (0.0 - 1.0)
+  double get levelProgress => nodesInLevel > 0 
+      ? (currentNode / nodesInLevel).clamp(0.0, 1.0) : 0.0;
   
   /// Level tamamlanması için gereken toplam XP
   int get xpNeededForLevel => nodesInLevel * 100;
@@ -64,15 +59,13 @@ class GamificationState {
   /// Level içinde kazanılan toplam XP
   int get xpEarnedInLevel => (currentNode * 100) + currentXP;
   
-  // ============ XP EKLEME ============
+  // ============ XP EKLEME (DÜZELTİLDİ) ============
   
-  /// XP Ekle
+  /// XP Ekle - Total XP'den otomatik hesaplama yapar
   GamificationState addXP(int amount, String source) {
-    int newXP = xpEarnedToday + amount;
-    int newCurrentXP = currentXP + amount;
-    int newTotalXP = totalXP + amount;
-    
-    bool goalCompleted = newXP >= dailyXPGoal;
+    final newTotalXP = totalXP + amount;
+    final newXPToday = xpEarnedToday + amount;
+    final goalCompleted = newXPToday >= dailyXPGoal;
     
     // Activity counts güncelle
     int reels = reelsWatchedToday;
@@ -85,10 +78,12 @@ class GamificationState {
     if (source == 'detail_read') details++;
     if (source == 'share_given') shares++;
     
-    return copyWith(
-      currentXP: newCurrentXP,
-      xpEarnedToday: newXP,
+    // ✅ YENİ: Total XP'den level/node/currentXP hesapla
+    final calculatedState = _calculateFromTotalXP(newTotalXP);
+    
+    return calculatedState.copyWith(
       totalXP: newTotalXP,
+      xpEarnedToday: newXPToday,
       dailyGoalCompleted: goalCompleted,
       reelsWatchedToday: reels,
       emojisGivenToday: emojis,
@@ -97,193 +92,209 @@ class GamificationState {
     );
   }
   
-  // ============ LEVEL UP KONTROLÜ ============
+  // ============ TOTAL XP'DEN HESAPLAMA (YENİ) ============
   
-  /// Düğüm ve level atlamayı kontrol et
-  /// Düğüm ve level atlamayı kontrol et
-GamificationState checkLevelUp() {
-  int newCurrentXP = currentXP;
-  int newNode = currentNode;
-  int newLevel = currentLevel;
-  int newNodesInLevel = nodesInLevel;
-  
-  // Düğüm tamamlandı mı? (100 XP = 1 düğüm)
-  while (newCurrentXP >= 100) {
-    newCurrentXP -= 100;
-    newNode++;
+  /// Total XP'den level, node, currentXP hesapla
+  /// Backend'deki _calculate_level_and_node ile aynı mantık
+  GamificationState _calculateFromTotalXP(int totalXP) {
+    int remainingXP = totalXP;
+    int level = 0;
+    int node = 0;
+    int currentXP = 0;
     
-    // Level tamamlandı mı?
-    if (newNode >= newNodesInLevel) {
-      newLevel++;
-      newNode = 0;
-      newNodesInLevel = _getNodesForLevel(newLevel);
+    debugPrint('🔄 [Calculate] Total XP: $totalXP');
+    
+    while (remainingXP > 0) {
+      final nodesInLevel = _getNodesForLevel(level);
+      final xpForLevel = nodesInLevel * 100;
       
-      debugPrint('🎉 LEVEL UP! Level $newLevel reached, ${newNodesInLevel} nodes in this level');
+      if (remainingXP < xpForLevel) {
+        // Bu level'deyiz
+        node = remainingXP ~/ 100;
+        currentXP = remainingXP % 100;
+        
+        debugPrint('   → Level $level, Node $node, Current XP $currentXP');
+        
+        return copyWith(
+          currentLevel: level,
+          currentNode: node,
+          currentXP: currentXP,
+          nodesInLevel: nodesInLevel,
+        );
+      }
+      
+      // Bu level'i tamamladık, sonrakine geç
+      remainingXP -= xpForLevel;
+      level++;
+      
+      // Safety check
+      if (level > 100) {
+        debugPrint('⚠️ Max level reached!');
+        return copyWith(
+          currentLevel: 100,
+          currentNode: 0,
+          currentXP: 0,
+          nodesInLevel: 10,
+        );
+      }
     }
+    
+    // Tam 0 XP
+    return copyWith(
+      currentLevel: 0,
+      currentNode: 0,
+      currentXP: 0,
+      nodesInLevel: 2,
+    );
   }
   
-  return copyWith(
-    currentXP: newCurrentXP,
-    currentNode: newNode,
-    currentLevel: newLevel,
-    nodesInLevel: newNodesInLevel,
-  );
-}
+  // ============ HELPER: LEVEL'E GÖRE NODE SAYISI ============
   
-  // ============ LEVEL FORMÜLÜ ============
-  
-  /// Seviyeye göre düğüm sayısını hesapla
-  /// Level 1-5: 2 düğüm
-  /// Level 6-10: 4 düğüm
-  /// Level 11-15: 6 düğüm
-  /// Level 16+: 8 düğüm
+  /// Level'e göre node sayısını hesapla
+  /// Backend ile aynı: Her 5 levelda 2 node artar
   int _getNodesForLevel(int level) {
-  if (level < 5) return 2;
-  if (level < 10) return 4;
-  if (level < 15) return 6;
-  if (level < 20) return 8;
-  return 10; // Level 20+
-}
+    if (level < 5) return 2;
+    if (level < 10) return 4;
+    if (level < 15) return 6;
+    if (level < 20) return 8;
+    return 10; // Max
+  }
+
+  // ============ DAILY RESET ============
   
-  // ============ GÜNLÜK RESET ============
-  
-  /// Günlük sıfırlama (her gün)
+  /// Günlük verileri sıfırla
   GamificationState resetDaily() {
-    // Streak kontrolü
-    int newStreak = currentStreak;
-    if (dailyGoalCompleted) {
-      newStreak++; // Hedef tamamlandıysa streak devam
-    } else if (currentStreak > 0) {
-      newStreak = 0; // Hedef tamamlanmadıysa streak kırıldı
-    }
-    
     return copyWith(
       xpEarnedToday: 0,
+      dailyGoalCompleted: false,
       reelsWatchedToday: 0,
       emojisGivenToday: 0,
       detailsReadToday: 0,
       sharesGivenToday: 0,
-      dailyGoalCompleted: false,
-      currentStreak: newStreak,
-      lastActivityDate: DateTime.now(),
-      streakPercentile: _calculatePercentile(newStreak),
     );
   }
+
+  // ============ STREAK ============
   
-  // ============ HELPER METHODS ============
-  
-  /// Streak'e göre percentile hesapla
-  int _calculatePercentile(int streak) {
-    if (streak >= 30) return 95;
-    if (streak >= 14) return 85;
-    if (streak >= 7) return 70;
-    if (streak >= 3) return 50;
-    return 30;
+  /// Streak güncelle
+  GamificationState updateStreak(DateTime now) {
+    if (lastActivityDate == null) {
+      // İlk aktivite
+      return copyWith(
+        currentStreak: 1,
+        longestStreak: 1,
+        lastActivityDate: now,
+      );
+    }
+    
+    final lastDate = lastActivityDate!;
+    final daysDiff = now.difference(DateTime(lastDate.year, lastDate.month, lastDate.day)).inDays;
+    
+    if (daysDiff == 0) {
+      // Bugün zaten aktivite var
+      return this;
+    } else if (daysDiff == 1) {
+      // Dün aktivite vardı, streak devam
+      final newStreak = currentStreak + 1;
+      return copyWith(
+        currentStreak: newStreak,
+        longestStreak: newStreak > longestStreak ? newStreak : longestStreak,
+        lastActivityDate: now,
+      );
+    } else {
+      // Streak kırıldı
+      return copyWith(
+        currentStreak: 1,
+        lastActivityDate: now,
+      );
+    }
   }
-  
-  // ============ COPYWITH ============
+
+  // ============ COPY WITH ============
   
   GamificationState copyWith({
-    int? currentXP,
-    int? dailyXPGoal,
     int? totalXP,
     int? currentLevel,
     int? currentNode,
+    int? currentXP,
     int? nodesInLevel,
+    int? xpEarnedToday,
+    int? dailyXPGoal,
+    bool? dailyGoalCompleted,
     int? currentStreak,
+    int? longestStreak,
     DateTime? lastActivityDate,
-    int? streakPercentile,
     int? reelsWatchedToday,
     int? emojisGivenToday,
     int? detailsReadToday,
     int? sharesGivenToday,
-    int? xpEarnedToday,
-    bool? dailyGoalCompleted,
   }) {
     return GamificationState(
-      currentXP: currentXP ?? this.currentXP,
-      dailyXPGoal: dailyXPGoal ?? this.dailyXPGoal,
       totalXP: totalXP ?? this.totalXP,
       currentLevel: currentLevel ?? this.currentLevel,
       currentNode: currentNode ?? this.currentNode,
+      currentXP: currentXP ?? this.currentXP,
       nodesInLevel: nodesInLevel ?? this.nodesInLevel,
+      xpEarnedToday: xpEarnedToday ?? this.xpEarnedToday,
+      dailyXPGoal: dailyXPGoal ?? this.dailyXPGoal,
+      dailyGoalCompleted: dailyGoalCompleted ?? this.dailyGoalCompleted,
       currentStreak: currentStreak ?? this.currentStreak,
+      longestStreak: longestStreak ?? this.longestStreak,
       lastActivityDate: lastActivityDate ?? this.lastActivityDate,
-      streakPercentile: streakPercentile ?? this.streakPercentile,
       reelsWatchedToday: reelsWatchedToday ?? this.reelsWatchedToday,
       emojisGivenToday: emojisGivenToday ?? this.emojisGivenToday,
       detailsReadToday: detailsReadToday ?? this.detailsReadToday,
       sharesGivenToday: sharesGivenToday ?? this.sharesGivenToday,
-      xpEarnedToday: xpEarnedToday ?? this.xpEarnedToday,
-      dailyGoalCompleted: dailyGoalCompleted ?? this.dailyGoalCompleted,
     );
   }
+
+  // ============ JSON ============
   
-  // ============ MOCK DATA ============
-  
-  /// Test için mock data
-  factory GamificationState.mock() {
-  return GamificationState(
-      currentXP: 0,           // 45 → 0
-      totalXP: 0,            // 850 → 0  
-      currentLevel: 1,        // 3 → 1 (değişmedi ama tutarlılık için)
-      currentNode: 0,         // 1 → 0
-      nodesInLevel: 2,
-      currentStreak: 0,
-      lastActivityDate: DateTime.now(),
-      streakPercentile: 65,
-      reelsWatchedToday: 0,
-      emojisGivenToday: 0,
-      detailsReadToday: 0,
-      sharesGivenToday: 0,
-      xpEarnedToday: 0,
-      dailyGoalCompleted: false,
-    );
-  }
-  
-  // ============ JSON SERİALİZATION ============
-  
-  /// JSON'a çevir (Local storage için)
   Map<String, dynamic> toJson() {
     return {
-      'currentXP': currentXP,
-      'dailyXPGoal': dailyXPGoal,
       'totalXP': totalXP,
       'currentLevel': currentLevel,
       'currentNode': currentNode,
+      'currentXP': currentXP,
       'nodesInLevel': nodesInLevel,
+      'xpEarnedToday': xpEarnedToday,
+      'dailyXPGoal': dailyXPGoal,
+      'dailyGoalCompleted': dailyGoalCompleted,
       'currentStreak': currentStreak,
+      'longestStreak': longestStreak,
       'lastActivityDate': lastActivityDate?.toIso8601String(),
-      'streakPercentile': streakPercentile,
       'reelsWatchedToday': reelsWatchedToday,
       'emojisGivenToday': emojisGivenToday,
       'detailsReadToday': detailsReadToday,
       'sharesGivenToday': sharesGivenToday,
-      'xpEarnedToday': xpEarnedToday,
-      'dailyGoalCompleted': dailyGoalCompleted,
     };
   }
-  
-  /// JSON'dan oluştur
+
   factory GamificationState.fromJson(Map<String, dynamic> json) {
     return GamificationState(
-      currentXP: json['currentXP'] ?? 0,
-      dailyXPGoal: json['dailyXPGoal'] ?? 300,
       totalXP: json['totalXP'] ?? 0,
-      currentLevel: json['currentLevel'] ?? 1,
+      currentLevel: json['currentLevel'] ?? 0,
       currentNode: json['currentNode'] ?? 0,
+      currentXP: json['currentXP'] ?? 0,
       nodesInLevel: json['nodesInLevel'] ?? 2,
+      xpEarnedToday: json['xpEarnedToday'] ?? 0,
+      dailyXPGoal: json['dailyXPGoal'] ?? 300,
+      dailyGoalCompleted: json['dailyGoalCompleted'] ?? false,
       currentStreak: json['currentStreak'] ?? 0,
+      longestStreak: json['longestStreak'] ?? 0,
       lastActivityDate: json['lastActivityDate'] != null
           ? DateTime.parse(json['lastActivityDate'])
           : null,
-      streakPercentile: json['streakPercentile'] ?? 0,
       reelsWatchedToday: json['reelsWatchedToday'] ?? 0,
       emojisGivenToday: json['emojisGivenToday'] ?? 0,
       detailsReadToday: json['detailsReadToday'] ?? 0,
       sharesGivenToday: json['sharesGivenToday'] ?? 0,
-      xpEarnedToday: json['xpEarnedToday'] ?? 0,
-      dailyGoalCompleted: json['dailyGoalCompleted'] ?? false,
     );
+  }
+
+  @override
+  String toString() {
+    return 'GamificationState(level: $currentLevel, node: $currentNode/$nodesInLevel, '
+           'xp: $currentXP/100, total: $totalXP, streak: $currentStreak)';
   }
 }
