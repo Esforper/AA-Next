@@ -1,82 +1,105 @@
 // lib/views/home_view.dart
-// AA Haber Ana Sayfa - Haber kartları ve günlük ilerleme
+// GÜNCELLEME: Progress bar'lar ve düğüm sistemi + Web responsive düzen
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/utils/platform_utils.dart';
-import '../../core/constants/app_constants.dart';
-import '../../models/reel_model.dart';
 import '../../providers/gamification_provider.dart';
-import '../../providers/saved_reels_provider.dart';
-import '../../viewmodels/news_home_viewmodel.dart';
 import '../../shared/widgets/gamification/daily_progress_card.dart';
-import '../../shared/widgets/news_card.dart';
-import '../pages/reels_feed_page.dart';
+import '../../shared/widgets/gamification/level_chain_display.dart';
+import 'chat_rooms_view.dart';
+import '../pages/game_menu_page.dart';
 
-/// Home View - AA Haber Ana Sayfa
-/// Günlük ilerleme + Haber kartları (AA.com.tr tarzı)
-class HomeView extends StatefulWidget {
+/// Home View - Ana Sayfa
+/// Günlük ilerleme, level sistemi, oyun modları
+class HomeView extends StatelessWidget {
   const HomeView({Key? key}) : super(key: key);
 
   @override
-  State<HomeView> createState() => _HomeViewState();
-}
-
-class _HomeViewState extends State<HomeView> {
-  late NewsHomeViewModel _viewModel;
-  final ScrollController _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _viewModel = NewsHomeViewModel();
-    _viewModel.loadNews();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _viewModel.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >= 
-        _scrollController.position.maxScrollExtent - 200) {
-      _viewModel.loadMore();
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _viewModel,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: RefreshIndicator(
-          onRefresh: _viewModel.refresh,
-          color: AppColors.primary,
+    // Web için özel düzen: Üstte AppBar ve iki sütunlu içerik (sol ana içerik, sağ yan panel)
+    if (PlatformUtils.isWeb) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          title: const Text(
+            'AA - Next',
+            style: TextStyle(
+              color: Colors.blueAccent,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.menu, color: Colors.blueAccent),
+              onPressed: () {},
+            ),
+          ],
+        ),
+        backgroundColor: Colors.grey[50],
+        body: Row(
+          children: [
+            // Sol sütun: ana içerik
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: PlatformUtils.getMaxWidth(context),
+                    ),
+                    child: _buildMobileContent(context),
+                  ),
+                ),
+              ),
+            ),
+            // Sağ sütun: sabit genişlikli yan panel
+            Container(
+              width: 300,
+              padding: const EdgeInsets.all(16),
+              color: Colors.grey[200],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Öne Çıkanlar',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Web'e özel yardımcı içerikler buraya eklenebilir
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Mobil düzen (değişmeden)
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      body: SafeArea(
         child: CustomScrollView(
-            controller: _scrollController,
           slivers: [
-              // Mobil için AppBar
-              if (!PlatformUtils.isWeb || 
-                  PlatformUtils.getScreenSize(context) == ScreenSize.mobile)
+            // App Bar
             SliverAppBar(
               floating: true,
               snap: true,
               elevation: 0,
-                  backgroundColor: AppColors.primary,
+              backgroundColor: Colors.white,
               title: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                      gradient: LinearGradient(
+                        colors: [Colors.blue[600]!, Colors.indigo[600]!],
+                      ),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Text(
@@ -90,12 +113,13 @@ class _HomeViewState extends State<HomeView> {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      color: Colors.black87,
                     ),
                   ),
                 ],
               ),
               actions: [
+                // Level indicator
                 Consumer<GamificationProvider>(
                   builder: (context, provider, _) {
                     return Container(
@@ -105,13 +129,18 @@ class _HomeViewState extends State<HomeView> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                            color: AppColors.accent,
+                        gradient: LinearGradient(
+                          colors: [Colors.amber[400]!, Colors.orange[500]!],
+                        ),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                              const Text('⚡', style: TextStyle(fontSize: 16)),
+                          const Text(
+                            '⚡',
+                            style: TextStyle(fontSize: 16),
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Lv ${provider.currentLevel}',
@@ -131,7 +160,274 @@ class _HomeViewState extends State<HomeView> {
 
             // Content
             SliverToBoxAdapter(
-                child: _buildContent(context),
+              child: _buildMobileContent(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Ortak içerik widget'ı (hem mobil hem web için)
+  Widget _buildMobileContent(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Daily Progress Card
+        Consumer<GamificationProvider>(
+          builder: (context, provider, _) {
+            return DailyProgressCard(
+              currentXP: provider.state.xpEarnedToday,
+              goalXP: provider.dailyXPGoal,
+              streakDays: provider.currentStreak,
+              percentile: provider.state.streakPercentile,
+              goalCompleted: provider.dailyGoalCompleted,
+            );
+          },
+        ),
+
+        const SizedBox(height: 8),
+
+        // Level & Chain Display
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Consumer<GamificationProvider>(
+            builder: (context, provider, _) {
+              return LevelChainDisplay(
+                currentLevel: provider.currentLevel,
+                currentNode: provider.currentNode,
+                totalNodes: provider.state.nodesInLevel,
+                currentXP: provider.currentXP,
+              );
+            },
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // Section: Oyun Modları
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Row(
+            children: [
+              const Text(
+                '🎮',
+                style: TextStyle(fontSize: 20),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Oyun Modları',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Game modes grid (responsive)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: PlatformUtils.getGridColumns(context),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.3,
+            children: [
+              _buildGameModeCard(
+                context,
+                icon: '⚔️',
+                title: 'Haber Kapışması',
+                subtitle: 'Bilgini konuştur',
+                color: Colors.red,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const GameMenuPage()),
+                  );
+                },
+              ),
+              _buildGameModeCard(
+                context,
+                icon: '🔥',
+                title: 'Streak Modu',
+                subtitle: 'Seriyi devam ettir',
+                color: Colors.orange,
+                onTap: () {
+                  // Navigate to reels
+                },
+              ),
+              _buildGameModeCard(
+                context,
+                icon: '🏆',
+                title: 'Liderlik',
+                subtitle: 'Yakında',
+                color: Colors.purple,
+                isLocked: true,
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Bu özellik yakında eklenecek!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+              _buildGameModeCard(
+                context,
+                icon: '💬',
+                title: 'Sohbet Odaları',
+                subtitle: 'Arkadaşlarla',
+                color: Colors.green,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChatRoomsView(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Section: İstatistikler
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Row(
+            children: [
+              const Text(
+                '📊',
+                style: TextStyle(fontSize: 20),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Bugünkü Aktiviteler',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Stats cards
+        Consumer<GamificationProvider>(
+          builder: (context, provider, _) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  _buildStatCard(
+                    icon: '👀',
+                    label: 'İzlenen Haber',
+                    value: '${provider.state.reelsWatchedToday}',
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildStatCard(
+                    icon: '❤️',
+                    label: 'Atılan Emoji',
+                    value: '${provider.state.emojisGivenToday}',
+                    color: Colors.pink,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildStatCard(
+                    icon: '📖',
+                    label: 'Detay Okuma',
+                    value: '${provider.state.detailsReadToday}',
+                    color: Colors.purple,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildStatCard(
+                    icon: '🔗',
+                    label: 'Paylaşım',
+                    value: '${provider.state.sharesGivenToday}',
+                    color: Colors.green,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildGameModeCard(
+    BuildContext context, {
+    required String icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    bool isLocked = false,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 2,
+      shadowColor: color.withOpacity(0.1),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: color.withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    icon,
+                    style: const TextStyle(fontSize: 32),
+                  ),
+                  if (isLocked)
+                    Icon(
+                      Icons.lock,
+                      color: Colors.grey[400],
+                      size: 20,
+                    ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: color.withOpacity(isLocked ? 0.5 : 1.0),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -140,450 +436,56 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // Ana içerik
-  Widget _buildContent(BuildContext context) {
-    final screenSize = PlatformUtils.getScreenSize(context);
-    final isWebWide = PlatformUtils.isWeb && 
-                      (screenSize == ScreenSize.desktop || screenSize == ScreenSize.tablet);
-    
-    return Padding(
-      padding: isWebWide 
-          ? const EdgeInsets.symmetric(horizontal: 48, vertical: 24)
-          : const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-          // Kategori filtresi - Responsive (Mobilde wrap, web'de horizontal scroll)
-          Consumer<NewsHomeViewModel>(
-            builder: (context, vm, _) {
-              final screenSize = PlatformUtils.getScreenSize(context);
-              final isMobile = screenSize == ScreenSize.mobile;
-              
-              // Mobil: Wrap layout (2 satır)
-              if (isMobile) {
-                return Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: vm.categories.map((category) {
-                    final isSelected = vm.selectedCategory == category;
-                    return FilterChip(
-                      label: Text(category),
-                      selected: isSelected,
-                      onSelected: (_) => vm.selectCategory(category),
-                      backgroundColor: AppColors.surface,
-                      selectedColor: AppColors.primary,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                      side: BorderSide(
-                        color: isSelected ? AppColors.primary : AppColors.border,
-                      ),
-                    );
-                  }).toList(),
-                );
-              }
-              
-              // Web: Horizontal scroll
-              return SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: vm.categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final category = vm.categories[index];
-                    final isSelected = vm.selectedCategory == category;
-                    
-                    return FilterChip(
-                      label: Text(category),
-                      selected: isSelected,
-                      onSelected: (_) => vm.selectCategory(category),
-                      backgroundColor: AppColors.surface,
-                      selectedColor: AppColors.primary,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                      side: BorderSide(
-                        color: isSelected ? AppColors.primary : AppColors.border,
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-
-                  const SizedBox(height: 24),
-
-          // Haber listesi
-          Consumer<NewsHomeViewModel>(
-            builder: (context, vm, _) {
-              if (vm.isLoading && vm.news.isEmpty) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(48),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-
-              if (vm.error != null && vm.news.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(48),
-                        child: Column(
-                          children: [
-                        const Icon(Icons.error_outline, size: 64, color: AppColors.error),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Haberler yüklenemedi',
-                          style: AppTextStyles.h4,
-                            ),
-                            const SizedBox(height: 8),
-                        Text(
-                          vm.error!,
-                          style: AppTextStyles.bodySmall,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: vm.refresh,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Tekrar Dene'),
-            ),
-          ],
+  Widget _buildStatCard({
+    required String icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1.5,
         ),
       ),
-    );
-  }
-
-              if (vm.isEmpty) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(48),
-                    child: Text('Henüz haber yok'),
-      ),
-    );
-  }
-
-              final filteredNews = vm.filteredNews;
-
-              // Responsive grid düzeni
-              return _buildNewsGrid(context, filteredNews, isWebWide);
-            },
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              icon,
+              style: const TextStyle(fontSize: 24),
+            ),
           ),
-
-          // Loading indicator (daha fazla yüklenirken)
-          Consumer<NewsHomeViewModel>(
-            builder: (context, vm, _) {
-              if (vm.isLoading && vm.news.isNotEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              return const SizedBox.shrink();
-            },
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
+              ),
+            ),
           ),
-
-          const SizedBox(height: 32),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
   }
-
-  // Haber grid düzeni - Responsive: Web'de küçük, mobilde orta boy kartlar
-  Widget _buildNewsGrid(BuildContext context, List<Reel> news, bool isWebWide) {
-    final crossAxisCount = isWebWide ? 5 : 2; // Web'de 5 sütun (daha küçük), mobilde 2 sütun
-    // Web'de 0.75 = daha küçük kartlar (1/3 oranında küçültülmüş)
-    // Mobilde 0.85 = orta boy kartlar
-    final aspectRatio = isWebWide ? 0.75 : 0.85;
-    
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: aspectRatio, // 📐 Responsive aspect ratio
-      ),
-      itemCount: news.length,
-      itemBuilder: (context, index) {
-        return NewsCard(
-          news: news[index],
-          onTap: () => _showNewsDetailModal(context, news[index]),
-        );
-      },
-    );
-  }
-
-  // Haber detayına git (Reels sayfasına yönlendir)
-  void _openNewsDetail(Reel news) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const ReelsFeedPage(),
-      ),
-    );
-  }
-
-  // 🆕 YENİ: Modal detay kartı göster
-  void _showNewsDetailModal(BuildContext context, Reel news) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _NewsDetailModal(news: news),
-    );
-  }
 }
-
-// 🆕 YENİ: Detay Modal Widget
-class _NewsDetailModal extends StatelessWidget {
-  final Reel news;
-
-  const _NewsDetailModal({required this.news});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasImage = news.imageUrls.isNotEmpty;
-    final screenHeight = MediaQuery.of(context).size.height;
-    
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // 🌫️ Arka plan bulanık
-      child: Container(
-        height: screenHeight * 0.9,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            // Üst butonlar (Geri, Paylaş, Beğen)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Geri butonu
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey[100],
-                    ),
-                  ),
-                  
-                  // Sağ taraf butonlar
-                  Row(
-                    children: [
-                      // Beğen butonu
-                      Consumer<SavedReelsProvider>(
-                        builder: (context, savedProvider, _) {
-                          final isSaved = savedProvider.isSaved(news.id);
-                          return IconButton(
-                            onPressed: () => _toggleSave(context, news, isSaved),
-                            icon: Icon(
-                              isSaved ? Icons.bookmark : Icons.bookmark_border,
-                              color: isSaved ? AppColors.primary : Colors.grey[700],
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.grey[100],
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      // Paylaş butonu
-                      IconButton(
-                        onPressed: () => _shareNews(news),
-                        icon: const Icon(Icons.share),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.grey[100],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // İçerik
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Resim
-                    if (hasImage)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: CachedNetworkImage(
-                          imageUrl: news.imageUrls.first,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            height: 250,
-                            color: AppColors.surfaceVariant,
-                            child: const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            height: 250,
-                            color: AppColors.surfaceVariant,
-                            child: const Icon(Icons.image_not_supported, size: 64),
-                          ),
-                        ),
-                      ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Kategori ve zaman
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            news.category.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          _formatTime(news.publishedAt),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textTertiary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    // Başlık
-                    Text(
-                      news.title,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                        height: 1.3,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    // Özet
-                    Text(
-                      news.summary,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                        height: 1.6,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Tam içerik
-                    if (news.fullContent.isNotEmpty)
-                      ...news.fullContent.map((paragraph) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(
-                          paragraph,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: AppColors.textPrimary,
-                            height: 1.7,
-                          ),
-                        ),
-                      )),
-                    
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _toggleSave(BuildContext context, Reel news, bool isSaved) {
-    final savedProvider = context.read<SavedReelsProvider>();
-    
-    if (isSaved) {
-      savedProvider.unsaveReel(news.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kaydedilenlerden çıkarıldı'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } else {
-      savedProvider.saveReel(
-        reelId: news.id,
-        title: news.title,
-        imageUrl: news.imageUrls.isNotEmpty ? news.imageUrls.first : '',
-        content: news.fullContent.join('\n\n'),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kaydedilenlere eklendi 💾'),
-          duration: Duration(seconds: 2),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
-
-  void _shareNews(Reel news) {
-    Share.share(
-      '${news.title}\n\n${news.summary}\n\nAA Haber uygulamasından paylaşıldı.',
-      subject: news.title,
-    );
-  }
-
-  String _formatTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-    
-    if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} dk önce';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} saat önce';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} gün önce';
-    } else {
-      return '${dateTime.day}.${dateTime.month}.${dateTime.year}';
-    }
-  }
-}
-
