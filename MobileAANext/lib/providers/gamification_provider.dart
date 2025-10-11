@@ -198,38 +198,67 @@ class GamificationProvider extends ChangeNotifier {
   }
   
   /// Total XP'den state hesapla (helper metod)
-  GamificationState _recalculateFromTotalXP(int totalXP) {
-    int remainingXP = totalXP;
-    int level = 1;
-    int node = 0;
-    int currentXP = 0;
+  /// Total XP'den state hesapla (helper metod)
+GamificationState _recalculateFromTotalXP(int totalXP) {
+  int remainingXP = totalXP;
+  int level = 0;  // ✅ DEĞİŞTİ: 1 → 0
+  int node = 0;
+  int currentXP = 0;
+  
+  debugPrint('🔄 [Recalculate] Starting from totalXP: $totalXP');
+  
+  while (remainingXP > 0) {
+    // Bu level'de kaç node var?
+    final nodesInLevel = _getNodesForLevel(level);
+    final xpForLevel = nodesInLevel * 100;
     
-    while (remainingXP >= 100) {
-      // Bir node tamamlandı
-      remainingXP -= 100;
-      node++;
+    debugPrint('   Level $level: $nodesInLevel nodes = $xpForLevel XP needed');
+    
+    if (remainingXP < xpForLevel) {
+      // Bu level'deyiz
+      node = remainingXP ~/ 100;
+      currentXP = remainingXP % 100;
       
-      // Bu level'de kaç node var?
-      final nodesInLevel = _getNodesForLevel(level);
+      debugPrint('   → Final: Level $level, Node $node, CurrentXP $currentXP');
       
-      // Level tamamlandı mı?
-      if (node >= nodesInLevel) {
-        level++;
-        node = 0;
-      }
+      return _state.copyWith(
+        totalXP: totalXP,
+        currentLevel: level,
+        currentNode: node,
+        currentXP: currentXP,
+        nodesInLevel: nodesInLevel,
+      );
     }
     
-    currentXP = remainingXP;
-    final nodesInLevel = _getNodesForLevel(level);
+    // Bu level'i tamamladık, sonrakine geç
+    remainingXP -= xpForLevel;
+    level++;
     
-    return _state.copyWith(
-      currentLevel: level,
-      currentNode: node,
-      nodesInLevel: nodesInLevel,
-      currentXP: currentXP,
-      totalXP: totalXP,
-    );
+    debugPrint('   ✓ Level completed, remaining XP: $remainingXP');
+    
+    // Safety check
+    if (level > 100) {
+      debugPrint('⚠️ Max level reached!');
+      return _state.copyWith(
+        totalXP: totalXP,
+        currentLevel: 100,
+        currentNode: 0,
+        currentXP: 0,
+        nodesInLevel: 10,
+      );
+    }
   }
+  
+  // XP = 0 ise
+  debugPrint('   → Zero XP: Level 0, Node 0');
+  return _state.copyWith(
+    totalXP: 0,
+    currentLevel: 0,
+    currentNode: 0,
+    currentXP: 0,
+    nodesInLevel: 2,
+  );
+}
   
   /// Level'e göre node sayısı
   int _getNodesForLevel(int level) {
@@ -356,7 +385,7 @@ class GamificationProvider extends ChangeNotifier {
       
     } catch (e) {
       debugPrint('❌ Storage yükleme hatası: $e');
-      _state = GamificationState.mock();
+      _state = const GamificationState();
     }
   }
   

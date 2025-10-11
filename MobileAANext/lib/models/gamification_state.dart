@@ -30,7 +30,7 @@ class GamificationState {
     this.currentXP = 0,
     this.dailyXPGoal = 300,
     this.totalXP = 0,
-    this.currentLevel = 1,
+    this.currentLevel = 0,
     this.currentNode = 0,
     this.nodesInLevel = 2,
     this.currentStreak = 0,
@@ -100,32 +100,35 @@ class GamificationState {
   // ============ LEVEL UP KONTROLÜ ============
   
   /// Düğüm ve level atlamayı kontrol et
-  GamificationState checkLevelUp() {
-    int newCurrentXP = currentXP;
-    int newNode = currentNode;
-    int newLevel = currentLevel;
-    int newNodesInLevel = nodesInLevel;
+  /// Düğüm ve level atlamayı kontrol et
+GamificationState checkLevelUp() {
+  int newCurrentXP = currentXP;
+  int newNode = currentNode;
+  int newLevel = currentLevel;
+  int newNodesInLevel = nodesInLevel;
+  
+  // Düğüm tamamlandı mı? (100 XP = 1 düğüm)
+  while (newCurrentXP >= 100) {
+    newCurrentXP -= 100;
+    newNode++;
     
-    // Düğüm tamamlandı mı? (100 XP = 1 düğüm)
-    while (newCurrentXP >= 100) {
-      newCurrentXP -= 100;
-      newNode++;
+    // Level tamamlandı mı?
+    if (newNode >= newNodesInLevel) {
+      newLevel++;
+      newNode = 0;
+      newNodesInLevel = _getNodesForLevel(newLevel);
       
-      // Level tamamlandı mı?
-      if (newNode >= newNodesInLevel) {
-        newLevel++;
-        newNode = 0;
-        newNodesInLevel = _getNodesForLevel(newLevel);
-      }
+      debugPrint('🎉 LEVEL UP! Level $newLevel reached, ${newNodesInLevel} nodes in this level');
     }
-    
-    return copyWith(
-      currentXP: newCurrentXP,
-      currentNode: newNode,
-      currentLevel: newLevel,
-      nodesInLevel: newNodesInLevel,
-    );
   }
+  
+  return copyWith(
+    currentXP: newCurrentXP,
+    currentNode: newNode,
+    currentLevel: newLevel,
+    nodesInLevel: newNodesInLevel,
+  );
+}
   
   // ============ LEVEL FORMÜLÜ ============
   
@@ -135,11 +138,12 @@ class GamificationState {
   /// Level 11-15: 6 düğüm
   /// Level 16+: 8 düğüm
   int _getNodesForLevel(int level) {
-    if (level <= 5) return 2;
-    if (level <= 10) return 4;
-    if (level <= 15) return 6;
-    return 8; // 16+
-  }
+  if (level < 5) return 2;
+  if (level < 10) return 4;
+  if (level < 15) return 6;
+  if (level < 20) return 8;
+  return 10; // Level 20+
+}
   
   // ============ GÜNLÜK RESET ============
   
@@ -219,21 +223,20 @@ class GamificationState {
   
   /// Test için mock data
   factory GamificationState.mock() {
-    return GamificationState(
-      currentXP: 45,
-      dailyXPGoal: 300,
-      totalXP: 850,
-      currentLevel: 3,
-      currentNode: 1,
+  return GamificationState(
+      currentXP: 0,           // 45 → 0
+      totalXP: 0,            // 850 → 0  
+      currentLevel: 1,        // 3 → 1 (değişmedi ama tutarlılık için)
+      currentNode: 0,         // 1 → 0
       nodesInLevel: 2,
-      currentStreak: 5,
+      currentStreak: 0,
       lastActivityDate: DateTime.now(),
       streakPercentile: 65,
-      reelsWatchedToday: 8,
-      emojisGivenToday: 6,
-      detailsReadToday: 4,
-      sharesGivenToday: 2,
-      xpEarnedToday: 145,
+      reelsWatchedToday: 0,
+      emojisGivenToday: 0,
+      detailsReadToday: 0,
+      sharesGivenToday: 0,
+      xpEarnedToday: 0,
       dailyGoalCompleted: false,
     );
   }
