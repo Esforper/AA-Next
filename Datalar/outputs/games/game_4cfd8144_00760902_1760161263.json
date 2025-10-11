@@ -1,0 +1,111 @@
+{
+  "game_id": "game_4cfd8144_00760902_1760161263",
+  "player1_id": "4cfd8144-0c78-4379-be89-e472ddda1e79",
+  "player2_id": "00760902-7e94-4c25-aa4f-dfce501044c1",
+  "player1_score": 40,
+  "player2_score": 80,
+  "winner_id": "00760902-7e94-4c25-aa4f-dfce501044c1",
+  "created_at": "2025-10-11T08:41:03.134560",
+  "finished_at": "2025-10-11T08:41:20.138922",
+  "total_rounds": 8,
+  "round_history": [
+    {
+      "round": 0,
+      "player_id": "00760902-7e94-4c25-aa4f-dfce501044c1",
+      "is_correct": true,
+      "is_pass": false,
+      "timestamp": "2025-10-11T08:41:07.027111"
+    },
+    {
+      "round": 1,
+      "player_id": "4cfd8144-0c78-4379-be89-e472ddda1e79",
+      "is_correct": false,
+      "is_pass": false,
+      "timestamp": "2025-10-11T08:41:08.885297"
+    },
+    {
+      "round": 2,
+      "player_id": "00760902-7e94-4c25-aa4f-dfce501044c1",
+      "is_correct": true,
+      "is_pass": false,
+      "timestamp": "2025-10-11T08:41:10.667250"
+    },
+    {
+      "round": 3,
+      "player_id": "4cfd8144-0c78-4379-be89-e472ddda1e79",
+      "is_correct": false,
+      "is_pass": false,
+      "timestamp": "2025-10-11T08:41:12.649889"
+    },
+    {
+      "round": 4,
+      "player_id": "00760902-7e94-4c25-aa4f-dfce501044c1",
+      "is_correct": true,
+      "is_pass": false,
+      "timestamp": "2025-10-11T08:41:14.382197"
+    },
+    {
+      "round": 5,
+      "player_id": "4cfd8144-0c78-4379-be89-e472ddda1e79",
+      "is_correct": true,
+      "is_pass": false,
+      "timestamp": "2025-10-11T08:41:16.223605"
+    },
+    {
+      "round": 6,
+      "player_id": "00760902-7e94-4c25-aa4f-dfce501044c1",
+      "is_correct": true,
+      "is_pass": false,
+      "timestamp": "2025-10-11T08:41:18.006984"
+    },
+    {
+      "round": 7,
+      "player_id": "4cfd8144-0c78-4379-be89-e472ddda1e79",
+      "is_correct": true,
+      "is_pass": false,
+      "timestamp": "2025-10-11T08:41:20.138909"
+    }
+  ],
+  "news_discussed": [
+    {
+      "reel_id": "reel_3706392",
+      "title": "Okan Buruk ve Sergen Yalçın'ın derbi karnesi",
+      "url": "https://www.aa.com.tr/tr/guncel/okan-buruk-ve-sergen-yalcinin-derbi-karnesi/3706392"
+    },
+    {
+      "reel_id": "reel_3705231",
+      "title": "Trabzonspor, Kayserispor'u konuk edecek",
+      "url": "https://www.aa.com.tr/tr/spor/trabzonspor-kayserisporu-konuk-edecek/3705231"
+    },
+    {
+      "reel_id": "reel_3706272",
+      "title": "Futbolda haftanın programı",
+      "url": "https://www.aa.com.tr/tr/guncel/futbolda-haftanin-programi/3706272"
+    },
+    {
+      "reel_id": "reel_3706407",
+      "title": "Genç milli güreşçinin hedefi Balkan Şampiyonası'ndan altın madalyayla dönmek",
+      "url": "https://www.aa.com.tr/tr/guncel/genc-milli-gurescinin-hedefi-balkan-sampiyonasindan-altin-madalyayla-donmek/3706407"
+    },
+    {
+      "reel_id": "reel_3706266",
+      "title": "Basketbolda haftanın programı",
+      "url": "https://www.aa.com.tr/tr/guncel/basketbolda-haftanin-programi/3706266"
+    },
+    {
+      "reel_id": "reel_3706431",
+      "title": "Yüzmede tarihe geçen otizmli genç, olimpiyat için kendinden emin",
+      "url": "https://www.aa.com.tr/tr/guncel/yuzmede-tarihe-gecen-otizmli-genc-olimpiyat-icin-kendinden-emin/3706431"
+    },
+    {
+      "reel_id": "reel_3706423",
+      "title": "Wushu antrenörü muhtar, mahallesindeki çocuk ve gençlere savunma eğitimi veriyor",
+      "url": "https://www.aa.com.tr/tr/guncel/wushu-antrenoru-muhtar-mahallesindeki-cocuk-ve-genclere-savunma-egitimi-veriyor/3706423"
+    },
+    {
+      "reel_id": "reel_3706097",
+      "title": "Celtic taraftarları İsrail'i protesto etti",
+      "url": "https://www.aa.com.tr/tr/spor/celtic-taraftarlari-israili-protesto-etti/3706097"
+    }
+  ]
+}

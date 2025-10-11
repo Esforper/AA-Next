@@ -1,0 +1,1 @@
+outputs klasörü BackendAPIDemo klasörüne yerleştirilerek 650 aktif ve kullanılabilir data ile çalıştırılır.

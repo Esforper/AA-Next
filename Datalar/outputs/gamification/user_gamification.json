@@ -1,0 +1,372 @@
+{
+  "00760902-7e94-4c25-aa4f-dfce501044c1": {
+    "user_id": "00760902-7e94-4c25-aa4f-dfce501044c1",
+    "total_xp": 335,
+    "current_level": 1,
+    "current_node": 1,
+    "current_xp": 35,
+    "current_streak": 1,
+    "last_activity_date": "2025-10-11",
+    "daily_xp_goal": 300,
+    "xp_earned_today": 335,
+    "reels_watched_today": 0,
+    "emojis_given_today": 3,
+    "details_read_today": 0,
+    "shares_given_today": 0,
+    "xp_history": [
+      {
+        "timestamp": "2025-10-11T06:53:21.630343",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 10
+      },
+      {
+        "timestamp": "2025-10-11T06:53:28.474955",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 20
+      },
+      {
+        "timestamp": "2025-10-11T06:55:05.365485",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 30
+      },
+      {
+        "timestamp": "2025-10-11T06:55:10.301539",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 40
+      },
+      {
+        "timestamp": "2025-10-11T06:55:16.987154",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 50
+      },
+      {
+        "timestamp": "2025-10-11T07:10:26.152975",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 60
+      },
+      {
+        "timestamp": "2025-10-11T07:10:33.167408",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 70
+      },
+      {
+        "timestamp": "2025-10-11T07:20:43.422316",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 80
+      },
+      {
+        "timestamp": "2025-10-11T07:31:34.512123",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 90
+      },
+      {
+        "timestamp": "2025-10-11T07:31:38.352680",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 100
+      },
+      {
+        "timestamp": "2025-10-11T07:31:43.501778",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 110
+      },
+      {
+        "timestamp": "2025-10-11T07:31:51.790719",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 120
+      },
+      {
+        "timestamp": "2025-10-11T07:31:57.597079",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 130
+      },
+      {
+        "timestamp": "2025-10-11T07:41:05.627933",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 140
+      },
+      {
+        "timestamp": "2025-10-11T07:45:00.557433",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 150
+      },
+      {
+        "timestamp": "2025-10-11T07:45:04.556996",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 160
+      },
+      {
+        "timestamp": "2025-10-11T07:45:26.874308",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 170
+      },
+      {
+        "timestamp": "2025-10-11T07:51:08.674908",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 180
+      },
+      {
+        "timestamp": "2025-10-11T07:51:13.832387",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 190
+      },
+      {
+        "timestamp": "2025-10-11T08:01:22.549283",
+        "xp_amount": 5,
+        "source": "emoji_given",
+        "metadata": null,
+        "total_xp_after": 195
+      },
+      {
+        "timestamp": "2025-10-11T08:26:14.927119",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 205
+      },
+      {
+        "timestamp": "2025-10-11T08:26:18.274765",
+        "xp_amount": 5,
+        "source": "emoji_given",
+        "metadata": null,
+        "total_xp_after": 210
+      },
+      {
+        "timestamp": "2025-10-11T08:26:28.814598",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 220
+      },
+      {
+        "timestamp": "2025-10-11T08:26:30.971890",
+        "xp_amount": 5,
+        "source": "emoji_given",
+        "metadata": null,
+        "total_xp_after": 225
+      },
+      {
+        "timestamp": "2025-10-11T08:26:36.951835",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 235
+      },
+      {
+        "timestamp": "2025-10-11T08:26:41.914719",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 245
+      },
+      {
+        "timestamp": "2025-10-11T08:26:46.859731",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 255
+      },
+      {
+        "timestamp": "2025-10-11T08:26:51.802217",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 265
+      },
+      {
+        "timestamp": "2025-10-11T08:26:56.298445",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 275
+      },
+      {
+        "timestamp": "2025-10-11T08:27:00.032890",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 285
+      },
+      {
+        "timestamp": "2025-10-11T08:38:14.231965",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 295
+      },
+      {
+        "timestamp": "2025-10-11T08:38:18.659026",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 305
+      },
+      {
+        "timestamp": "2025-10-11T08:38:24.413004",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 315
+      },
+      {
+        "timestamp": "2025-10-11T08:38:29.833007",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 325
+      },
+      {
+        "timestamp": "2025-10-11T08:38:35.461960",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 335
+      }
+    ],
+    "level_history": [
+      {
+        "timestamp": "2025-10-11T08:26:14.927131",
+        "old_level": 0,
+        "new_level": 1
+      }
+    ],
+    "unlocked_achievements": [],
+    "created_at": "2025-10-11T06:51:04.934208",
+    "updated_at": "2025-10-11T08:38:35.461983"
+  },
+  "4cfd8144-0c78-4379-be89-e472ddda1e79": {
+    "user_id": "4cfd8144-0c78-4379-be89-e472ddda1e79",
+    "total_xp": 110,
+    "current_level": 0,
+    "current_node": 1,
+    "current_xp": 10,
+    "current_streak": 1,
+    "last_activity_date": "2025-10-11",
+    "daily_xp_goal": 300,
+    "xp_earned_today": 110,
+    "reels_watched_today": 0,
+    "emojis_given_today": 0,
+    "details_read_today": 0,
+    "shares_given_today": 0,
+    "xp_history": [
+      {
+        "timestamp": "2025-10-11T08:39:25.923888",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 10
+      },
+      {
+        "timestamp": "2025-10-11T08:39:35.886145",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 20
+      },
+      {
+        "timestamp": "2025-10-11T08:39:38.266040",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 30
+      },
+      {
+        "timestamp": "2025-10-11T08:39:44.772739",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 40
+      },
+      {
+        "timestamp": "2025-10-11T08:39:51.092710",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 50
+      },
+      {
+        "timestamp": "2025-10-11T08:39:54.105075",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 60
+      },
+      {
+        "timestamp": "2025-10-11T08:39:58.197760",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 70
+      },
+      {
+        "timestamp": "2025-10-11T08:40:03.730101",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 80
+      },
+      {
+        "timestamp": "2025-10-11T08:40:08.235057",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 90
+      },
+      {
+        "timestamp": "2025-10-11T08:40:14.218711",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 100
+      },
+      {
+        "timestamp": "2025-10-11T08:40:21.525900",
+        "xp_amount": 10,
+        "source": "reel_watched",
+        "metadata": null,
+        "total_xp_after": 110
+      }
+    ],
+    "level_history": [],
+    "unlocked_achievements": [],
+    "created_at": "2025-10-11T08:39:25.919278",
+    "updated_at": "2025-10-11T08:40:21.525923"
+  }
+}
