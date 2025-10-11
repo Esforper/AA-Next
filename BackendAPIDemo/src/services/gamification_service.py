@@ -480,12 +480,16 @@ class GamificationService:
         
         # Kaydet
         self._save_to_file()
-        
+
+        # ✅ nodes_in_level ve current_xp ekle
+        nodes_in_level = self._get_nodes_in_level(user.current_level)
+
         return {
             'total_xp': user.total_xp,
             'current_level': user.current_level,
             'current_node': user.current_node,
-            'current_xp': user.current_xp,
+            'current_xp': user.current_xp,  # ✅ EKLENDI
+            'nodes_in_level': nodes_in_level,  # ✅ EKLENDI
             'level_up': level_up
         }
     
