@@ -1,6 +1,7 @@
 // lib/models/gamification_state.dart
 // Gamification State - Immutable state yönetimi
 // ✅ NODE ARTIŞ SORUNU DÜZELTİLDİ
+// ✅ TÜM EKSİK GETTER'LAR EKLENDİ
 
 import 'package:flutter/foundation.dart';
 
@@ -53,11 +54,28 @@ class GamificationState {
   double get levelProgress => nodesInLevel > 0 
       ? (currentNode / nodesInLevel).clamp(0.0, 1.0) : 0.0;
   
+  /// Günlük hedef ilerleme yüzdesi (0.0 - 1.0)
+  double get dailyProgress => dailyXPGoal > 0
+      ? (xpEarnedToday / dailyXPGoal).clamp(0.0, 1.0) : 0.0;
+  
+  /// Node içindeki ilerleme yüzdesi (0.0 - 1.0)
+  double get nodeProgress => currentXP / 100.0;
+  
+  /// Streak percentile (mock değer - gerçek değer backend'den gelecek)
+  int get streakPercentile => currentStreak >= 30 ? 95
+      : currentStreak >= 20 ? 85
+      : currentStreak >= 10 ? 70
+      : currentStreak >= 5 ? 50
+      : 20;
+  
   /// Level tamamlanması için gereken toplam XP
   int get xpNeededForLevel => nodesInLevel * 100;
   
   /// Level içinde kazanılan toplam XP
   int get xpEarnedInLevel => (currentNode * 100) + currentXP;
+  
+  /// Bir sonraki node için gereken XP
+  int get xpNeededForNextNode => 100 - currentXP;
   
   // ============ XP EKLEME (DÜZELTİLDİ) ============
   
