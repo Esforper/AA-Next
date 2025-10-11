@@ -7,12 +7,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
 import 'game_play_page.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; // 🆕
-import 'game_play_page.dart'; // 🆕
-import '../../services/auth_service.dart'; // 🆕
-import 'dart:io' show Platform; // 🆕
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
 import 'package:provider/provider.dart';
 import '../../providers/gamification_provider.dart';
+import '../../core/utils/platform_utils.dart';
 
 class GameMenuPage extends StatefulWidget {
   const GameMenuPage({Key? key}) : super(key: key);
@@ -100,8 +99,13 @@ void _startGame() async {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Web desktop'ta AppBar main.dart'tan gelir
+    final screenSize = PlatformUtils.getScreenSize(context);
+    final isWebWide = PlatformUtils.isWeb && 
+        (screenSize == ScreenSize.desktop || screenSize == ScreenSize.tablet);
+    
     return Scaffold(
-      appBar: AppBar(
+      appBar: isWebWide ? null : AppBar(
         title: const Text('Haber Kapışması'),
         backgroundColor: Colors.transparent,
         elevation: 0,

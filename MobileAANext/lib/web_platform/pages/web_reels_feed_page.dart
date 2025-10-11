@@ -19,7 +19,14 @@ import '../widgets/web_audio_player.dart';
 import '../widgets/web_gamification_sidebar.dart';
 
 class WebReelsFeedPage extends StatefulWidget {
-  const WebReelsFeedPage({super.key});
+  final int? currentIndex;
+  final Function(int)? onNavigate;
+  
+  const WebReelsFeedPage({
+    super.key,
+    this.currentIndex,
+    this.onNavigate,
+  });
 
   @override
   State<WebReelsFeedPage> createState() => _WebReelsFeedPageState();
@@ -151,42 +158,10 @@ if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: const Color(0xFF003D82),
-      elevation: 0,
-      title: Row(
-        children: [
-          const Text(
-            'AA Haberler',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'Reels',
-              style: TextStyle(color: Colors.white, fontSize: 14),
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        // XP Overlay (sağ üstte)
-        const Padding(
-          padding: EdgeInsets.only(right: 16),
-          child: ReelsXPOverlay(),
-        ),
-      ],
-    );
+  PreferredSizeWidget? _buildAppBar() {
+    // ✅ Eğer onNavigate null ise, main.dart'tan AppBar gelir
+    // Bu durumda burada AppBar göstermeye gerek yok
+    return null;
   }
 
   Widget _buildErrorState(ReelsProvider provider) {

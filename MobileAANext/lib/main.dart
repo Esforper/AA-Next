@@ -23,7 +23,6 @@ import 'core/utils/platform_utils.dart';
 // Mobile Platform Pages & Views
 import 'mobile_platform/pages/splash_page.dart';
 import 'mobile_platform/pages/home_page_redesigned.dart';
-import 'mobile_platform/pages/reels_feed_page.dart';
 import 'mobile_platform/pages/game_menu_page.dart';
 import 'mobile_platform/pages/login_page.dart';
 import 'mobile_platform/views/home_view.dart';
@@ -31,6 +30,11 @@ import 'mobile_platform/views/profile_view.dart';
 
 // ✅ YENİ: Web Platform Pages
 import 'web_platform/pages/web_reels_feed_page.dart';
+import 'web_platform/widgets/web_category_dropdown.dart';
+
+// Shared widgets
+import 'shared/widgets/reels/category_reel_feed.dart';
+import 'mobile_platform/pages/reels_feed_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,14 +105,12 @@ class _MainNavigatorState extends State<MainNavigator> {
   int _currentIndex = 0;
 
   // ✅ PLATFORM-AWARE SCREENS
-  final List<Widget> _screens = [
+  List<Widget> get _screens => [
     const HomePageRedesigned(),
-    
-    // ✅ REELS: Web için özel sayfa, Mobile için eski sayfa
+    // Web ve mobile için farklı sayfalar
     PlatformUtils.isWeb 
         ? const WebReelsFeedPage()  // 🆕 WEB
         : const ReelsFeedPage(),     // 📱 MOBILE
-    
     const GameMenuPage(),
     const ProfileView(),
   ];
@@ -121,23 +123,49 @@ class _MainNavigatorState extends State<MainNavigator> {
         (screenSize == ScreenSize.desktop || screenSize == ScreenSize.tablet);
 
     return Scaffold(
-      appBar: isWebWide ? _buildWebAppBar() : null,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      // ✅ Web'de AppBar yok - her sayfa kendi bar'ını yönetir
+      body: isWebWide 
+          ? _buildWebLayout()
+          : IndexedStack(
+              index: _currentIndex,
+              children: _screens,
+            ),
       bottomNavigationBar: isWebWide ? null : _buildMobileBottomNav(),
     );
   }
 
-  // Web için üst navigasyon
+  // ✅ Web için layout - tüm sayfalar için birleşik navigasyon
+  Widget _buildWebLayout() {
+    return Scaffold(
+      appBar: _buildWebAppBar(),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+    );
+  }
+
+  // ✅ Web için üst navigasyon - birleşik bar
   PreferredSizeWidget _buildWebAppBar() {
     return AppBar(
       automaticallyImplyLeading: false,
-      centerTitle: true,
+      backgroundColor: AppColors.primary, // ✅ Mavi arka plan
+      elevation: 0,
       title: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
+          // ✅ Sol: Logo/Başlık
+          const Text(
+            'AA Next',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          
+          const Spacer(),
+          
+          // ✅ Orta: Navigasyon Butonları (Centered)
           _TopNavButton(
             label: 'Ana Sayfa',
             icon: Icons.home_outlined,
@@ -159,12 +187,30 @@ class _MainNavigatorState extends State<MainNavigator> {
             onTap: () => setState(() => _currentIndex = 2),
           ),
           const SizedBox(width: 8),
+          
+          // ✅ Kategoriler Dropdown (Oyunlar ve Profil arasında)
+          WebCategoryDropdown(
+            onCategorySelected: (categoryId, categoryName, categoryIcon, categoryColor) {
+              // Kategori seçildiğinde CategoryReelFeed sayfasına git
+              CategoryReelFeed.navigateTo(
+                context,
+                categoryId: categoryId,
+                categoryName: categoryName,
+                categoryIcon: categoryIcon,
+                categoryColor: categoryColor,
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          
           _TopNavButton(
             label: 'Profil',
             icon: Icons.person_outline,
             selected: _currentIndex == 3,
             onTap: () => setState(() => _currentIndex = 3),
           ),
+          
+          const Spacer(),
         ],
       ),
     );
@@ -174,9 +220,10 @@ class _MainNavigatorState extends State<MainNavigator> {
   Widget _buildMobileBottomNav() {
     return Container(
       decoration: BoxDecoration(
+        color: AppColors.primary, // ✅ Mavi arka plan
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -186,9 +233,9 @@ class _MainNavigatorState extends State<MainNavigator> {
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textTertiary,
+        backgroundColor: AppColors.primary, // ✅ Mavi arka plan
+        selectedItemColor: Colors.white, // ✅ Seçili renk beyaz
+        unselectedItemColor: Colors.white.withOpacity(0.6), // ✅ Seçili olmayan beyaz şeffaf
         selectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 12,
@@ -223,7 +270,7 @@ class _MainNavigatorState extends State<MainNavigator> {
   }
 }
 
-// ✅ ORİJİNAL TASARIM KORUNDU
+// ✅ Navigasyon butonu widget
 class _TopNavButton extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -239,14 +286,21 @@ class _TopNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? Colors.white : Colors.white.withValues(alpha: 0.8);
+    final color = selected ? Colors.white : Colors.white.withOpacity(0.7);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: TextButton.icon(
         onPressed: onTap,
         style: TextButton.styleFrom(
           foregroundColor: color,
-          overlayColor: Colors.white.withValues(alpha: 0.1),
+          backgroundColor: selected 
+              ? Colors.white.withOpacity(0.15) 
+              : Colors.transparent,
+          overlayColor: Colors.white.withOpacity(0.1),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
         icon: Icon(icon, color: color, size: 20),
         label: Text(
@@ -254,6 +308,7 @@ class _TopNavButton extends StatelessWidget {
           style: TextStyle(
             color: color,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 14,
           ),
         ),
       ),

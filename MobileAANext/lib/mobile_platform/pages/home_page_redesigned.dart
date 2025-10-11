@@ -76,9 +76,12 @@ class _HomePageRedesignedState extends State<HomePageRedesigned> {
     // ✅ Responsive padding
     final padding = isDesktop ? 32.0 : (isTablet ? 24.0 : 16.0);
     
+    // ✅ Web desktop'ta AppBar main.dart'tan gelir
+    final showAppBar = !PlatformUtils.isWeb || !(isDesktop || isTablet);
+    
     return Scaffold(
       backgroundColor: AAColors.grey50,
-      appBar: _buildAppBar(),
+      appBar: showAppBar ? _buildAppBar() : null,
       body: Stack(
         children: [
           // Ana içerik - ✅ Responsive center layout
@@ -175,8 +178,9 @@ class _HomePageRedesignedState extends State<HomePageRedesigned> {
 
                         const SizedBox(height: 24),
 
-                        // Kategori Buton
-                        _buildCategoryButton(),
+                        // Kategori Buton - Sadece mobilde göster (Web'de üst barda)
+                        if (!isWideScreen)
+                          _buildCategoryButton(),
 
                         const SizedBox(height: 100), // Alt navigasyon için boşluk
                       ],
