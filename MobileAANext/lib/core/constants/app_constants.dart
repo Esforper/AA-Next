@@ -15,14 +15,14 @@ class AppColors {
   static const secondaryDark = Color(0xFF2A3844);
   static const secondaryLight = Color(0xFF4A5D70);
   
-  // Accent colors - Koyu kırmızı vurgu
-  static const accent = Color(0xFFC30019); // AA Kırmızı
-  static const accentDark = Color(0xFFA00015);
-  static const accentLight = Color(0xFFD43347);
+  // Accent colors - ✅ Mavi tonları (kırmızı yerine)
+  static const accent = Color(0xFF0077CC); // ✅ Açık mavi (eski: kırmızı)
+  static const accentDark = Color(0xFF005799); // ✅ Orta mavi
+  static const accentLight = Color(0xFF3D94DC); // ✅ Açık mavi tonu
   
   // Gamification colors
   static const xpGold = Color(0xFFFBBF24);
-  static const streakFire = Color(0xFFC30019); // AA Kırmızı streak için
+  static const streakFire = Color(0xFF0077CC); // ✅ Mavi streak (eski: kırmızı)
   static const levelPurple = Color(0xFF0078D2); // AA Mavi level için
   
   // Neutral colors
@@ -37,7 +37,7 @@ class AppColors {
   
   // Status colors
   static const success = Color(0xFF10B981);
-  static const error = Color(0xFFC30019); // AA Kırmızı hata için
+  static const error = Color(0xFF0077CC); // ✅ Mavi hata rengi (eski: kırmızı)
   static const warning = Color(0xFFF59E0B);
   static const info = Color(0xFF0078D2); // AA Mavi bilgi için
   
@@ -100,28 +100,31 @@ class AppRadius {
   );
 }
 
-/// Text style'ları
+/// ✅ Text style'ları - Daha okunaklı ve modern
 class AppTextStyles {
-  // Heading styles
+  // Heading styles - ✅ İyileştirilmiş okunabilirlik
   static const h1 = TextStyle(
     fontSize: 32,
-    fontWeight: FontWeight.bold,
+    fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.2,
+    height: 1.3,
+    letterSpacing: -0.5,
   );
   
   static const h2 = TextStyle(
     fontSize: 28,
-    fontWeight: FontWeight.bold,
+    fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.3,
+    letterSpacing: -0.4,
   );
   
   static const h3 = TextStyle(
     fontSize: 24,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
-    height: 1.3,
+    height: 1.4,
+    letterSpacing: -0.3,
   );
   
   static const h4 = TextStyle(
@@ -129,55 +132,64 @@ class AppTextStyles {
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.4,
+    letterSpacing: -0.2,
   );
   
-  // Body styles
+  // Body styles - ✅ Daha iyi satır yüksekliği
   static const bodyLarge = TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.normal,
+    fontSize: 17,
+    fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
-    height: 1.5,
+    height: 1.6,
+    letterSpacing: -0.2,
   );
   
   static const body = TextStyle(
-    fontSize: 14,
-    fontWeight: FontWeight.normal,
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
-    height: 1.5,
+    height: 1.6,
+    letterSpacing: -0.1,
   );
   
   static const bodySmall = TextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.normal,
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
-    height: 1.4,
+    height: 1.5,
+    letterSpacing: 0,
   );
   
-  // Label styles
+  // Label styles - ✅ Daha belirgin
   static const label = TextStyle(
-    fontSize: 14,
-    fontWeight: FontWeight.w500,
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
+    letterSpacing: -0.1,
   );
   
   static const labelSmall = TextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.w500,
-    color: AppColors.textSecondary,
-  );
-  
-  // Caption
-  static const caption = TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.normal,
-    color: AppColors.textTertiary,
-  );
-  
-  // Button text
-  static const button = TextStyle(
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.5,
+    color: AppColors.textSecondary,
+    letterSpacing: 0,
+  );
+  
+  // Caption - ✅ Daha okunaklı
+  static const caption = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: AppColors.textTertiary,
+    height: 1.4,
+    letterSpacing: 0,
+  );
+  
+  // Button text - ✅ Daha vurgulu
+  static const button = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.1,
+    height: 1.2,
   );
 }
 

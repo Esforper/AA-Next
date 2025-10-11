@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/aa_colors.dart';
+import '../../core/utils/platform_utils.dart'; // ✅ Responsive için
 import '../../providers/gamification_provider.dart';
 import '../../shared/widgets/home/streak_github_calendar.dart';
 import '../../shared/widgets/home/level_progress_card.dart';
@@ -66,76 +67,121 @@ class _HomePageRedesignedState extends State<HomePageRedesigned> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Responsive layout kontrolü
+    final screenSize = PlatformUtils.getScreenSize(context);
+    final isDesktop = screenSize == ScreenSize.desktop;
+    final isTablet = screenSize == ScreenSize.tablet;
+    final isWideScreen = isDesktop || isTablet;
+    
+    // ✅ Responsive padding
+    final padding = isDesktop ? 32.0 : (isTablet ? 24.0 : 16.0);
+    
     return Scaffold(
       backgroundColor: AAColors.grey50,
       appBar: _buildAppBar(),
       body: Stack(
         children: [
-          // Ana içerik
-          RefreshIndicator(
-            onRefresh: _loadData,
-            color: AAColors.aaRed,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Hoşgeldin
-                    _buildWelcomeSection(),
+          // Ana içerik - ✅ Responsive center layout
+          Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isDesktop ? 1400 : double.infinity,
+              ),
+              child: RefreshIndicator(
+                onRefresh: _loadData,
+                color: AAColors.aaRed, // ✅ Artık mavi
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Padding(
+                    padding: EdgeInsets.all(padding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Hoşgeldin
+                        _buildWelcomeSection(),
 
-                    const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                    // Streak Calendar
-                    Consumer<GamificationProvider>(
-                      builder: (context, gamification, _) {
-                        // TODO: Backend'den streak calendar data al
-                        final mockCalendarData = <String, dynamic>{};
-                        
-                        return StreakGithubCalendar(
-                          calendarData: mockCalendarData,
-                          currentStreak: gamification.currentStreak,
-                          longestStreak: 30, // TODO: Backend'den al
-                        );
-                      },
+                        // ✅ RESPONSIVE LAYOUT: Web PC için yan yana
+                        if (isWideScreen)
+                          Consumer<GamificationProvider>(
+                            builder: (context, gamification, _) {
+                              final mockCalendarData = <String, dynamic>{};
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Sol: Streak Calendar
+                                  Expanded(
+                                    flex: 2,
+                                    child: StreakGithubCalendar(
+                                      calendarData: mockCalendarData,
+                                      currentStreak: gamification.currentStreak,
+                                      longestStreak: 30,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  // Sağ: Daily Goal Ring
+                                  Expanded(
+                                    flex: 1,
+                                    child: DailyGoalRing(
+                                      xpEarnedToday: gamification.state.xpEarnedToday,
+                                      dailyGoal: gamification.dailyXPGoal,
+                                      goalCompleted: gamification.dailyGoalCompleted,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          )
+                        else
+                          // ✅ Mobile Layout: Dikey
+                          Consumer<GamificationProvider>(
+                            builder: (context, gamification, _) {
+                              final mockCalendarData = <String, dynamic>{};
+                              return Column(
+                                children: [
+                                  // Streak Calendar
+                                  StreakGithubCalendar(
+                                    calendarData: mockCalendarData,
+                                    currentStreak: gamification.currentStreak,
+                                    longestStreak: 30,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Daily Goal Ring
+                                  DailyGoalRing(
+                                    xpEarnedToday: gamification.state.xpEarnedToday,
+                                    dailyGoal: gamification.dailyXPGoal,
+                                    goalCompleted: gamification.dailyGoalCompleted,
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+
+                        const SizedBox(height: 16),
+
+                        // Level Progress
+                        Consumer<GamificationProvider>(
+                          builder: (context, gamification, _) {
+                            return LevelProgressCard(
+                              currentLevel: gamification.currentLevel,
+                              currentNode: gamification.currentNode,
+                              nodesInLevel: gamification.state.nodesInLevel,
+                              currentXP: gamification.currentXP,
+                              totalXP: gamification.state.totalXP,
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Kategori Buton
+                        _buildCategoryButton(),
+
+                        const SizedBox(height: 100), // Alt navigasyon için boşluk
+                      ],
                     ),
-
-                    const SizedBox(height: 16),
-
-                    // Level Progress
-                    Consumer<GamificationProvider>(
-                      builder: (context, gamification, _) {
-                        return LevelProgressCard(
-                          currentLevel: gamification.currentLevel,
-                          currentNode: gamification.currentNode,
-                          nodesInLevel: gamification.state.nodesInLevel,
-                          currentXP: gamification.currentXP,
-                          totalXP: gamification.state.totalXP,
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Daily Goal Ring
-                    Consumer<GamificationProvider>(
-                      builder: (context, gamification, _) {
-                        return DailyGoalRing(
-                          xpEarnedToday: gamification.state.xpEarnedToday,
-                          dailyGoal: gamification.dailyXPGoal,
-                          goalCompleted: gamification.dailyGoalCompleted,
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Kategori Buton
-                    _buildCategoryButton(),
-
-                    const SizedBox(height: 100), // Alt navigasyon için boşluk
-                  ],
+                  ),
                 ),
               ),
             ),
