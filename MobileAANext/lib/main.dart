@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
+import 'mobile_platform/pages/home_page_redesigned.dart';
 // Providers
 import 'providers/auth_provider.dart';
 import 'providers/reels_provider.dart';
@@ -95,7 +95,7 @@ class _MainNavigatorState extends State<MainNavigator> {
 
   // 🔽 DEĞİŞİKLİK BURADA 🔽
   final List<Widget> _screens = [
-    const HomeView(),
+    const HomePageRedesigned(),
     const ReelsFeedPage(),
     const GameMenuPage(), // ✅ Placeholder yerine GameMenuPage geldi
     const ProfileView(),

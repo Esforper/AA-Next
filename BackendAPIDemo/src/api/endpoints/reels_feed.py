@@ -138,3 +138,57 @@ async def get_latest_published_reel(
     except Exception as e:
         print(f"❌ Get latest reel error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+# backend/src/api/endpoints/reels_feed.py
+# 🎯 CATEGORY FEED ENDPOINT - Dosyanın SONUNA EKLE (router tanımından sonra)
+
+@router.get("/category/{category_id}")
+async def get_reels_by_category(
+    category_id: str,
+    user_id: str = Depends(get_current_user_id),
+    limit: int = Query(20, ge=1, le=50, description="Sayfa başına reel"),
+    cursor: Optional[str] = Query(None, description="Pagination cursor")
+):
+    """
+    🎯 Kategoriye özel reels feed (JWT Auth)
+    
+    **Instagram-style category feed**
+    
+    Args:
+        - category_id: Kategori slug (guncel, ekonomi, spor, etc)
+        - limit: Sayfa başına reel sayısı
+        - cursor: Pagination için son reel_id
+    
+    Returns:
+        - Kategoriye ait reels
+        - Pagination bilgisi
+        - Kategori metadata
+    """
+    try:
+        from ...services.category_feed_service import category_feed_service
+        
+        print(f"📥 Category feed: {category_id} (user: {user_id})")
+        
+        result = await category_feed_service.get_category_feed(
+            user_id=user_id,
+            category=category_id,
+            limit=limit,
+            cursor=cursor
+        )
+        
+        if not result['success']:
+            raise HTTPException(
+                status_code=404,
+                detail=result.get('message', 'Category not found')
+            )
+        
+        print(f"✅ Returning {len(result['reels'])} reels")
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Category feed error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

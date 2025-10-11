@@ -5,7 +5,7 @@ Gamification API - XP, Level, Node, Streak, Achievements
 Frontend'deki puan sisteminin backend karşılığı
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from datetime import datetime
@@ -71,6 +71,7 @@ async def add_xp(
     """
     try:
         from ...services.gamification_service import gamification_service
+        await streak_service.update_streak(user_id, request.xp_amount)
         
         result = await gamification_service.add_xp(
             user_id=user_id,
@@ -461,4 +462,107 @@ async def get_daily_progress(
         }
         
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    
+    
+@router.get("/streak/{user_id}")
+async def get_user_streak(
+    user_id: str,
+    current_user_id: str = Depends(get_current_user_id)
+):
+    """
+    🔥 Kullanıcının streak bilgilerini getir (GitHub tarzı)
+    
+    Returns:
+        - Current streak count
+        - Longest streak
+        - Calendar data (son 12 hafta)
+        - Bu haftanın istatistikleri
+    """
+    try:
+        from ...services.streak_service import streak_service
+        
+        result = await streak_service.get_streak_info(user_id)
+        
+        return {
+            'success': True,
+            'current_streak': result.streak_info.current_streak,
+            'longest_streak': result.streak_info.longest_streak,
+            'last_activity_date': result.streak_info.last_activity_date,
+            'min_xp_required': result.streak_info.min_xp_required,
+            'calendar_data': {
+                date: {
+                    'xp_earned': activity.xp_earned,
+                    'level': activity.level,
+                    'reels_watched': activity.reels_watched
+                }
+                for date, activity in result.calendar_data.items()
+            },
+            'this_week_stats': {
+                'days_active': result.this_week_stats.days_active if result.this_week_stats else 0,
+                'total_xp': result.this_week_stats.total_xp if result.this_week_stats else 0,
+                'total_reels': result.this_week_stats.total_reels if result.this_week_stats else 0
+            } if result.this_week_stats else None,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ Error getting streak: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/daily-requirement")
+async def get_daily_requirement():
+    """
+    📋 Günlük minimum gereksinimleri getir
+    
+    Returns:
+        - Minimum XP
+        - Minimum reel sayısı
+    """
+    return {
+        'success': True,
+        'min_xp_required': 100,
+        'min_reels_required': 3,
+        'description': 'Streaki korumak için günlük minimum gereksinimler',
+        'levels': {
+            'none': {'min_xp': 0, 'max_xp': 99, 'color': '#EBEDF0'},
+            'low': {'min_xp': 100, 'max_xp': 199, 'color': '#FFCDD2'},
+            'medium': {'min_xp': 200, 'max_xp': 299, 'color': '#EF5350'},
+            'high': {'min_xp': 300, 'max_xp': 999999, 'color': '#E30613'}
+        }
+    }
+
+
+@router.post("/update-streak/{user_id}")
+async def update_user_streak(
+    user_id: str,
+    xp_earned: int = Query(..., ge=0, description="Bugün kazanılan toplam XP"),
+    current_user_id: str = Depends(get_current_user_id)
+):
+    """
+    🔄 Streak güncelle (genellikle otomatik çağrılır)
+    
+    Args:
+        - user_id: Kullanıcı ID
+        - xp_earned: Bugün kazanılan XP
+    """
+    try:
+        from ...services.streak_service import streak_service
+        
+        updated_streak = await streak_service.update_streak(user_id, xp_earned)
+        
+        return {
+            'success': True,
+            'message': 'Streak updated successfully',
+            'current_streak': updated_streak.current_streak,
+            'longest_streak': updated_streak.longest_streak,
+            'streak_alive': updated_streak.is_streak_alive(),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ Error updating streak: {e}")
         raise HTTPException(status_code=500, detail=str(e))
