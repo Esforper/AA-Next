@@ -542,9 +542,15 @@ class GamificationService:
         """Kullanıcı istatistiklerini getir"""
         user = self._get_or_create_user(user_id)
         
+        # ✅ nodes_in_level hesapla
+        nodes_in_level = self._get_nodes_in_level(user.current_level)
+        
         return {
             'total_xp': user.total_xp,
             'current_level': user.current_level,
+            'current_node': user.current_node,  # ✅ EKLENDI
+            'current_xp': user.current_xp,  # ✅ EKLENDI
+            'nodes_in_level': nodes_in_level,  # ✅ EKLENDI
             'current_streak': user.current_streak,
             'today_stats': {
                 'reels_watched': user.reels_watched_today,

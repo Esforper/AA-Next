@@ -35,20 +35,25 @@ class GamificationProvider extends ChangeNotifier {
   // ============ INITIALIZATION ============
   
   /// Provider'ı başlat
-  Future<void> init() async {
-    debugPrint('🎮 [Gamification] Initializing...');
-    
-    // Backend'den state çek
-    final userId = await _getUserId();
-    if (userId != null) {
-      await _fetchStateFromBackend(userId);
-    } else {
-      debugPrint('⚠️ [Gamification] No user ID, using default state');
-      _state = const GamificationState();
-    }
-    
-    notifyListeners();
+/// Provider'ı başlat
+Future<void> init() async {
+  debugPrint('🎮 [Gamification] Initializing...');
+  
+  // ✅ FIX: API Service'i initialize et
+  GamificationApiService().init();
+  debugPrint('✅ [Gamification] API Service initialized');
+  
+  // Backend'den state çek
+  final userId = await _getUserId();
+  if (userId != null) {
+    await _fetchStateFromBackend(userId);
+  } else {
+    debugPrint('⚠️ [Gamification] No user ID, using default state');
+    _state = const GamificationState();
   }
+  
+  notifyListeners();
+}
   
 
 /// Backend'den tüm state'i çek

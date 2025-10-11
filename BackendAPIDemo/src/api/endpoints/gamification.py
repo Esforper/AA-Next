@@ -11,7 +11,7 @@ from typing import Optional, List, Dict
 from datetime import datetime
 
 from ..utils.auth_utils import get_current_user_id
-
+from ...services.streak_service import streak_service
 router = APIRouter(prefix="/api/gamification", tags=["gamification"])
 
 # ============ MODELS ============
@@ -62,23 +62,24 @@ async def add_xp(
 ):
     """
     XP ekle ve level kontrolü yap
-    
-    Frontend her aktivitede buraya istek atar:
-    - Reel izleme: 10 XP
-    - Emoji verme: 5 XP (ilk)
-    - Detay okuma: 15 XP
-    - Share verme: 20 XP (ilk)
     """
     try:
         from ...services.gamification_service import gamification_service
+        from ...services.streak_service import streak_service
+        
+        # Streak güncelle
         await streak_service.update_streak(user_id, request.xp_amount)
         
+        # XP ekle
         result = await gamification_service.add_xp(
             user_id=user_id,
             xp_amount=request.xp_amount,
             source=request.source,
             metadata=request.metadata
         )
+        
+        # ✅ FIX: nodes_in_level ekle
+        nodes_in_level = gamification_service._get_nodes_in_level(result["current_level"])
         
         return XPResponse(
             success=True,
@@ -87,11 +88,14 @@ async def add_xp(
             total_xp=result["total_xp"],
             current_level=result["current_level"],
             current_node=result["current_node"],
+            current_xp=result["current_xp"],  # ✅ EKLE
+            nodes_in_level=nodes_in_level,    # ✅ EKLE
             level_up=result["level_up"],
             timestamp=datetime.now().isoformat()
         )
         
     except Exception as e:
+        print(f"❌ [Add XP API] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/level/{user_id}", response_model=LevelDataResponse)

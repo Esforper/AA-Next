@@ -25,6 +25,7 @@ class ReelsFeedPage extends StatefulWidget {
 }
 
 class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserver {
+  final List<FloatingXPData> _floatingXPList = [];
   DateTime? _reelStartTime;
   bool _hasEarnedWatchXP = false;
   String? _currentReelId;
@@ -70,24 +71,31 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
     }
   }
 
-  void _startReelTracking(Reel reel) {
-    // Önceki tracker'ı durdur (varsa)
-    _stopCurrentTracker();
-    
-    // Yeni tracker oluştur
-    _currentTracker = ReelTrackerService(
-      reelId: reel.id,
-      category: reel.category,
-    );
-    _currentTracker!.start();
-    
-    // Gamification için
-    _reelStartTime = DateTime.now();
-    _hasEarnedWatchXP = false;
-    _currentReelId = reel.id;
-    
-    debugPrint('🎬 Started tracking: ${reel.id}');
-  }
+void _startReelTracking(Reel reel) {
+  debugPrint('');
+  debugPrint('▶️ [START TRACKING]');
+  
+  // Önceki tracker'ı durdur (varsa)
+  _stopCurrentTracker();
+  
+  // Yeni tracker oluştur
+  _currentTracker = ReelTrackerService(
+    reelId: reel.id,
+    category: reel.category,
+  );
+  _currentTracker!.start();
+  
+  // Gamification için RESET
+  _reelStartTime = DateTime.now();
+  _hasEarnedWatchXP = false;
+  _currentReelId = reel.id;
+  
+  debugPrint('   ├─ Reel ID: ${reel.id}');
+  debugPrint('   ├─ Start Time: $_reelStartTime');
+  debugPrint('   ├─ _hasEarnedWatchXP: $_hasEarnedWatchXP');
+  debugPrint('   └─ Tracker: STARTED');
+  debugPrint('');
+}
 
 
 
@@ -114,45 +122,110 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> with WidgetsBindingObserv
   }
 
   /// ✅ GÜNCELLEME: Page değişimi
-  void _onPageChanged(int index) async {
-    final reelsProvider = context.read<ReelsProvider>();
-    final audioService = context.read<AudioService>();
+/// ✅ GÜNCELLEME: Page değişimi + DETAYLI DEBUG
+void _onPageChanged(int index) async {
+  debugPrint('');
+  debugPrint('═══════════════════════════════════════════');
+  debugPrint('🔄 [PAGE CHANGED] Index: $index');
+  debugPrint('═══════════════════════════════════════════');
+  
+  final reelsProvider = context.read<ReelsProvider>();
+  final audioService = context.read<AudioService>();
+  
+  // ✅ Önceki tracker'ı durdur ve backend'e gönder
+  debugPrint('🛑 [STEP 1] Stopping current tracker...');
+  await _stopCurrentTracker();
+  
+  // ✅ XP KONTROLÜ - DETAYLI DEBUG
+  debugPrint('');
+  debugPrint('🎮 [STEP 2] XP Check:');
+  debugPrint('   ├─ _hasEarnedWatchXP: $_hasEarnedWatchXP');
+  debugPrint('   ├─ _reelStartTime: $_reelStartTime');
+  debugPrint('   └─ _currentReelId: $_currentReelId');
+  
+  if (!_hasEarnedWatchXP && _reelStartTime != null && _currentReelId != null) {
+    final duration = DateTime.now().difference(_reelStartTime!);
+    final durationSeconds = duration.inSeconds;
     
-    // ✅ Önceki tracker'ı durdur ve backend'e gönder
-    await _stopCurrentTracker();
+    debugPrint('   ├─ Duration: ${durationSeconds}s');
     
-    // ✅ Gamification XP (3+ saniye izlendiyse)
-    if (!_hasEarnedWatchXP && _reelStartTime != null && _currentReelId != null) {
-      final duration = DateTime.now().difference(_reelStartTime!);
-      if (duration.inSeconds >= 3) {
-        final gamificationProvider = context.read<GamificationProvider>();
-        gamificationProvider.onReelWatched(_currentReelId!);
-        _showFloatingXP(10, 'reel_watched');
-        _hasEarnedWatchXP = true;
-      }
+    if (durationSeconds >= 3) {
+      debugPrint('   ✅ AWARDING XP!');
+      
+      final gamificationProvider = context.read<GamificationProvider>();
+      
+      // ✅ XP öncesi state
+      debugPrint('   ├─ Before XP:');
+      debugPrint('   │  ├─ Total XP: ${gamificationProvider.state.totalXP}');
+      debugPrint('   │  ├─ Level: ${gamificationProvider.state.currentLevel}');
+      debugPrint('   │  └─ Today XP: ${gamificationProvider.state.xpEarnedToday}');
+      
+      // ✅ Backend'e XP isteği gönder
+      gamificationProvider.onReelWatched(_currentReelId!);
+      
+      // ✅ XP sonrası state
+      debugPrint('   ├─ After XP:');
+      debugPrint('   │  ├─ Total XP: ${gamificationProvider.state.totalXP}');
+      debugPrint('   │  ├─ Level: ${gamificationProvider.state.currentLevel}');
+      debugPrint('   │  └─ Today XP: ${gamificationProvider.state.xpEarnedToday}');
+      
+      _hasEarnedWatchXP = true;
+      debugPrint('   └─ Flag set: _hasEarnedWatchXP = true');
+    } else {
+      debugPrint('   ⏭️ SKIPPED - Duration too short (${durationSeconds}s < 3s)');
     }
-
-    // Yeni reel'e geç
-    reelsProvider.setIndex(index);
+  } else {
+    debugPrint('   ⏭️ SKIPPED - Conditions not met:');
+    if (_hasEarnedWatchXP) debugPrint('      └─ Already earned XP for this reel');
+    if (_reelStartTime == null) debugPrint('      └─ No start time');
+    if (_currentReelId == null) debugPrint('      └─ No reel ID');
+  }
+  
+  // ✅ Index güncelle
+  debugPrint('');
+  debugPrint('📍 [STEP 3] Updating index to: $index');
+  reelsProvider.setIndex(index);
+  
+  // ✅ Emoji panelini kapat
+  if (_showEmojis) {
+    debugPrint('😊 [STEP 4] Closing emoji panel');
+    setState(() => _showEmojis = false);
+  }
+  
+  // ✅ Yeni reel'in tracking'ini başlat
+  if (reelsProvider.current != null) {
+    final newReel = reelsProvider.current!;
     
-    if (reelsProvider.current != null) {
-      final reel = reelsProvider.current!;
-      
-      // ✅ Yeni tracker başlat
-      _startReelTracking(reel);
-      
-      // Audio çal
-      if (reel.audioUrl.isNotEmpty) {
-        audioService.play(reel.audioUrl, reel.id);
-      }
-      
-      // Infinite scroll check
-      if (index >= reelsProvider.reels.length - 3) {
-        debugPrint('📜 Near end of feed, loading more...');
-        reelsProvider.loadMore();
-      }
+    debugPrint('');
+    debugPrint('🎬 [STEP 5] Starting new reel:');
+    debugPrint('   ├─ ID: ${newReel.id}');
+    // ✅ FIX: Title kısaysa hata vermesin
+    final titlePreview = newReel.title.length > 30 
+        ? '${newReel.title.substring(0, 30)}...' 
+        : newReel.title;
+    debugPrint('   ├─ Title: $titlePreview');
+    debugPrint('   └─ Audio: ${newReel.audioUrl.isNotEmpty ? "✅" : "❌"}');
+    
+    _startReelTracking(newReel);
+    
+    // ✅ Yeni reel'in sesini çal
+    if (newReel.audioUrl.isNotEmpty) {
+      debugPrint('🎵 Playing audio...');
+      audioService.play(newReel.audioUrl, newReel.id);
     }
   }
+  
+  // ✅ Infinite scroll check
+  if (index >= reelsProvider.reels.length - 3 && 
+      !reelsProvider.isLoadingMore && 
+      reelsProvider.hasMore) {
+    debugPrint('📜 [STEP 6] Loading more reels...');
+    reelsProvider.loadMore();
+  }
+  
+  debugPrint('═══════════════════════════════════════════');
+  debugPrint('');
+}
 
   /// ✅ YENİ: Emoji seçildiğinde
   void _onEmojiSelected(String emoji, Reel reel) {
@@ -312,17 +385,36 @@ void _onSaveTapped(Reel reel) {
 }
 
 
-  void _showFloatingXP(int amount, String source) {
-    FloatingXPOverlay.show(
-      context,
-      xpAmount: amount,
+void _showFloatingXP(int amount, String source) {
+  print('🎯 DEBUG: _showFloatingXP çağrıldı - amount: $amount, source: $source');
+  
+  // State'e floating XP ekle
+  setState(() {
+    _floatingXPList.add(FloatingXPData(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      amount: amount,
       source: source,
       position: Offset(
         MediaQuery.of(context).size.width / 2 - 60,
         MediaQuery.of(context).size.height / 2 - 100,
       ),
-    );
-  }
+    ));
+  });
+  
+  print('✅ DEBUG: Floating XP eklendi, liste boyutu: ${_floatingXPList.length}');
+  
+  // 2 saniye sonra listeden çıkar
+  Future.delayed(const Duration(milliseconds: 2000), () {
+    if (mounted) {
+      setState(() {
+        _floatingXPList.removeWhere((xp) => 
+          xp.id == _floatingXPList.first.id
+        );
+      });
+      print('🗑️ DEBUG: Floating XP silindi, liste boyutu: ${_floatingXPList.length}');
+    }
+  });
+}
 
 @override
 Widget build(BuildContext context) {
@@ -393,17 +485,138 @@ Widget build(BuildContext context) {
         ),
       ],
     ),
-    // ✅ BODY EKLENDİ!
+    // ✅ BODY - STACK İLE OVERLAY EKLENDI
     body: Stack(
-      children: [
-        _buildBody(context, provider),
+  children: [
+    _buildBody(context, provider),
 
-        const Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(child: ReelsXPOverlay()),
+    // Üst XP overlay (level, node, progress)
+    const Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(child: ReelsXPOverlay()),
+    ),
+    
+    // 🆕 Floating XP animasyonları
+    ..._floatingXPList.map((xpData) => 
+      FloatingXP(
+        key: ValueKey(xpData.id),
+        xpAmount: xpData.amount,
+        startPosition: xpData.position,
+        source: xpData.source,
+        onComplete: () {
+          print('🎬 DEBUG: FloatingXP animasyonu tamamlandı: ${xpData.id}');
+        },
+      )
+    ).toList(),
+  ],
+),
+
+
+  );
+}
+
+/// ✅ YENİ METOD: PageView'i ayrı metoda çıkar
+Widget _buildReelsPageView(ReelsProvider provider) {
+  if (provider.status == FeedStatus.loading) {
+    return const Center(
+      child: CircularProgressIndicator(color: Colors.white),
+    );
+  }
+
+  if (provider.status == FeedStatus.error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.white, size: 64),
+          const SizedBox(height: 16),
+          const Text(
+            'Bir hata oluştu',  // ✅ Sabit mesaj
+            style: TextStyle(color: Colors.white, fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => provider.loadReels(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Tekrar Dene'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  if (provider.reels.isEmpty) {
+    return const Center(
+      child: Text(
+        'Henüz içerik yok',
+        style: TextStyle(color: Colors.white, fontSize: 16),
+      ),
+    );
+  }
+
+  return PageView.builder(
+    controller: _pageController,
+    scrollDirection: Axis.vertical,
+    onPageChanged: _onPageChanged,
+    itemCount: provider.reels.length,
+    itemBuilder: (context, index) {
+      final reel = provider.reels[index];
+      // ✅ Zaten var olan _buildBody metodunu kullan
+      return _buildReelContent(reel, index);
+    },
+  );
+}
+
+
+/// ✅ Tek bir reel'in içeriği
+/// ✅ Tek bir reel'in içeriği
+Widget _buildReelContent(Reel reel, int index) {
+  final audioService = context.watch<AudioService>();
+  
+  return GestureDetector(
+    onTap: () {
+      if (_showEmojis) {
+        setState(() => _showEmojis = false);
+      }
+    },
+    child: Stack(
+      children: [
+        // Arka plan görsel
+        ImageCarousel(urls: reel.imageUrls),  // ✅ imageUrls → urls
+        
+        // Gradient overlay
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.7),
+                ],
+              ),
+            ),
+          ),
         ),
+        
+        // Alt yazı (subtitle)
+        if (_subtitlesEnabled && reel.subtitles != null)
+          Positioned(
+            bottom: 120,
+            left: 0,
+            right: 0,
+            child: SubtitleWidget(
+              subtitles: reel.subtitles!,
+              currentPosition: audioService.position,
+              isVisible: _subtitlesEnabled,
+            ),
+          ),
+        
+        // İçerik burada devam eder...
       ],
     ),
   );
@@ -825,19 +1038,17 @@ Widget _buildReelItem(Reel reel) {
     FloatingXPOverlay.remove();
     super.dispose();
   }
-}
+} 
 
 
 // 6️⃣ _ReelView CLASS'I TAMAMEN DEĞİŞSİN (satır 485 civarı)
 class _ReelView extends StatelessWidget {
   final Reel reel;
   final bool subtitlesEnabled;
-  // ❌ KALDIRILAN: final dynamic audioService;
 
   const _ReelView({
     required this.reel,
     required this.subtitlesEnabled,
-    // ❌ KALDIRILAN: required this.audioService,
   });
 
   @override
@@ -867,8 +1078,6 @@ class _ReelView extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 240,
-            // ❌ KALDIRILAN: AnimatedBuilder(animation: audioService,...)
-            // ✅ YENİ: Consumer kullan
             child: Consumer<AudioService>(
               builder: (context, audioService, _) {
                 return SubtitleWidget(
@@ -880,7 +1089,7 @@ class _ReelView extends StatelessWidget {
             ),
           ),
 
-        // Başlık ve özet (değişmedi, aynı kalacak)
+        // Başlık ve özet
         Positioned(
           left: 0,
           right: 0,
@@ -967,4 +1176,17 @@ String? _formatPublishedDate(Reel reel) {
   } else {
     return '${reel.publishedAt.day}.${reel.publishedAt.month}.${reel.publishedAt.year}';
   }
+}
+class FloatingXPData {
+  final String id;
+  final int amount;
+  final String source;
+  final Offset position;
+  
+  FloatingXPData({
+    required this.id,
+    required this.amount,
+    required this.source,
+    required this.position,
+  });
 }

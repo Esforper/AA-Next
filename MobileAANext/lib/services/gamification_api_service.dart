@@ -43,10 +43,23 @@ class GamificationApiService {
   }
 
   // Initialize
-  void init() {
-    _baseUrl = dotenv.env['API_URL'] ?? 'http://localhost:8000';
-    debugPrint('🎮 [Gamification API] Initialized with base URL: $_baseUrl');
+// Initialize
+void init() {
+  // ✅ FIX: Android emulator için 10.0.2.2 kullan
+  final envUrl = dotenv.env['API_URL'] ?? '';
+  
+  if (envUrl.isEmpty) {
+    // Fallback: Platform'a göre otomatik belirle
+    _baseUrl = 'http://10.0.2.2:8000'; // Android emulator
+    debugPrint('⚠️ [Gamification API] API_URL not found in .env, using Android emulator default');
+  } else {
+    // localhost -> 10.0.2.2 değiştir (Android için)
+    _baseUrl = envUrl.replaceAll('localhost', '10.0.2.2');
+    debugPrint('✅ [Gamification API] Using URL from .env (converted): $_baseUrl');
   }
+  
+  debugPrint('🎮 [Gamification API] Initialized with base URL: $_baseUrl');
+}
 
   // ============ XP ENDPOINTS ============
 
