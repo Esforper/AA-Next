@@ -1,10 +1,11 @@
 // lib/main.dart
-// Auth entegrasyonu + Splash ekranı + Audio Service eklendi
+// ✅ WEB/MOBILE ROUTING ENTEGRASYONU
+// Platform-aware: Web için WebReelsFeedPage, Mobile için ReelsFeedPage
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'mobile_platform/pages/home_page_redesigned.dart';
+
 // Providers
 import 'providers/auth_provider.dart';
 import 'providers/reels_provider.dart';
@@ -13,23 +14,31 @@ import 'providers/saved_reels_provider.dart';
 import 'providers/chat_provider.dart';
 import 'services/audio_service.dart';
 
-// Core (Yeni eklenenler)
+// Core
 import 'core/theme/app_theme.dart';
 import 'core/theme/web_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/utils/platform_utils.dart';
 
-// Mobile Platform Pages & Views (Doğru path'ler)
+// Mobile Platform Pages & Views
 import 'mobile_platform/pages/splash_page.dart';
+import 'mobile_platform/pages/home_page_redesigned.dart';
 import 'mobile_platform/pages/reels_feed_page.dart';
-import 'mobile_platform/pages/login_page.dart';
 import 'mobile_platform/pages/game_menu_page.dart';
+import 'mobile_platform/pages/login_page.dart';
 import 'mobile_platform/views/home_view.dart';
 import 'mobile_platform/views/profile_view.dart';
+
+// ✅ YENİ: Web Platform Pages
+import 'web_platform/pages/web_reels_feed_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
+  
+  print('🚀 App starting...');
+  print('📱 Platform: ${PlatformUtils.isWeb ? "WEB" : "MOBILE"}');
+  
   runApp(const AanextApp());
 }
 
@@ -40,17 +49,17 @@ class AanextApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Auth Provider - İlk sırada
+        // Auth Provider
         ChangeNotifierProvider<AuthProvider>(
           create: (_) => AuthProvider(),
         ),
         
-        // Audio Service Provider (ReelsProvider'dan ÖNCE!)
+        // Audio Service Provider
         ChangeNotifierProvider<AudioService>(
           create: (_) => AudioService(),
         ),
         
-        // Reels Provider - Audio service'i kullanıyor
+        // Reels Provider
         ChangeNotifierProvider<ReelsProvider>(
           create: (_) => ReelsProvider()..loadReels(),
         ),
@@ -73,9 +82,7 @@ class AanextApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'AA-Next',
-        // Platform-aware theme
         theme: PlatformUtils.isWeb ? WebTheme.theme : AppTheme.theme,
-        // ⚠️ ÖNEMLİ: SplashPage ile başla (auth kontrolü için)
         home: const SplashPage(),
       ),
     );
@@ -93,120 +100,130 @@ class MainNavigator extends StatefulWidget {
 class _MainNavigatorState extends State<MainNavigator> {
   int _currentIndex = 0;
 
-  // 🔽 DEĞİŞİKLİK BURADA 🔽
+  // ✅ PLATFORM-AWARE SCREENS
   final List<Widget> _screens = [
     const HomePageRedesigned(),
-    const ReelsFeedPage(),
-    const GameMenuPage(), // ✅ Placeholder yerine GameMenuPage geldi
+    
+    // ✅ REELS: Web için özel sayfa, Mobile için eski sayfa
+    PlatformUtils.isWeb 
+        ? const WebReelsFeedPage()  // 🆕 WEB
+        : const ReelsFeedPage(),     // 📱 MOBILE
+    
+    const GameMenuPage(),
     const ProfileView(),
   ];
-  // 🔼 DEĞİŞİKLİK BURADA 🔼
 
   @override
   Widget build(BuildContext context) {
     // Web (PC/tablet) için üstte butonlar, altta nav yok
     final screenSize = PlatformUtils.getScreenSize(context);
-    final bool isWebWide = PlatformUtils.isWeb && (screenSize == ScreenSize.desktop || screenSize == ScreenSize.tablet);
+    final bool isWebWide = PlatformUtils.isWeb && 
+        (screenSize == ScreenSize.desktop || screenSize == ScreenSize.tablet);
 
     return Scaffold(
-      appBar: isWebWide
-          ? AppBar(
-              automaticallyImplyLeading: false,
-              centerTitle: true,
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _TopNavButton(
-                    label: 'Ana Sayfa',
-                    icon: Icons.home_outlined,
-                    selected: _currentIndex == 0,
-                    onTap: () => setState(() => _currentIndex = 0),
-                  ),
-                  const SizedBox(width: 8),
-                  _TopNavButton(
-                    label: 'Reels',
-                    icon: Icons.play_circle_outline,
-                    selected: _currentIndex == 1,
-                    onTap: () => setState(() => _currentIndex = 1),
-                  ),
-                  const SizedBox(width: 8),
-                  _TopNavButton(
-                    label: 'Oyunlar',
-                    icon: Icons.sports_esports_outlined,
-                    selected: _currentIndex == 2,
-                    onTap: () => setState(() => _currentIndex = 2),
-                  ),
-                  const SizedBox(width: 8),
-                  _TopNavButton(
-                    label: 'Profil',
-                    icon: Icons.person_outline,
-                    selected: _currentIndex == 3,
-                    onTap: () => setState(() => _currentIndex = 3),
-                  ),
-                ],
-              ),
-            )
-          : null,
+      appBar: isWebWide ? _buildWebAppBar() : null,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: isWebWide ? null : Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: AppColors.surface,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.textTertiary,
-          selectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
+      bottomNavigationBar: isWebWide ? null : _buildMobileBottomNav(),
+    );
+  }
+
+  // Web için üst navigasyon
+  PreferredSizeWidget _buildWebAppBar() {
+    return AppBar(
+      automaticallyImplyLeading: false,
+      centerTitle: true,
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _TopNavButton(
+            label: 'Ana Sayfa',
+            icon: Icons.home_outlined,
+            selected: _currentIndex == 0,
+            onTap: () => setState(() => _currentIndex = 0),
           ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 11,
+          const SizedBox(width: 8),
+          _TopNavButton(
+            label: 'Reels',
+            icon: Icons.play_circle_outline,
+            selected: _currentIndex == 1,
+            onTap: () => setState(() => _currentIndex = 1),
           ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Ana Sayfa',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.play_circle_outline),
-              activeIcon: Icon(Icons.play_circle),
-              label: 'Reels',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.sports_esports_outlined),
-              activeIcon: Icon(Icons.sports_esports),
-              label: 'Oyunlar',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profil',
-            ),
-          ],
+          const SizedBox(width: 8),
+          _TopNavButton(
+            label: 'Oyunlar',
+            icon: Icons.sports_esports_outlined,
+            selected: _currentIndex == 2,
+            onTap: () => setState(() => _currentIndex = 2),
+          ),
+          const SizedBox(width: 8),
+          _TopNavButton(
+            label: 'Profil',
+            icon: Icons.person_outline,
+            selected: _currentIndex == 3,
+            onTap: () => setState(() => _currentIndex = 3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Mobile için alt navigasyon
+  Widget _buildMobileBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: AppColors.surface,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textTertiary,
+        selectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
         ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 11,
+        ),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Ana Sayfa',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.play_circle_outline),
+            activeIcon: Icon(Icons.play_circle),
+            label: 'Reels',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.sports_esports_outlined),
+            activeIcon: Icon(Icons.sports_esports),
+            label: 'Oyunlar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profil',
+          ),
+        ],
       ),
     );
   }
 }
 
+// ✅ ORİJİNAL TASARIM KORUNDU
 class _TopNavButton extends StatelessWidget {
   final String label;
   final IconData icon;
