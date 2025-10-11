@@ -4,3 +4,4 @@ export * from './reelsApi';
 export * from './articlesApi';
 export * from './newsApi';
 export * from './authApi';
+export * from './gameApi';

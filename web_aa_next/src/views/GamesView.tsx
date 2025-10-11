@@ -1,13 +1,12 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';  // ✅ Import ekle
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components';
 
 export const GamesView: React.FC = () => {
-  const navigate = useNavigate();  // ✅ Hook ekle
+  const navigate = useNavigate();
   
   const plannedFeatures = [
     'Mini kelime oyunları',
-    'Haber bilgi yarışması',
     'Puan kazanma sistemi',
     'Liderlik tablosu',
     'Günlük görevler',
@@ -28,22 +27,22 @@ export const GamesView: React.FC = () => {
       {/* Content - Responsive */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
-        {/* ✅ YENI: Race Demo Kartı */}
-        <Card padding="lg" shadow="lg" className="mb-6 bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+        {/* Multiplayer Game Card */}
+        <Card padding="lg" shadow="lg" className="mb-6 bg-gradient-to-br from-green-500 to-blue-600 text-white">
           <div className="text-center">
-            <div className="text-4xl sm:text-6xl mb-4">🏁</div>
+            <div className="text-4xl sm:text-6xl mb-4">🎮</div>
             <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-4">
-              Haber Yarış Oyunu
+              Haber Kapışması
             </h2>
-            <p className="text-blue-100 text-base sm:text-lg leading-relaxed mb-6">
-              5 oyuncu, paralel şeritler, haftalık haber takip yarışı!
+            <p className="text-green-100 text-base sm:text-lg leading-relaxed mb-6">
+              Rakibinle karşılıklı soru sor, haberlerden yarış! İki oyuncu, 8 round, heyecan dolu bir mücadele!
             </p>
             
             <button
-              onClick={() => navigate('/race')}
-              className="px-8 py-4 bg-white text-blue-600 rounded-lg font-bold text-lg hover:bg-blue-50 transition-colors shadow-lg hover:shadow-xl"
+              onClick={() => navigate('/games/menu')}
+              className="px-8 py-4 bg-white text-green-600 rounded-lg font-bold text-lg hover:bg-green-50 transition-colors shadow-lg hover:shadow-xl"
             >
-              Yarışa Başla →
+              Oyuna Başla →
             </button>
           </div>
         </Card>

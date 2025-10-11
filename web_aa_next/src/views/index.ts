@@ -9,3 +9,7 @@ export * from './NewsDetailView';
 export * from './BackendTestView';
 export * from './NewsGraphView';
 export { default as GameRaceView } from './GameRaceView';
+export * from './GameMenuView';
+export * from './GameMatchmakingView';
+export * from './GamePlayView';
+export * from './GameResultView';
