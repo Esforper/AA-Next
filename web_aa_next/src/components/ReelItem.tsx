@@ -71,9 +71,14 @@ export const ReelItem: React.FC<ReelItemProps> = ({
   };
 
   // Title overlay sizing for transparent-text white panel under image
-  const titleOverlayText = (reel.title || '').trim();
-  const overlayWidth = Math.min(Math.max(titleOverlayText.length * 13 + 32, 200), 820);
-  const overlayHeight = 52;
+  // Karakter limiti ve kısa overlay
+  const fullTitle = (reel.title || '').trim();
+  const maxChars = 40; // Maksimum 40 karakter
+  const titleOverlayText = fullTitle.length > maxChars 
+    ? fullTitle.substring(0, maxChars) + '...' 
+    : fullTitle;
+  const overlayWidth = Math.min(Math.max(titleOverlayText.length * 12 + 32, 180), 520); // Daha kısa max width
+  const overlayHeight = 48; // Biraz daha küçük yükseklik
 
   // Aksiyon handlers
   const handleShare = () => {
@@ -143,23 +148,24 @@ export const ReelItem: React.FC<ReelItemProps> = ({
           {/* Cinematic Vignette for Bleed Effect */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/20" />
 
-          {/* Transparent-text white panel under image edge */}
+          {/* Transparent-text white panel under image edge - Kısa ve responsive */}
           {titleOverlayText && (
             <svg
-              className="absolute left-4 z-50"
-              style={{ bottom: '-10px' }}
+              className="absolute left-4 z-50 max-w-[90%]" 
+              style={{ bottom: '-8px' }}
               width={overlayWidth}
               height={overlayHeight}
               viewBox={`0 0 ${overlayWidth} ${overlayHeight}`}
+              preserveAspectRatio="xMinYMid meet"
               aria-hidden="true"
             >
               <defs>
                 <mask id={`title-overlay-mask-${reel.id}`}>
-                  <rect x="0" y="0" width={overlayWidth} height={overlayHeight} fill="white" rx="14" ry="14" />
-                  <text x="12" y={overlayHeight - 14} fontSize="22" fontWeight="800" fill="black">{titleOverlayText}</text>
+                  <rect x="0" y="0" width={overlayWidth} height={overlayHeight} fill="white" rx="12" ry="12" />
+                  <text x="12" y={overlayHeight - 12} fontSize="20" fontWeight="800" fill="black">{titleOverlayText}</text>
                 </mask>
               </defs>
-              <rect x="0" y="0" width={overlayWidth} height={overlayHeight} rx="14" ry="14" fill="rgba(255,255,255,0.95)" mask={`url(#title-overlay-mask-${reel.id})`} />
+              <rect x="0" y="0" width={overlayWidth} height={overlayHeight} rx="12" ry="12" fill="rgba(255,255,255,0.95)" mask={`url(#title-overlay-mask-${reel.id})`} />
             </svg>
           )}
         </div>

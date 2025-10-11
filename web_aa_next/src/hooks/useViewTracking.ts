@@ -103,12 +103,24 @@ export const useViewTracking = (): UseViewTrackingReturn => {
         session_id: SESSION_ID
       };
       
+      // Get auth token from localStorage
+      const token = localStorage.getItem('aa_auth_token') || sessionStorage.getItem('aa_auth_token');
+      
+      // Build headers with auth if available
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        headers['X-User-ID'] = USER_ID; // Fallback to X-User-ID if no token
+      }
+      
       const response = await fetch(`${API_BASE}/api/reels/track-view`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-ID': USER_ID
-        },
+        headers,
         body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(10000)
       });

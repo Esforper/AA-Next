@@ -1,4 +1,4 @@
-rimport React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import clsx from 'clsx';
 import { useNewsViewModel } from '../viewmodels/useNewsViewModel';
 import NewsModal from '../components/NewsModal';

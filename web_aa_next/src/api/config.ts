@@ -22,6 +22,15 @@ export const API_CONFIG = {
       CHANGE_PASSWORD: '/api/auth/change-password',
       CHECK_EMAIL: '/api/auth/check-email',
       CHECK_USERNAME: '/api/auth/check-username'
+    },
+    GAME: {
+      CHECK_ELIGIBILITY: '/api/game/check-eligibility',
+      JOIN_MATCHMAKING: '/api/game/matchmaking/join',
+      MATCHMAKING_STATUS: '/api/game/matchmaking/status',
+      CANCEL_MATCHMAKING: '/api/game/matchmaking/cancel',
+      GAME_SESSION: '/api/game/session',
+      GAME_HISTORY: '/api/game/history',
+      BOT_MATCH: '/api/game/test/bot-match'
     }
   },
   DEFAULT_TIMEOUT: 10000

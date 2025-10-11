@@ -1,6 +1,19 @@
 import { API_CONFIG } from './config';
 import { NewsListResponse, NewsQueryParams, NewsItem } from '../models/NewsModels';
 
+// Auth helper - get token from localStorage
+function getAuthToken(): string | null {
+  try {
+    let token = localStorage.getItem('aa_auth_token');
+    if (token) return token;
+    token = sessionStorage.getItem('aa_auth_token');
+    if (token) return token;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export class NewsApi {
   static async fetchNews(params: NewsQueryParams = {}): Promise<NewsListResponse> {
     try {
@@ -23,12 +36,22 @@ export class NewsApi {
         // Try reels feed as fallback source (BackendAPIDemo Reels.py)
         const reelsParams = new URLSearchParams({ limit: String(limit) });
         const reelsUrl = `${API_CONFIG.BASE_URL}/api/reels/feed?${reelsParams.toString()}`;
+        
+        // Build headers with auth if available
+        const token = getAuthToken();
+        const reelsHeaders: Record<string, string> = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        };
+        
+        if (token) {
+          reelsHeaders['Authorization'] = `Bearer ${token}`;
+        } else {
+          reelsHeaders['X-User-ID'] = 'web_user_' + Math.random().toString(36).substr(2, 9);
+        }
+        
         const reelsRes = await fetch(reelsUrl, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-User-ID': 'web_user_' + Math.random().toString(36).substr(2, 9)
-          },
+          headers: reelsHeaders,
           signal: AbortSignal.timeout(API_CONFIG.DEFAULT_TIMEOUT)
         });
 

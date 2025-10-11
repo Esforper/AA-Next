@@ -9,7 +9,11 @@ import {
   TestView, 
   SimpleHomeView, 
   BackendTestView,
-  GameRaceView  // ✅ Import ekle
+  GameRaceView,
+  GameMenuView,
+  GameMatchmakingView,
+  GamePlayView,
+  GameResultView
 } from './views';
 import { TabBar } from './components';
 import { useNavigationViewModel } from './viewmodels';
@@ -26,10 +30,10 @@ const AppContent: React.FC = () => {
       setActiveTab('home');
     } else if (currentPath === '/reels') {
       setActiveTab('reels');
-    } else if (currentPath === '/games') {
+    } else if (currentPath === '/games' || currentPath.startsWith('/games/')) {
       setActiveTab('games');
-    } else if (currentPath === '/race') {  // ✅ Race route
-      setActiveTab('games');  // Race'i games tab'ı altında göster
+    } else if (currentPath === '/race') {
+      setActiveTab('games');
     } else if (currentPath === '/profile') {
       setActiveTab('profile');
     }
@@ -59,9 +63,10 @@ const AppContent: React.FC = () => {
 
   const isReels = location.pathname === '/reels';
   const isEmbed = new URLSearchParams(location.search).get('embed') === '1';
-  // Don't show tab bar on news detail pages or race view; hide in embed mode
+  // Don't show tab bar on news detail pages, race view, or game subpages; hide in embed mode
   const showTabBar = !location.pathname.startsWith('/news/') && 
                      !location.pathname.startsWith('/race') &&
+                     !location.pathname.startsWith('/games/') &&
                      !isEmbed;
 
   return (
@@ -126,7 +131,11 @@ const AppContent: React.FC = () => {
           <Route path="/home" element={<SimpleHomeView />} />
           <Route path="/reels" element={<ReelsView />} />
           <Route path="/games" element={<GamesView />} />
-          <Route path="/race" element={<GameRaceView />} />  {/* ✅ Yeni route */}
+          <Route path="/games/menu" element={<GameMenuView />} />
+          <Route path="/games/matchmaking" element={<GameMatchmakingView />} />
+          <Route path="/games/play/:gameId" element={<GamePlayView />} />
+          <Route path="/games/result/:gameId" element={<GameResultView />} />
+          <Route path="/race" element={<GameRaceView />} />
           <Route path="/profile" element={<ProfileView />} />
           <Route path="/news/:id" element={<NewsDetailView />} />
           <Route path="/backend-test" element={<BackendTestView />} />

@@ -4,3 +4,4 @@ export * from './ArticleModels';
 export * from './CommonModels';
 export * from './NewsModels';
 export * from './AuthModels';
+export * from './GameModels';

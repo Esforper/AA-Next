@@ -82,6 +82,73 @@ const API_CONFIG = {
 // Generate consistent user ID for session
 const USER_ID = 'web_user_' + Math.random().toString(36).substr(2, 9);
 
+// Auth helper - get token from localStorage
+function getAuthToken(): string | null {
+  try {
+    // Check localStorage first (persistent)
+    let token = localStorage.getItem('aa_auth_token');
+    if (token) return token;
+    
+    // Check sessionStorage (temporary)
+    token = sessionStorage.getItem('aa_auth_token');
+    if (token) return token;
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Create guest user token if needed
+async function ensureAuthToken(): Promise<string> {
+  let token = getAuthToken();
+  
+  if (token) {
+    return token;
+  }
+  
+  // Create guest user automatically
+  try {
+    console.log('🎭 Creating guest user for API access...');
+    
+    const guestEmail = `guest_${Date.now()}@aanext.app`;
+    const guestPassword = `Guest${Date.now()}!`;
+    
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        email: guestEmail,
+        username: `guest_${Date.now()}`,
+        password: guestPassword,
+        full_name: 'Guest User'
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.token && data.token.access_token) {
+        const newToken = data.token.access_token;
+        // Save to sessionStorage (not localStorage, so it's temporary)
+        sessionStorage.setItem('aa_auth_token', newToken);
+        console.log('✅ Guest user created successfully');
+        return newToken;
+      }
+    }
+    
+    // If registration fails, try login with existing guest
+    console.warn('⚠️ Guest registration failed, will use X-User-ID fallback');
+    return ''; // Empty token means use X-User-ID
+    
+  } catch (error) {
+    console.error('Failed to create guest user:', error);
+    return ''; // Fallback to X-User-ID
+  }
+}
+
 export class ReelsApi {
   
   /**
@@ -115,13 +182,24 @@ export class ReelsApi {
       
       console.log(`🔄 Fetching infinite feed: ${url}`);
       
+      // Get auth token
+      const token = await ensureAuthToken();
+      
+      // Build headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        headers['X-User-ID'] = USER_ID;
+      }
+      
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-ID': USER_ID,
-          'Accept': 'application/json'
-        },
+        headers,
         signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
       });
       
@@ -179,13 +257,24 @@ export class ReelsApi {
     try {
       console.log(`📊 Tracking view: ${request.reel_id}, duration: ${request.duration_ms}ms`);
       
+      // Get auth token
+      const token = await ensureAuthToken();
+      
+      // Build headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        headers['X-User-ID'] = USER_ID;
+      }
+      
       const response = await fetch(`${API_CONFIG.BASE_URL}/api/reels/track-view`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-ID': USER_ID,
-          'Accept': 'application/json'
-        },
+        headers,
         body: JSON.stringify(request),
         signal: AbortSignal.timeout(10000)
       });
@@ -233,13 +322,24 @@ export class ReelsApi {
       
       const url = `${API_CONFIG.BASE_URL}/api/reels/trending?${queryParams.toString()}`;
       
+      // Get auth token
+      const token = await ensureAuthToken();
+      
+      // Build headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        headers['X-User-ID'] = USER_ID;
+      }
+      
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-ID': USER_ID,
-          'Accept': 'application/json'
-        },
+        headers,
         signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
       });
       
@@ -286,13 +386,24 @@ export class ReelsApi {
       const targetUserId = userId || USER_ID;
       const url = `${API_CONFIG.BASE_URL}/api/reels/user/${targetUserId}/daily-progress`;
       
+      // Get auth token
+      const token = await ensureAuthToken();
+      
+      // Build headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        headers['X-User-ID'] = USER_ID;
+      }
+      
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-ID': USER_ID,
-          'Accept': 'application/json'
-        },
+        headers,
         signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
       });
       
@@ -326,13 +437,24 @@ export class ReelsApi {
     try {
       const url = `${API_CONFIG.BASE_URL}/api/reels/${reelId}`;
       
+      // Get auth token
+      const token = await ensureAuthToken();
+      
+      // Build headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        headers['X-User-ID'] = USER_ID;
+      }
+      
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-ID': USER_ID,
-          'Accept': 'application/json'
-        },
+        headers,
         signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
       });
       
