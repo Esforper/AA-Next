@@ -12,6 +12,12 @@ import '../../shared/widgets/image_carousel.dart';
 import '../../shared/widgets/gamification/reels_xp_overlay.dart';
 import '../widgets/web_article_detail_panel.dart';
 
+
+
+import '../../services/audio_service.dart';
+import '../widgets/web_audio_player.dart';
+import '../widgets/web_gamification_sidebar.dart';
+
 class WebReelsFeedPage extends StatefulWidget {
   const WebReelsFeedPage({super.key});
 
@@ -27,18 +33,30 @@ class _WebReelsFeedPageState extends State<WebReelsFeedPage> {
   // Scroll controller
   final ScrollController _scrollController = ScrollController();
 
-  @override
-  void initState() {
-    super.initState();
+@override
+void initState() {
+  super.initState();
+  
+  // İlk yükleme
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final provider = context.read<ReelsProvider>();
+    provider.loadReels();
     
-    // İlk yükleme
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ReelsProvider>().loadReels();
-    });
+    // ✅ YENİ: İlk reel'in sesini başlat
+    if (provider.reels.isNotEmpty) {
+      final audioService = context.read<AudioService>();
+      final firstReel = provider.reels[0];
+      
+      if (firstReel.audioUrl.isNotEmpty) {
+        debugPrint('🎵 Auto-starting audio for first reel');
+        audioService.play(firstReel.audioUrl, firstReel.id);
+      }
+    }
+  });
 
-    // Infinite scroll listener
-    _scrollController.addListener(_onScroll);
-  }
+  // Infinite scroll listener
+  _scrollController.addListener(_onScroll);
+}
 
   void _onScroll() {
     if (_scrollController.position.pixels >= 
@@ -60,25 +78,17 @@ class _WebReelsFeedPageState extends State<WebReelsFeedPage> {
 
     final currentReel = provider.reels[_currentReelIndex];
 
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      // Sonraki haber
-      if (_currentReelIndex < reelsCount - 1) {
-        setState(() {
-          _currentReelIndex++;
-          _currentImageIndex = 0;
-        });
-        _scrollToCurrentReel();
-      }
-    } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      // Önceki haber
-      if (_currentReelIndex > 0) {
-        setState(() {
-          _currentReelIndex--;
-          _currentImageIndex = 0;
-        });
-        _scrollToCurrentReel();
-      }
-    } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+  // Sonraki haber
+  if (_currentReelIndex < reelsCount - 1) {
+    _onReelChanged(_currentReelIndex + 1); // ✅ setState yerine bu
+  }
+} else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+  // Önceki haber
+  if (_currentReelIndex > 0) {
+    _onReelChanged(_currentReelIndex - 1); // ✅ setState yerine bu
+  }
+} else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
       // Sonraki resim
       if (_currentImageIndex < currentReel.imageUrls.length - 1) {
         setState(() => _currentImageIndex++);
@@ -202,45 +212,48 @@ class _WebReelsFeedPageState extends State<WebReelsFeedPage> {
     );
   }
 
-  Widget _buildMainContent(ReelsProvider provider) {
-    return Stack(
-      children: [
-        // Ana içerik
-        Row(
-          children: [
-            // SOL: Haber listesi (thumbnail preview)
-            _buildReelsList(provider),
-            
-            // ORTA: Ana görsel ve bilgi paneli
-            Expanded(
-              child: _buildReelDetailView(provider),
-            ),
-          ],
-        ),
-
-        // SAĞ: Detay paneli (conditional)
-        if (_showDetailPanel)
-          WebArticleDetailPanel(
-            reel: provider.reels[_currentReelIndex],
-            onClose: () => setState(() => _showDetailPanel = false),
+Widget _buildMainContent(ReelsProvider provider) {
+  return Stack(
+    children: [
+      // Ana içerik
+      Row(
+        children: [
+          // SOL: Haber listesi (thumbnail preview)
+          _buildReelsList(provider),
+          
+          // ORTA: Ana görsel ve bilgi paneli
+          Expanded(
+            child: _buildReelDetailView(provider),
           ),
-      ],
-    );
-  }
-
-  Widget _buildReelsList(ReelsProvider provider) {
-    return Container(
-      width: 320,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(2, 0),
-          ),
+          
+          // SAĞ: Gamification Sidebar
+          const WebGamificationSidebar(),
         ],
       ),
+
+      // SAĞ ÜSTTE: Detay paneli (conditional)
+      if (_showDetailPanel)
+        WebArticleDetailPanel(
+          reel: provider.reels[_currentReelIndex],
+          onClose: () => setState(() => _showDetailPanel = false),
+        ),
+    ],
+  );
+}
+
+Widget _buildReelsList(ReelsProvider provider) {
+  return Container(
+    width: 280, // 320 → 280 (sidebar için yer açtık)
+    decoration: BoxDecoration(
+      color: Colors.white,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.05),
+          blurRadius: 10,
+          offset: const Offset(2, 0),
+        ),
+      ],
+    ),
       child: ListView.builder(
         controller: _scrollController,
         itemCount: provider.reels.length + (provider.isLoadingMore ? 1 : 0),
@@ -265,14 +278,9 @@ class _WebReelsFeedPageState extends State<WebReelsFeedPage> {
   }
 
   Widget _buildReelListItem(Reel reel, int index, bool isSelected) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _currentReelIndex = index;
-          _currentImageIndex = 0;
-        });
-      },
-      child: Container(
+  return InkWell(
+    onTap: () => _onReelChanged(index), // ✅ Yeni fonksiyon kullan
+    child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -337,39 +345,51 @@ class _WebReelsFeedPageState extends State<WebReelsFeedPage> {
     );
   }
 
-  Widget _buildReelDetailView(ReelsProvider provider) {
-    if (provider.reels.isEmpty) return const SizedBox();
-    
-    final reel = provider.reels[_currentReelIndex];
+Widget _buildReelDetailView(ReelsProvider provider) {
+  if (provider.reels.isEmpty) return const SizedBox();
+  
+  final reel = provider.reels[_currentReelIndex];
 
-    return Container(
-      color: const Color(0xFFF8F9FA),
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 1200),
-          padding: const EdgeInsets.all(32),
-          child: Row(
+  return Container(
+    color: const Color(0xFFF8F9FA),
+    child: Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 900), // 1200 → 900 (sidebar için yer)
+        padding: const EdgeInsets.all(32),
+        child: SingleChildScrollView(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // SOL: Görsel
-              Expanded(
-                flex: 4,
-                child: _buildImageSection(reel),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // SOL: Görsel
+                  Expanded(
+                    flex: 4,
+                    child: _buildImageSection(reel),
+                  ),
+                  
+                  const SizedBox(width: 32),
+                  
+                  // SAĞ: Bilgiler
+                  Expanded(
+                    flex: 6,
+                    child: _buildInfoSection(reel),
+                  ),
+                ],
               ),
               
-              const SizedBox(width: 32),
+              const SizedBox(height: 32),
               
-              // SAĞ: Bilgiler
-              Expanded(
-                flex: 6,
-                child: _buildInfoSection(reel),
-              ),
+              // ✅ YENİ: Audio Player (alt kısımda, tam genişlik)
+              WebAudioPlayer(reel: reel),
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildImageSection(Reel reel) {
     return Column(
@@ -461,6 +481,29 @@ class _WebReelsFeedPageState extends State<WebReelsFeedPage> {
       ],
     );
   }
+
+
+void _onReelChanged(int newIndex) {
+  if (_currentReelIndex == newIndex) return;
+  
+  setState(() {
+    _currentReelIndex = newIndex;
+    _currentImageIndex = 0;
+  });
+  
+  // ✅ Ses değiştir
+  final provider = context.read<ReelsProvider>();
+  final newReel = provider.reels[newIndex];
+  
+  if (newReel.audioUrl.isNotEmpty) {
+    final audioService = context.read<AudioService>();
+    debugPrint('🎵 Changing audio to: ${newReel.id}');
+    audioService.play(newReel.audioUrl, newReel.id);
+  }
+  
+  _scrollToCurrentReel();
+}
+
 
   Widget _buildInfoSection(Reel reel) {
     return SingleChildScrollView(
@@ -609,9 +652,14 @@ class _WebReelsFeedPageState extends State<WebReelsFeedPage> {
     }
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
+@override
+void dispose() {
+  _scrollController.dispose();
+  
+  // ✅ YENİ: Ses durdur
+  final audioService = context.read<AudioService>();
+  audioService.stop();
+  
+  super.dispose();
+}
 }
