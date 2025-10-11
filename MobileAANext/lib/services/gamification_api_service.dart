@@ -457,38 +457,65 @@ int _calculateNodesInLevel(int level) {
   // ============ HELPER METHODS ============
 
   /// Response handler
-  Map<String, dynamic> _handleResponse(http.Response response) {
-    debugPrint('📡 Response status: ${response.statusCode}');
-    debugPrint('📥 Response body: ${response.body}');
+  /// Streak Calendar Data Al
+  /// GET /api/gamification/streak/{user_id}
+  Future<Map<String, dynamic>> getStreakCalendar({
+    required String userId,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/gamification/streak/$userId');
+      
+      debugPrint('🔥 [API] GET $uri');
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final response = await http.get(
+        uri,
+        headers: await _getHeaders(),
+      );
+
+      final result = _handleResponse(response);
+      
+      debugPrint('✅ [API] Streak Calendar received');
+      debugPrint('   ├─ Current Streak: ${result['current_streak']}');
+      debugPrint('   ├─ Longest Streak: ${result['longest_streak']}');
+      debugPrint('   └─ Calendar Days: ${result['calendar_data']?.length ?? 0}');
+
+      return result;
+    } catch (e) {
+      debugPrint('❌ [API] Get Streak Calendar error: $e');
+      return _handleError(e);
+    }
+  }
+
+  // ============ RESPONSE HANDLERS ============
+  
+  Map<String, dynamic> _handleResponse(http.Response response) {
+    debugPrint('📬 [API] Response: ${response.statusCode}');
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data;
     } else if (response.statusCode == 401) {
+      debugPrint('❌ [API] Unauthorized - token may be expired');
       return {
         'success': false,
-        'message': 'Authentication failed - Invalid token',
-      };
-    } else if (response.statusCode == 404) {
-      return {
-        'success': false,
-        'message': 'Endpoint not found',
+        'message': 'Unauthorized - please login again',
       };
     } else {
+      debugPrint('❌ [API] Error response: ${response.body}');
       return {
         'success': false,
-        'message': 'API error: ${response.statusCode}',
+        'message': 'API Error: ${response.statusCode}',
       };
     }
   }
 
   Map<String, dynamic> _handleError(dynamic error) {
-    debugPrint('❌ [Gamification API] Error: $error');
+    debugPrint('❌ [API] Request error: $error');
     return {
       'success': false,
-      'message': 'Request failed: $error',
+      'message': 'Network error: $error',
     };
   }
-
 
   /// Health check
   Future<bool> healthCheck() async {

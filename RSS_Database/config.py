@@ -4,7 +4,7 @@ Keyword-based scraper için ayarlar
 
 # Dosya yolları (aynı dizinde)
 RSS_NEWS_FILE = 'aa_news_data.json'
-SCRAPED_NEWS_FILE = 'aa_news_scraped_last.json'
+SCRAPED_NEWS_FILE = 'aa_news_scraped_data.json'
 
 # Scraping ayarları
 REQUEST_DELAY = 2  # Requestler arası bekleme süresi (saniye)

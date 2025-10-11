@@ -16,15 +16,23 @@ dependencies:
   cached_network_image: ^3.3.1
   shared_preferences: ^2.5.3
   flutter_dotenv: ^6.0.0
-  flutter_secure_storage : ^8.0.0
+  flutter_secure_storage: ^8.0.0
   share_plus: ^7.2.1
-  audioplayers: ^5.2.1
   material: ^1.0.0+2
   visibility_detector: ^0.4.0+2
   foundation: ^0.0.5
   url_launcher: ^6.2.2
   web_socket_channel: ^2.4.0
   timeago: ^3.6.1
+  
+  # ✅ YENİ: Background Audio + Kilit Ekranı
+  just_audio: ^0.9.36
+  audio_service: ^0.18.12
+  rxdart: ^0.27.7
+  
+  # ✅ YENİ: Audio metadata (optional ama iyi olur)
+  audio_session: ^0.1.18
+  audioplayers: ^6.5.1
 
 dev_dependencies:
   flutter_test:

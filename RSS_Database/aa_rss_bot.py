@@ -57,7 +57,7 @@ FEEDS = {
 
 DATA_FILE = 'aa_news_data.json'
 LOG_FILE = 'aa_bot_errors.log'
-CHECK_INTERVAL = 900  # 15 dakika
+CHECK_INTERVAL = 3600  # 1 saat
 MAX_RETRIES = 3  # Maksimum yeniden deneme sayısı
 FEED_TIMEOUT = 45  # Her feed için maksimum bekleme süresi
 

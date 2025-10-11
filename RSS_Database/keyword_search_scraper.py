@@ -1,7 +1,8 @@
 """
-AA News Keyword-Based Deep Scraper
+AA News Keyword-Based Deep Scraper - Geliştirilmiş Versiyon
 aa_news_data.json'dan henüz scrape edilmemiş haberleri alır,
 scrape eder ve keyword'lerinden bulduğu diğer haberleri de scrape eder.
+Resimler dahil tüm verileri düzgün formatta kaydeder.
 """
 
 import json
@@ -11,6 +12,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import sys
 import os
+import re
+import hashlib
 
 # aa_scraper.py'den AANewsScraper class'ını import et
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -26,6 +29,9 @@ from config import (
     AA_BASE_URL
 )
 
+# AA domains
+AA_DOMAIN = 'https://www.aa.com.tr'
+AA_CDN = 'https://cdnuploads.aa.com.tr'
 
 class KeywordSearchScraper:
     def __init__(self):
@@ -90,9 +96,159 @@ class KeywordSearchScraper:
         
         return unscraped
     
+    def get_category_from_url(self, url):
+        """URL'den kategori bilgisini çıkar"""
+        try:
+            if '/tr/' in url:
+                parts = url.split('/tr/')
+                if len(parts) > 1:
+                    category = parts[1].split('/')[0]
+                    return category if category else 'guncel'
+            return 'guncel'
+        except:
+            return 'guncel'
+    
+    def normalize_url(self, src):
+        """URL normalize et"""
+        if not src:
+            return None
+        if src.startswith('http://') or src.startswith('https://'):
+            return src
+        if src.startswith('//'):
+            return 'https:' + src
+        if src.startswith('/'):
+            return AA_CDN + src if src.startswith('/uploads/') else AA_DOMAIN + src
+        return None
+    
+    def filter_aa_images(self, soup, base_url):
+        """AA görselleri filtrele - scrape_missing_images.py mantığı"""
+        images = []
+        main_image = None
+        
+        # Ana görsel
+        main_img = soup.select_one('img.detay-buyukFoto, img[class*="detay-buyuk"]')
+        if main_img and main_img.get('src'):
+            src = self.normalize_url(main_img.get('src'))
+            if src:
+                main_image = src
+                images.append(src)
+        
+        # İçerik görselleri
+        content_div = soup.select_one('div.detay-icerik')
+        if content_div:
+            for img in content_div.find_all('img'):
+                src = self.normalize_url(img.get('src'))
+                if src and src != main_image:
+                    if any(k in src.lower() for k in ['/uploads/', 'cdnuploads.aa.com.tr', '/thumbs_']):
+                        images.append(src)
+        
+        # Fallback: Tüm görselleri tara
+        if not images:
+            for img in soup.find_all('img'):
+                src = self.normalize_url(img.get('src'))
+                if src:
+                    if not any(p in src.lower() for p in ['logo', 'icon', 'button', 'social', 'facebook', 'twitter', 'instagram']):
+                        images.append(src)
+        
+        # Deduplicate
+        return list(dict.fromkeys(images))
+    
+    def clean_and_separate_summary(self, soup):
+        """Summary/description'ı temizle ve ayır"""
+        result = {
+            'title': None,
+            'summary': None,
+            'clean_summary': None,
+            'category': None,
+            'author': None,
+            'date': None
+        }
+        
+        # Başlık
+        title_elem = soup.find('h1', class_='detay-baslik') or soup.find('h1')
+        if title_elem:
+            result['title'] = title_elem.get_text(strip=True)
+        
+        # Spot/Summary bölümü
+        spot_div = soup.find('div', class_='detay-spot-category')
+        if spot_div:
+            # Kategori
+            category_elem = spot_div.find('a', href=lambda x: x and '/tr/' in x)
+            if category_elem:
+                result['category'] = category_elem.get_text(strip=True)
+            
+            # h4 içindeki özet (temiz summary)
+            h4_elem = spot_div.find('h4')
+            if h4_elem:
+                result['summary'] = h4_elem.get_text(strip=True)
+                result['clean_summary'] = result['summary']
+            
+            # Yazar ve tarih bilgisi
+            author_span = spot_div.find('span', style=lambda x: x and 'float:left' in x)
+            if author_span:
+                author_text = author_span.get_text(strip=True)
+                result['author'] = author_text.replace('|', '').strip()
+            
+            date_span = spot_div.find('span', class_='tarih')
+            if date_span:
+                result['date'] = date_span.get_text(strip=True)
+        
+        # Alternatif summary yeri
+        if not result['summary']:
+            summary_elem = soup.find('div', class_='detay-spot') or soup.find('p', class_='lead')
+            if summary_elem:
+                result['summary'] = summary_elem.get_text(strip=True)
+                result['clean_summary'] = result['summary']
+        
+        return result
+    
+    def enhanced_scrape_article(self, url):
+        """Geliştirilmiş scraping - resimler ve temiz summary dahil"""
+        try:
+            # Önce aa_scraper ile temel scraping yap
+            scraped_content = self.aa_scraper.scrape_article(url)
+            
+            if not scraped_content:
+                return None
+            
+            # Ekstra scraping için sayfayı tekrar çek
+            time.sleep(REQUEST_DELAY)
+            response = self.session.get(url, headers=self.headers, timeout=30)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Summary'yi temizle ve ayır
+            summary_info = self.clean_and_separate_summary(soup)
+            
+            # Resimleri al
+            images = self.filter_aa_images(soup, url)
+            
+            # Kategori bilgisini güncelle
+            if not scraped_content.get('category'):
+                scraped_content['category'] = self.get_category_from_url(url)
+            
+            if summary_info['category']:
+                scraped_content['category_full'] = summary_info['category']
+            
+            # Temiz summary'yi kullan
+            if summary_info['clean_summary']:
+                scraped_content['summary'] = summary_info['clean_summary']
+            
+            # Resimleri ekle
+            scraped_content['images'] = images
+            
+            # TTS için özel format oluştur
+            if scraped_content.get('full_title') and scraped_content.get('summary'):
+                scraped_content['tts_formatted'] = f"{scraped_content['full_title']}\n\n{scraped_content['summary']}"
+            
+            return scraped_content
+            
+        except Exception as e:
+            print(f"  ✗ Enhanced scraping hatası: {e}")
+            # Fallback olarak normal scraping sonucunu dön
+            return self.aa_scraper.scrape_article(url)
+    
     def is_valid_news_url(self, url):
         """Geçerli haber URL'si mi kontrol et"""
-        # İnfografik, abonelik formu gibi sayfaları filtrele
         invalid_patterns = [
             '/info/infographic/',
             '/p/abonelik',
@@ -108,7 +264,7 @@ class KeywordSearchScraper:
             if pattern in url:
                 return False
         
-        # Haber URL'si format kontrolü: /tr/kategori/haber-basligi/guid
+        # Haber URL'si format kontrolü
         parts = url.split('/')
         if len(parts) >= 5:
             # Son kısım sayısal guid olmalı
@@ -123,7 +279,7 @@ class KeywordSearchScraper:
     def extract_keywords_from_page(self, url):
         """Haber sayfasından keyword linklerini çıkar"""
         try:
-            time.sleep(REQUEST_DELAY + 1)  # Ekstra 1 saniye bekle
+            time.sleep(REQUEST_DELAY + 1)
             response = self.session.get(url, headers=self.headers, timeout=30)
             response.raise_for_status()
             
@@ -138,7 +294,7 @@ class KeywordSearchScraper:
                 if keyword_url.startswith('/'):
                     keyword_url = AA_BASE_URL + keyword_url
                 
-                keyword_text = link.text.strip().replace('\xa0', ' ')  # Non-breaking space temizle
+                keyword_text = link.text.strip().replace('\xa0', ' ')
                 
                 if keyword_text:
                     keywords.append({
@@ -153,9 +309,7 @@ class KeywordSearchScraper:
         except Exception as e:
             print(f"  ✗ Keyword çıkarma hatası: {e}")
             return []
-   
-   
-   
+    
     def scrape_keyword_search_page(self, keyword_url, keyword_text):
         """Keyword arama sayfasından haber linklerini çıkar (AJAX kullanarak)"""
         try:
@@ -222,11 +376,18 @@ class KeywordSearchScraper:
             if item.get('link') == url:
                 return True
         return False
- 
- 
+    
+    def generate_guid(self, url):
+        """URL'den benzersiz GUID oluştur"""
+        # URL'nin son kısmını al (genelde haber ID'si)
+        parts = url.split('/')
+        if parts and parts[-1].isdigit():
+            return parts[-1]
+        # Yoksa hash kullan
+        return hashlib.md5(url.encode()).hexdigest()[:12]
     
     def scrape_and_save_news(self, url, guid=None, pub_date=None):
-        """Bir haberi scrape et ve kaydet"""
+        """Bir haberi scrape et ve kaydet - Geliştirilmiş versiyon"""
         # Önce bellekte kontrol et
         if url in self.processed_urls:
             print(f"  ⊘ Bu oturumda zaten işlendi: {url}")
@@ -235,7 +396,7 @@ class KeywordSearchScraper:
         # Dosyada var mı kontrol et
         if self.is_already_scraped(url):
             print(f"  ⊘ Daha önce kaydedilmiş: {url}")
-            self.processed_urls.add(url)  # Bellekte de işaretle
+            self.processed_urls.add(url)
             return None
         
         if not self.is_valid_news_url(url):
@@ -244,27 +405,30 @@ class KeywordSearchScraper:
         
         print(f"  ↓ Scraping: {url}")
         
-        # AANewsScraper'ın scrape_article metodunu kullan
-        scraped_content = self.aa_scraper.scrape_article(url)
+        # Enhanced scraping kullan (resimler dahil)
+        scraped_content = self.enhanced_scrape_article(url)
         
         if scraped_content:
             if not guid:
-                guid = url.split('/')[-1]
+                guid = self.generate_guid(url)
             
-            # pubDate belirleme önceliği:
-            # 1. Parametre olarak gelen (AJAX'dan)
-            # 2. Scrape edilen sayfadan (published_date)
-            # 3. Şu an
+            # Kategori bilgisini URL'den al
+            category = self.get_category_from_url(url)
+            
+            # pubDate belirleme önceliği
             final_pub_date = pub_date or scraped_content.get('published_date') or datetime.now().isoformat()
+            
+            # Temiz description oluştur
+            description = scraped_content.get('summary', '')
             
             news_data = {
                 'guid': guid,
                 'title': scraped_content.get('full_title', ''),
                 'link': url,
-                'description': scraped_content.get('summary', ''),
-                'pubDate': final_pub_date,  # ← Burada kullanıyoruz
-                'category': scraped_content.get('category_full', ''),
-                'image': '',
+                'description': description,  # Temiz summary
+                'pubDate': final_pub_date,
+                'category': category,  # URL'den alınan kategori
+                'image': scraped_content.get('images', [None])[0] if scraped_content.get('images') else '',
                 'collected_at': datetime.now().isoformat(),
                 'scraped_content': scraped_content,
                 'scraping_success': True
@@ -272,6 +436,10 @@ class KeywordSearchScraper:
             
             self.processed_urls.add(url)
             print(f"  ✓ Başarılı: {scraped_content.get('full_title', 'Başlıksız')}")
+            
+            # Resim sayısını bildir
+            if scraped_content.get('images'):
+                print(f"    📷 {len(scraped_content['images'])} resim bulundu")
             
             # Hemen kaydet
             scraped_list = self.load_scraped_as_list()
@@ -286,7 +454,7 @@ class KeywordSearchScraper:
     def run(self):
         """Ana çalıştırma fonksiyonu"""
         print("=" * 60)
-        print("AA News Keyword-Based Deep Scraper")
+        print("AA News Keyword-Based Deep Scraper - Enhanced")
         print("=" * 60)
         
         # Henüz scrape edilmemiş haberleri al
@@ -298,6 +466,7 @@ class KeywordSearchScraper:
             return
         
         total_scraped = 0
+        category_stats = {}
         
         # Her haber için işlem yap
         for i, news in enumerate(unscraped_news, 1):
@@ -314,6 +483,10 @@ class KeywordSearchScraper:
             
             if scraped_news:
                 total_scraped += 1
+                
+                # Kategori istatistiklerini güncelle
+                cat = scraped_news.get('category', 'guncel')
+                category_stats[cat] = category_stats.get(cat, 0) + 1
                 
                 # Keyword'leri çıkar
                 keywords = self.extract_keywords_from_page(url)
@@ -333,9 +506,16 @@ class KeywordSearchScraper:
                         kw_scraped = self.scrape_and_save_news(kw_url, pub_date=kw_pub_date)
                         if kw_scraped:
                             total_scraped += 1
+                            # Kategori istatistiklerini güncelle
+                            cat = kw_scraped.get('category', 'guncel')
+                            category_stats[cat] = category_stats.get(cat, 0) + 1
         
+        # İstatistikleri göster
         print("\n" + "=" * 60)
         print(f"✓ Tamamlandı! Toplam {total_scraped} haber scrape edildi")
+        print("\nKategori Dağılımı:")
+        for cat, count in sorted(category_stats.items()):
+            print(f"  {cat:15s}: {count:3d} haber")
         print("=" * 60)
 
 
