@@ -214,14 +214,29 @@ class GamificationService:
             100 XP → Level 0, Node 1, XP 0
             200 XP → Level 1, Node 0, XP 0
         """
-        remaining_xp = total_xp
-        level = 0  # ✅ DEĞİŞTİ: 1 → 0
+        if total_xp == 0:
+            return (0, 0, 0)
         
-        while True:
+        remaining_xp = total_xp
+        level = 0
+        
+        while remaining_xp > 0:  # ✅ DEĞİŞTİ: True → remaining_xp > 0
             nodes_in_level = self._get_nodes_in_level(level)
             xp_for_level = nodes_in_level * 100
             
-            if remaining_xp < xp_for_level:
+            # ✅ DEĞİŞTİ: Önce level tamamlanma kontrolü
+            if remaining_xp >= xp_for_level:
+                # Level tamamlandı, sonrakine geç
+                remaining_xp -= xp_for_level
+                level += 1
+                
+                print(f"   ✓ Level {level-1} tamamlandı, remaining XP: {remaining_xp}")
+                
+                # Safety check
+                if level > 100:
+                    print(f"⚠️ Max level reached!")
+                    return (100, 0, 0)
+            else:
                 # Bu level'deyiz
                 node = remaining_xp // 100
                 current_xp = remaining_xp % 100
@@ -229,15 +244,10 @@ class GamificationService:
                 print(f"🔢 [Calculate] Total XP: {total_xp} → Level {level}, Node {node}, Current XP {current_xp}")
                 
                 return (level, node, current_xp)
-            
-            # Sonraki level'e geç
-            remaining_xp -= xp_for_level
-            level += 1
-            
-            # Safety: Max level 100
-            if level > 100:
-                print(f"⚠️ [Calculate] Max level reached!")
-                return (100, 0, 0)
+        
+        # Tam level sınırındaysa (200, 400, 600 XP gibi)
+        print(f"🔢 [Calculate] Total XP: {total_xp} → Level {level}, Node 0, Current XP 0")
+        return (level, 0, 0)
 # ============ NODE MANAGEMENT ============
     
     def has_available_nodes(self, user_id: str, required_nodes: int = 1) -> bool:

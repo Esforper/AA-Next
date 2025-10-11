@@ -109,24 +109,41 @@ class GamificationApiService {
 
   /// Kullanıcı istatistiklerini al
   /// GET /api/gamification/stats/{userId}
-  Future<Map<String, dynamic>> getUserStats({
-    required String userId,
-  }) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/api/gamification/stats/$userId');
-      
-      debugPrint('🎮 [API] GET $uri');
+/// Kullanıcı istatistiklerini getir (FULL STATE)
+/// GET /api/gamification/stats/{user_id}
+Future<Map<String, dynamic>> getUserStats({required String userId}) async {
+  try {
+    final uri = Uri.parse('$_baseUrl/api/gamification/stats/$userId');
+    
+    debugPrint('🎮 [API] GET $uri');
 
-      final response = await http.get(
-        uri,
-        headers: await _getHeaders(),
-      );
+    final response = await http.get(
+      uri,
+      headers: await _getHeaders(),
+    );
 
-      return _handleResponse(response);
-    } catch (e) {
-      return _handleError(e);
+    final result = _handleResponse(response);
+    
+    // nodes_in_level ekle (backend'den gelmiyorsa hesapla)
+    if (result['success'] == true && result['nodes_in_level'] == null) {
+      final level = result['current_level'] ?? 0;
+      result['nodes_in_level'] = _calculateNodesInLevel(level);
     }
+    
+    return result;
+  } catch (e) {
+    return _handleError(e);
   }
+}
+
+// Helper: Level'e göre node sayısı
+int _calculateNodesInLevel(int level) {
+  if (level < 5) return 2;
+  if (level < 10) return 4;
+  if (level < 15) return 6;
+  if (level < 20) return 8;
+  return 10;
+}
 
   /// Günlük progress al
   /// GET /api/gamification/daily-progress/{userId}
